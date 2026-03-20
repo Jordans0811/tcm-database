@@ -400,10 +400,12 @@ const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNk
 async function loadTCMData() {
   try {
     let response = await fetch(dataUrl);
-    let jsonData = await response.json();
-    receiveBackgroundUpdate(jsonData); // This is your existing function!
+    let textData = await response.text(); // Get raw text, not JSON, to prevent the crash!
+    
+    localStorage.setItem("tcmpoints_vault", textData); // Save a permanent offline copy
+    receiveBackgroundUpdate(textData); // Pass to your existing function safely
   } catch (e) {
-    console.log("Offline or failed to fetch. Service worker will provide cached data if available.");
+    console.log("Offline or failed to fetch. Relying on local storage.");
   }
 }
 
@@ -418,9 +420,8 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-
-  
-  let rawPoints = /*INJECT_DATA_HERE*/[];
+// Instant Offline Boot (Replaces Scriptable's INJECT_DATA_HERE)
+let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   
   let points = [];
   let filteredPoints = []; 
@@ -489,13 +490,13 @@ document.addEventListener("visibilitychange", () => {
     
     const allLabel = document.createElement("label");
     allLabel.className = "checkbox-label";
-    allLabel.innerHTML = \`<input type="checkbox" value="All" onchange="toggleChannel(this)" \${activeChannels.includes("All") ? "checked" : ""}> <strong>All Channels</strong>\`;
+    allLabel.innerHTML = `<input type="checkbox" value="All" onchange="toggleChannel(this)" ${activeChannels.includes("All") ? "checked" : ""}> <strong>All Channels</strong>`;
     container.appendChild(allLabel);
 
     uniqueChannels.forEach(chan => {
       const lbl = document.createElement("label");
       lbl.className = "checkbox-label";
-      lbl.innerHTML = \`<input type="checkbox" value="\${chan}" onchange="toggleChannel(this)" \${activeChannels.includes(chan) ? "checked" : ""}> \${chan}\`;
+      lbl.innerHTML = `<input type="checkbox" value="${chan}" onchange="toggleChannel(this)" ${activeChannels.includes(chan) ? "checked" : ""}> ${chan}`;
       container.appendChild(lbl);
     });
   }
@@ -672,10 +673,10 @@ document.addEventListener("visibilitychange", () => {
   // Expand standard abbreviations on the fly
   function expandTCMPoint(term) {
     term = term.trim();
-    const match = term.match(/^([a-z\\.]+)(?:[\\s\\-\\.]*)(\\d+)$/i);
+    const match = term.match(/^([a-z\.]+)(?:[\s\-\.]*)(\d+)$/i);
     if (!match) return [term];
 
-    let rawLetters = match[1].toLowerCase().replace(/\\./g, ""); 
+    let rawLetters = match[1].toLowerCase().replace(/\./g, ""); 
     let numbers = match[2];
 
     const aliases = {
@@ -717,8 +718,8 @@ document.addEventListener("visibilitychange", () => {
     const headerClearBtn = document.getElementById("headerClearBtn");
     if (query.length > 0) headerClearBtn.style.display = "flex"; else headerClearBtn.style.display = "none";
 
-    query = query.replace(/\\s*\\|\\s*/g, "|");
-    const tokenRegex = /(?:[^\\s"]+|"[^"]*")+/g;
+    query = query.replace(/\s*\|\s*/g, "|");
+    const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
     const rawKeywords = query.match(tokenRegex) || [];
     
     const headers = []; const fullNames = []; const exclude = []; const parsedIncludes = []; 
@@ -739,13 +740,13 @@ document.addEventListener("visibilitychange", () => {
         parts.forEach(part => {
           if (part.startsWith('"') && part.endsWith('"') && part.length >= 2) {
             const phrase = part.slice(1, -1).toLowerCase();
-            const safePhrase = phrase.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&');
-            orGroup.push({ type: 'exact', regex: new RegExp("\\\\b" + safePhrase + "\\\\b", "i"), regexString: "\\\\b" + safePhrase + "\\\\b", text: phrase });
+            const safePhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            orGroup.push({ type: 'exact', regex: new RegExp("\\b" + safePhrase + "\\b", "i"), regexString: "\\b" + safePhrase + "\\b", text: phrase });
           } else {
             const phrase = part.toLowerCase();
             const expandedTerms = expandTCMPoint(phrase);
             expandedTerms.forEach(ext => {
-              const safePhrase = ext.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&');
+              const safePhrase = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               orGroup.push({ type: 'substring', regexString: safePhrase, text: ext });
             });
           }
@@ -758,8 +759,8 @@ document.addEventListener("visibilitychange", () => {
     activeTextTerms = []; activeParsedIncludes = parsedIncludes; 
 
     parsedIncludes.forEach(group => { group.forEach(item => { regexParts.push(item.regexString); activeTextTerms.push(item.text); }); });
-    headers.forEach(h => { regexParts.push(h.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&')); activeTextTerms.push(h); });
-    fullNames.forEach(f => { regexParts.push(f.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&')); activeTextTerms.push(f); });
+    headers.forEach(h => { regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(h); });
+    fullNames.forEach(f => { regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(f); });
 
     const validRegexParts = regexParts.filter(t => t.trim().length > 0).sort((a, b) => b.length - a.length);
     if (validRegexParts.length > 0) activeHighlightRegex = new RegExp("(" + validRegexParts.join("|") + ")", "gi");
@@ -825,10 +826,10 @@ document.addEventListener("visibilitychange", () => {
 
   // Parses Markdown Tables and supports Cell Merging (Colspan/Rowspan)
   function formatTextWithTables(text) {
-    let normalizedText = text.replace(/\\r?\\n/g, '\\n');
-    if (!normalizedText.includes('|')) return normalizedText.replace(/\\n/g, "<br>");
+    let normalizedText = text.replace(/\r?\n/g, '\n');
+    if (!normalizedText.includes('|')) return normalizedText.replace(/\n/g, "<br>");
     
-    const lines = normalizedText.split('\\n');
+    const lines = normalizedText.split('\n');
     let output = "";
     let inTable = false;
     let tableRows = [];
@@ -898,7 +899,7 @@ document.addEventListener("visibilitychange", () => {
     // Process each line of text
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i].trim();
-      let cleanLine = line.replace(/<[^>]+>/g, '').replace(/\\s/g, ''); 
+      let cleanLine = line.replace(/<[^>]+>/g, '').replace(/\s/g, ''); 
       
       if (line.startsWith('|') && line.endsWith('|')) {
         if (!inTable) {
@@ -908,7 +909,7 @@ document.addEventListener("visibilitychange", () => {
         }
         
         // Detect markdown header separator (e.g., |---|---|)
-        if (/^\\|(?:[-:]+\\|)+$/.test(cleanLine)) {
+        if (/^\|(?:[-:]+\|)+$/.test(cleanLine)) {
           if (tableRows.length > 0) isHeaderRow[tableRows.length - 1] = true;
           continue; 
         }
@@ -932,21 +933,19 @@ document.addEventListener("visibilitychange", () => {
     return output;
   }
 
-
-
   // --- NEW: Linkify Points System ---
   function linkifyPoints(htmlText) {
     if (!htmlText) return "";
     
     // Regex to catch standard TCM point abbreviations (e.g. ST-36, ST 36, DU 20, EX-HN 3)
-    const regex = /\\b(LU|LI|L\\.I\\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|DU|GV|RN|REN|CV|EX-[A-Z]+)\\s*-?\\s*(\\d+)\\b/gi;
+    const regex = /\b(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*(\d+)\b/gi;
     
     // Split by HTML tags to avoid replacing text inside attributes or existing tags
     const parts = htmlText.split(/(<[^>]*>)/g);
     for (let i = 0; i < parts.length; i++) {
       if (!parts[i].startsWith("<")) {
         parts[i] = parts[i].replace(regex, (match, chan, num) => {
-          return \`<span class="point-link" onclick="event.stopPropagation(); openQuickPeek('\${chan}', '\${num}')">\${match}</span>\`;
+          return `<span class="point-link" onclick="event.stopPropagation(); openQuickPeek('${chan}', '${num}')">${match}</span>`;
         });
       }
     }
@@ -955,7 +954,7 @@ document.addEventListener("visibilitychange", () => {
 
   function openQuickPeek(chan, num) {
     // Standardize the channel prefix to match database IDs
-    chan = chan.toUpperCase().replace(/\\./g, "");
+    chan = chan.toUpperCase().replace(/\./g, "");
     const aliases = {
       'HE': 'HT', 'TB': 'SJ', 'TE': 'SJ', 'TH': 'SJ', 'P': 'PC',
       'LIV': 'LV', 'KID': 'KD', 'UB': 'BL', 'REN': 'REN', 'RN': 'CV', 'DU': 'DU'
@@ -1041,7 +1040,6 @@ document.addEventListener("visibilitychange", () => {
     addDetail("Notes", point.Notes);
     addDetail("CAM Notes", point["CAM Notes"]);
   }
-  // --- END NEW SYSTEM ---
 
   function showToast(msg) {
     let toast = document.getElementById("toast");
@@ -1099,7 +1097,7 @@ document.addEventListener("visibilitychange", () => {
     const addDetail = (label, value) => {
       if (!value) return; 
       const div = document.createElement("div"); 
-      const paras = value.split(/\\r?\\n/).filter(p => p.trim() !== "");
+      const paras = value.split(/\r?\n/).filter(p => p.trim() !== "");
       let matchingParas = []; let nonMatchingParas = [];
 
       if (activeParsedIncludes && activeParsedIncludes.length > 0) {
@@ -1119,7 +1117,6 @@ document.addEventListener("visibilitychange", () => {
         paras.forEach(p => matchingParas.push(p));
       }
 
-      // ADDED: linkifyPoints wraps the fully formatted text
       const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
 
       if (activeHighlightRegex && nonMatchingParas.length > 0) {
@@ -1129,8 +1126,7 @@ document.addEventListener("visibilitychange", () => {
           div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
         } else {
           div.className = "point-notes";
-          // ADDED: linkifyPoints wraps the filtered text too
-          const filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\\n\\n<span style='color:#999; font-size:11px;'>[...]</span>\\n\\n")));
+          const filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
           div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
         }
       } else {
@@ -1341,42 +1337,41 @@ document.addEventListener("visibilitychange", () => {
   function closeEditModal() { document.getElementById("editModal").style.display = "none"; currentEditingPoint = null; currentEditingField = ""; }
 
   function saveEdit() {
-  const newValue = document.getElementById("editArea").value;
-  document.getElementById("saveBtn").textContent = "Saving...";
-  document.getElementById("saveBtn").disabled = true; 
-  document.getElementById("cancelBtn").disabled = true;
-  document.getElementById("editError").style.display = "none";
-  
-  const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
-  
-  // The new CORS-bypassing fetch disguised as plain text
-  fetch(dataUrl, {
-    redirect: "follow", // Forces Safari to follow Google's internal routing
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8", // The magic disguise
-    },
-    body: JSON.stringify(payload)
-  })
-  .then(response => response.json()) // Google sends the success message back
-  .then(result => {
-    if (result.success) {
-      // Pass the new text to your existing success function to update the screen
-      completeSave(newValue); 
-    } else {
-      // If Google couldn't find the row, show the error
-      failSave("Google error: " + result.error); 
-    }
-  })
-  .catch(err => {
-    failSave("Network error or offline");
-  });
-}
+    const newValue = document.getElementById("editArea").value;
+    document.getElementById("saveBtn").textContent = "Saving...";
+    document.getElementById("saveBtn").disabled = true; 
+    document.getElementById("cancelBtn").disabled = true;
+    document.getElementById("editError").style.display = "none";
+    
+    const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
+    
+    fetch(dataUrl, {
+      redirect: "follow", 
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8", 
+      },
+      body: JSON.stringify(payload)
+    })
+    .then(response => response.json()) 
+    .then(result => {
+      if (result.success) {
+        completeSave(newValue); 
+      } else {
+        failSave("Google error: " + result.error); 
+      }
+    })
+    .catch(err => {
+      failSave("Network error or offline");
+    });
+  }
 
 
   function completeSave(newValue) {
     currentEditingPoint[currentEditingField] = newValue; 
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
+    
+    localStorage.setItem("tcmpoints_vault", JSON.stringify(points));
     
     const fields = [
       currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
@@ -1386,7 +1381,7 @@ document.addEventListener("visibilitychange", () => {
     ];
     let paras = [];
     fields.forEach(f => {
-      if (f) paras.push(...String(f).split(/\\r?\\n/).filter(p => p.trim() !== ""));
+      if (f) paras.push(...String(f).split(/\r?\n/).filter(p => p.trim() !== ""));
     });
     currentEditingPoint._paragraphs = paras;
 
