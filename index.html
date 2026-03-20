@@ -1271,12 +1271,17 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       document.documentElement.style.setProperty('--detail-header-height', headerHeightPx + 'px');
       const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
       
+      // Calculate the precise location of the Details Panel (ignoring the scroller)
+      const panelRect = panel.getBoundingClientRect();
+      const appRect = appContainer.getBoundingClientRect();
+      const targetScroll = appContainer.scrollTop + (panelRect.top - appRect.top) - mainHeaderH;
+      
       if (!isSilentOpen && !isSwipe) {
-        // Normal Tap: Smooth glide to the top of the details
-        appContainer.scrollTo({ top: rowDiv.offsetTop - mainHeaderH - 10, behavior: 'smooth' });
+        // Normal Tap: Smooth glide exactly to the details sticky header
+        appContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
       } else if (isSwipe) {
-        // Swipe: Instant snap to the top so you aren't stranded in blank space
-        appContainer.scrollTo({ top: rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
+        // Swipe: Instant snap directly to the sticky details header
+        appContainer.scrollTo({ top: targetScroll, behavior: 'auto' });
       }
     }, 50); 
   });
