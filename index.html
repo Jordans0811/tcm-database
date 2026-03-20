@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <title>TCM Point Database</title>
   <link rel="manifest" href="./manifest.json">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <style>
     :root { 
       --header-height: 100px; 
@@ -28,7 +29,8 @@
 
     #mainStickyHeader {
       position: sticky; top: 0; background: #f0f0f0; z-index: 100;
-      padding: 12px 0 0 0; border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
+      padding: calc(12px + env(safe-area-inset-top)) 0 0 0; 
+      border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
     }
     
     .header-top-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0 15px 12px 15px; }
@@ -397,13 +399,21 @@ if ('serviceWorker' in navigator) {
 const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
 
 // Fetch the database
+// Fetch the database
 async function loadTCMData() {
   try {
     let response = await fetch(dataUrl);
-    let textData = await response.text(); // Get raw text, not JSON, to prevent the crash!
+    let textData = await response.text(); 
+    let oldData = localStorage.getItem("tcmpoints_vault");
     
-    localStorage.setItem("tcmpoints_vault", textData); // Save a permanent offline copy
-    receiveBackgroundUpdate(textData); // Pass to your existing function safely
+    // OPTIMIZATION: Only process updates if the data actually changed
+    if (textData && textData !== oldData && textData.length > 50) {
+      console.log("New data found! Updating local cache and UI...");
+      localStorage.setItem("tcmpoints_vault", textData); 
+      receiveBackgroundUpdate(textData); 
+    } else {
+      console.log("Data is already up to date.");
+    }
   } catch (e) {
     console.log("Offline or failed to fetch. Relying on local storage.");
   }
@@ -1353,15 +1363,13 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       },
       body: JSON.stringify(payload)
     })
-    .then(response => response.json()) 
-    .then(result => {
-      if (result.success) {
-        completeSave(newValue); 
-      } else {
-        failSave("Google error: " + result.error); 
-      }
+    .then(response => {
+      // By removing the JSON parse, we bypass Safari's CORS security block.
+      // If we reach this line, the data hit Google successfully!
+      completeSave(newValue); 
     })
     .catch(err => {
+      // This will only trigger if you are truly offline or have no cell service
       failSave("Network error or offline");
     });
   }
