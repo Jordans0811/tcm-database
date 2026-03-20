@@ -5,7 +5,7 @@
   <title>TCM Point Database</title>
   <link rel="manifest" href="./manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <style>
     :root { 
@@ -28,9 +28,11 @@
       contain: layout style paint;
     }
 
-    #mainStickyHeader {
+   #mainStickyHeader {
       position: sticky; top: 0; background: #f0f0f0; z-index: 100;
-      padding: 12px 0 0 0; border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
+      /* env(safe-area-inset-top) automatically calculates the size of your notch/clock */
+      padding: calc(12px + env(safe-area-inset-top)) 0 0 0; 
+      border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
     }
     
     .header-top-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0 15px 12px 15px; }
