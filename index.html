@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TCM Point Database</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <style>
+    :root { 
+      --header-height: 100px; 
+      --detail-header-height: 105px; 
+    }
+    html, body {
+      height: 100%; overflow: hidden; margin: 0; padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f0f0; font-size: 14px;
+    }
+   #appContainer {
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+      transform: translateZ(0);
+      will-change: scroll-position;
+      contain: layout style paint;
+    }
+
+    #mainStickyHeader {
+      position: sticky; top: 0; background: #f0f0f0; z-index: 100;
+      padding: 12px 0 0 0; border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
+    }
+    
+    .header-top-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0 15px 12px 15px; }
+    h1 { font-size: 22px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
+    #resultsCounter { font-size: 13px; color: #8e8e93; margin: 0; font-weight: 500;}
+    #searchQueryDisplay { font-size: 12px; color: #8e8e93; margin: 2px 0 0 0; font-style: italic; display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65vw; }
+    
+    /* Header & Icon Buttons */
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+    .icon-btn {
+      width: 42px; height: 42px; border-radius: 50%; border: none;
+      background: #e3e3e8; color: #007aff; font-size: 16px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    .icon-btn:active { opacity: 0.7; }
+
+    /* Contextual Clear Search button (Red/Orange) */
+    .clear-active-btn { background: rgba(255, 59, 48, 0.1); color: #ff3b30; font-weight: 800; }
+    .clear-active-btn:active { background: rgba(255, 59, 48, 0.2); }
+
+    /* The Dropdown Search Area (Made INSTANT to fix scroll jumping) */
+    #searchDropdown {
+      display: none; 
+      background: #f0f0f0; 
+      padding: 10px 15px 15px 15px; 
+      border-bottom: 1px solid #d1d1d6;
+    }
+    #searchDropdown.expanded {
+      display: block; 
+    }
+
+    .search-sort-row { display: flex; gap: 10px; align-items: center; width: 100%; max-width: 800px; margin: 0 auto; }
+    
+    .search-container { flex: 1; position: relative; display: flex; align-items: center; }
+    .search-container::before {
+      content: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3ccircle cx='11' cy='11' r='8'/%3e%3cline x1='21' y1='21' x2='16.65' y2='16.65'/%3e%3c/svg%3e");
+      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+      width: 16px; height: 16px; opacity: 0.7; pointer-events: none; z-index: 1;
+    }
+    .search-box {
+      width: 100%; padding: 10px 40px 10px 34px; font-size: 16px;
+      background-color: #e3e3e8; border: none; border-radius: 10px; color: #000; box-sizing: border-box;
+      -webkit-appearance: none;
+    }
+    .search-box:focus { outline: none; box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3); }
+    .search-box::placeholder { color: #8e8e93; }
+    
+    .clear-btn-hitbox {
+      position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+      width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; z-index: 2;
+    }
+    .clear-btn-hitbox:active .clear-btn-icon { opacity: 0.7; }
+    .clear-btn-icon {
+      font-size: 11px; font-weight: 800; color: #fff; background: #c7c7cc; border-radius: 50%; 
+      width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; pointer-events: none;
+    }
+    
+    #cardContainer { padding-bottom: 50vh; }
+
+    .channel-row { 
+      margin-top: 15px; display: flex; flex-direction: column; 
+      width: 100%; max-width: 800px; margin-left: auto; margin-right: auto; 
+    }
+    .row-title { font-size: 18px; font-weight: 700; padding: 0 15px; margin-bottom: 10px; color: #333; }
+    
+    .scroller {
+      display: flex; overflow-x: auto; padding: 0 15px 15px 15px; gap: 12px;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .scroller::-webkit-scrollbar { display: none; }
+
+    .point-card {
+      flex: 0 0 auto; width: 100px; background: white; border-radius: 8px; overflow: hidden;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.15); cursor: pointer; display: flex; flex-direction: column;
+      border: 2px solid transparent; transition: border-color 0.2s ease, transform 0.1s;
+    }
+    .point-card:active { transform: scale(0.96); }
+    .point-card.active { border-color: #007aff; }
+
+    .card-img-container { width: 100%; height: 130px; background: #fff; display: flex; justify-content: center; align-items: center; }
+    .card-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .card-label { padding: 6px 4px; text-align: center; font-weight: 800; font-size: 14px; background: white; border-top: 1px solid #eee; }
+
+    .detail-panel { display: none; width: 100%; max-width: 900px; margin: 0 auto 20px auto; padding: 0 15px; box-sizing: border-box; }
+    .detail-panel.open { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .point-details { width: 100%; padding: 12px; background: #f0f0f5; box-sizing: border-box; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    
+    .detail-header-info { 
+      position: sticky; top: var(--header-height); z-index: 90;
+      background: rgba(240, 240, 245, 0.98); backdrop-filter: blur(8px);
+      margin: -12px -12px 15px -12px; padding: 12px 15px; 
+      border-bottom: 1px solid #d1d1d6; box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+      display: flex; align-items: center; gap: 12px;
+      border-top-left-radius: 10px; border-top-right-radius: 10px;
+    }
+    .detail-header-info img { width: 50px; height: 70px; object-fit: contain; border-radius: 4px; cursor: pointer; background: white; padding: 2px; flex-shrink: 0; }
+    .detail-title-group { flex: 1; min-width: 0; }
+    .detail-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .detail-meta { font-size: 12px; color: #666; display: flex; flex-wrap: wrap; gap: 4px; line-height: 1.2; }
+    .detail-meta span:not(:last-child)::after { content: "•"; margin-left: 5px; color: #ccc; }
+
+    .detail-nav-group {
+      display: flex; background: white; border-radius: 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow: hidden; flex-shrink: 0;
+    }
+    .detail-nav-btn {
+      padding: 8px 14px; border: none; background: transparent; font-size: 16px;
+      font-weight: bold; color: #cc5500; cursor: pointer;
+    }
+    .detail-nav-btn:active { background: #f0f0f0; }
+
+    .sticky-toggle-container {
+      position: sticky; bottom: 20px; z-index: 89; 
+      display: flex; justify-content: center; width: 100%;
+      pointer-events: none; margin-top: 15px; padding-bottom: 5px;
+    }
+    .card-toggle-btn {
+      background: rgba(227, 242, 253, 0.95); color: #007aff; border: 1px solid #bbdefb;
+      border-radius: 25px; padding: 12px 24px; font-size: 14px; font-weight: 700;
+      cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      pointer-events: auto; backdrop-filter: blur(8px); transition: background 0.2s, transform 0.1s;
+    }
+    .card-toggle-btn:active { background: #bbdefb; transform: scale(0.97); }
+
+    .detail-panel:not(.show-all-text) .full-view { display: none; }
+    .detail-panel.show-all-text .filtered-view { display: none; }
+    .detail-panel.show-all-text .full-view { display: block; }
+    .detail-panel:not(.show-all-text) .hidden-section { display: none !important; }
+
+    .point-notes { 
+      background: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px;
+      margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column; 
+    }
+    
+    .section-label {
+      background: #f8f8f8; padding: 6px 10px; font-size: 12px; font-weight: 700;
+      text-transform: uppercase; color: #cc5500; border-bottom: 1px solid #e0e0e0; letter-spacing: 0.5px;
+      border-top-left-radius: 8px; border-top-right-radius: 8px; 
+      position: sticky; top: calc(var(--header-height) + var(--detail-header-height)); z-index: 80; 
+    }
+        .section-content { 
+      padding: 10px; font-size: 14px; color: #2c2c2e; 
+      line-height: 1.35; overflow-x: auto; 
+      -webkit-overflow-scrolling: touch; 
+    }
+
+    
+    .action-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; box-sizing: border-box; }
+    .action-buttons button { display: block; width: 100%; box-sizing: border-box; text-align: center; padding: 10px; border-radius: 4px; border: none; color: white; font-size: 14px; font-weight: 600; background-color: #CC5500; cursor: pointer; }
+    
+    mark { background-color: #ffd54f; color: black; padding: 0; border-radius: 2px; }
+    
+    #lightbox, #editModal, #channelModal, #quickPeekModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center; }
+    #lightbox { background: rgba(0,0,0,0.9); z-index: 10002; flex-direction: column; }
+    #lightbox-title { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 16px; letter-spacing: 0.5px; }
+    #lightbox img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 8px; }
+    
+    .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .modal-title { margin: 0; font-size: 18px; color: black; }
+    #editArea { height: 200px; width: 100%; box-sizing: border-box; font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; resize: vertical; }
+    .modal-buttons { display: flex; justify-content: space-between; gap: 10px; }
+    .modal-buttons button { flex: 1; padding: 12px; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .cancel-btn { background: #e5e5ea; color: black; }
+    .save-btn { background: #34c759; color: white; }
+    #saveBtn:disabled { background: #999; }
+    #editError { color: red; font-size: 13px; font-weight: bold; display: none; margin: 0; text-align: center; }
+    
+    .checkbox-label { display: flex; align-items: center; gap: 12px; font-size: 16px; color: #333; cursor: pointer; padding: 4px 0; }
+    .checkbox-label input { width: 18px; height: 18px; cursor: pointer; }
+
+    #toast {
+      visibility: hidden; min-width: 200px; background-color: #333; color: #fff;
+      text-align: center; border-radius: 20px; padding: 10px 20px;
+      position: fixed; z-index: 10003; left: 50%; bottom: 30px;
+      transform: translateX(-50%); font-size: 14px;
+      opacity: 0; transition: opacity 0.5s, bottom 0.5s;
+    }
+    #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+
+    .help-icon {
+      width: 28px; height: 28px; border-radius: 50%; background: #e3e3e8; color: #8e8e93;
+      display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .help-icon:active { opacity: 0.7; }
+
+    #searchHelpTooltip {
+      display: none; position: absolute; top: calc(100% - 5px); left: 50%; transform: translateX(-50%);
+      width: calc(100% - 30px); max-width: 400px; background: rgba(240, 240, 245, 0.95); backdrop-filter: blur(10px);
+      padding: 12px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid #d1d1d6; 
+      z-index: 101; font-size: 13px; color: #333;
+    }
+    #searchHelpTooltip.show { display: block; animation: fadeIn 0.2s ease; }
+    .help-row { display: flex; margin-bottom: 6px; align-items: baseline; }
+    .help-row:last-child { margin-bottom: 0; }
+    .help-row span { font-family: monospace; font-weight: bold; background: #e3e3e8; padding: 2px 6px; border-radius: 4px; margin-right: 8px; color: #007aff; }
+
+    /* Table Styles */
+    .tcm-table {
+      width: 100%; border-collapse: collapse; margin: 12px 0;
+      font-size: 14px; border-radius: 6px; overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .tcm-table th, .tcm-table td {
+      border: 1px solid #d1d1d6; padding: 10px; text-align: left;
+    }
+    .tcm-table th { background-color: #e3e3e8; font-weight: 800; color: #333; }
+
+    /* Point Link Styles */
+    .point-link {
+      color: #007aff;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-color: rgba(0, 122, 255, 0.4);
+      text-underline-offset: 2px;
+      transition: background-color 0.2s;
+      border-radius: 3px;
+      padding: 0 2px;
+    }
+    .point-link:active { background-color: rgba(0, 122, 255, 0.15); }
+
+    /* Quick Peek Modal Specifics */
+    #quickPeekModal .quick-peek-content {
+      max-height: 85vh; width: 95%; max-width: 600px; padding: 0; overflow-y: auto; background: #f0f0f5;
+    }
+    #quickPeekModal .detail-header-info { top: 0; margin: 0; border-top-left-radius: 12px; border-top-right-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    #quickPeekModal .point-notes { margin: 12px; }
+    #quickPeekModal .section-label { top: 90px; } /* Sticky label adjustment for modal */
+
+    /* Dark Mode */
+    @media (prefers-color-scheme: dark) {
+      body, #mainStickyHeader, #searchDropdown { background: #000000; border-color: #38383a; }
+      h1, .modal-title, .row-title, .detail-title, .checkbox-label, .card-label { color: #ffffff; }
+      #resultsCounter, #searchQueryDisplay, .detail-meta { color: #8e8e93; }
+      .detail-meta span:not(:last-child)::after { color: #555; }
+      
+      .search-box { background-color: #1c1c1e; color: #ffffff; }
+      .icon-btn { background: #1c1c1e; color: #0a84ff; }
+      .clear-active-btn { background: rgba(255, 69, 58, 0.15); color: #ff453a; }
+      .clear-btn-icon { background: #3a3a3c; color: #8e8e93; }
+      #editArea { background: #1c1c1e; color: #ffffff; border-color: #38383a; }
+
+      .point-card, .modal-content, .card-label { background: #1c1c1e; border-color: #333; }
+      .point-details { background: #000000; }
+      
+      .detail-header-info { background: rgba(0,0,0,0.98); border-color: #333; }
+      .detail-nav-group { background: #1c1c1e; }
+      .detail-nav-btn:active { background: #2c2c2e; }
+
+      .point-notes { background: #1c1c1e; border-color: #333; }
+      .section-label { background: #2c2c2e; border-color: #333; color: #bbb; }
+      .section-content { color: #eee; }
+      
+      .card-toggle-btn { background: rgba(28, 44, 62, 0.95); border-color: #2c3e50; color: #64b5f6; }
+      .card-toggle-btn:active { background: #2c3e50; }
+      .cancel-btn { background: #3a3a3c; color: #ffffff; }
+      .card-img-container, .detail-header-info img { background: #1c1c1e; }
+      
+      .help-icon { background: #1c1c1e; color: #8e8e93; }
+      #searchHelpTooltip { background: rgba(28, 28, 30, 0.95); border-color: #38383a; color: #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+      .help-row span { background: #3a3a3c; color: #0a84ff; }
+
+      .tcm-table { box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+      .tcm-table th, .tcm-table td { border-color: #38383a; }
+      .tcm-table th { background-color: #2c2c2e; color: #eee; }
+
+      .point-link { color: #64b5f6; text-decoration-color: rgba(100, 181, 246, 0.4); }
+      .point-link:active { background-color: rgba(100, 181, 246, 0.2); }
+      #quickPeekModal .quick-peek-content { background: #000000; }
+    }
+
+    /* iPad / Desktop Adaptive Layout */
+    @media (min-width: 1900px) {
+      #searchDropdown { display: block !important; padding: 10px 15px 15px 15px; border-bottom: 1px solid #d1d1d6; }
+      .search-toggle-btn { display: none !important; } 
+    }
+  </style>
+</head>
+<body>
+  <div id="lightbox" onclick="closeLightbox()">
+    <div id="lightbox-title"></div>
+    <img id="lightbox-img" src="">
+  </div>
+  
+  <div id="toast">🔄 Data synced</div>
+
+  <div id="channelModal">
+    <div class="modal-content" style="max-height: 65vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 class="modal-title" style="margin-bottom: 0;">Select Channels</h3>
+        <button id="cancelBtn" onclick="cancelFilter()" style="background: transparent; border: none; font-size: 24px; cursor: pointer; color: #555; padding: 0; line-height: 1;" aria-label="Close">&times;</button>
+      </div>
+      <div id="channelCheckboxes" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding: 5px 0;"></div>      
+      <div class="modal-buttons">
+        <button id="applyFilterBtn" class="save-btn" onclick="applyChannels()">Apply Filter</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="quickPeekModal" onclick="if(event.target===this) closeQuickPeek()">
+    <div class="modal-content quick-peek-content" id="quickPeekContainer">
+      </div>
+  </div>
+
+  <div id="editModal">
+    <div class="modal-content">
+      <h3 id="editTitle" class="modal-title">Edit Notes</h3>
+      <textarea id="editArea" placeholder="Type your notes here..."></textarea>
+      <div id="editError"></div>
+      <div class="modal-buttons">
+        <button id="cancelBtn" class="cancel-btn" onclick="closeEditModal()">Cancel</button>
+        <button id="saveBtn" class="save-btn" onclick="saveEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="appContainer">
+    <div id="mainStickyHeader">
+      <div class="header-top-row">
+        <div>
+          <h1>Point Database</h1>
+          <p id="resultsCounter">Search Results: 0 of 0</p>
+          <p id="searchQueryDisplay"></p>
+        </div>
+        <div class="header-actions">
+          <button id="headerClearBtn" class="icon-btn clear-active-btn" onclick="clearAndCloseSearch()" style="display: none;">✕</button>
+          <button class="icon-btn search-toggle-btn" onclick="toggleSearchDropdown()">🔍</button>
+          <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
+        </div>
+      </div>
+      
+      <div id="searchDropdown">
+        <div class="search-sort-row">
+          <div class="search-container">
+            <input id="searchInput" class="search-box" type="text" placeholder='Search exact match, @short, #full...' />
+            <div class="clear-btn-hitbox" onclick="clearSearchText()"><span class="clear-btn-icon">✕</span></div>
+          </div>
+          <div class="help-icon" onclick="toggleHelp()">?</div>
+        </div>
+      </div>
+      
+      <div id="searchHelpTooltip">
+        <div class="help-row"><span>space</span> AND (e.g., <i>cough asthma</i>)</div>
+        <div class="help-row"><span>|</span> OR (e.g., <i>cough | asthma</i>)</div>
+        <div class="help-row"><span>" "</span> Exact phrase (e.g., <i>"clear heat"</i>)</div>
+        <div class="help-row"><span>@</span> Short Name (e.g., <i>@LU</i>)</div>
+        <div class="help-row"><span>#</span> Full Name (e.g., <i>#wood</i>)</div>
+        <div class="help-row"><span>&lt;&gt;</span> Exclude (e.g., <i>&lt;&gt;pain</i>)</div>
+      </div>
+    </div> 
+    <div id="cardContainer"></div>
+  </div>
+
+<script>
+// Register the Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .then(() => console.log('Bouncer is active!'))
+    .catch(err => console.error('Bouncer failed:', err));
+}
+
+const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
+
+// Fetch the database
+async function loadTCMData() {
+  try {
+    let response = await fetch(dataUrl);
+    let jsonData = await response.json();
+    receiveBackgroundUpdate(jsonData); // This is your existing function!
+  } catch (e) {
+    console.log("Offline or failed to fetch. Service worker will provide cached data if available.");
+  }
+}
+
+// Initial Load
+loadTCMData();
+
+// The Visibility Tripwire (Syncs instantly when you switch back to the app)
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    console.log("App resumed. Silently checking for updates...");
+    loadTCMData();
+  }
+});
+
+
+  
+  let rawPoints = /*INJECT_DATA_HERE*/[];
+  
+  let points = [];
+  let filteredPoints = []; 
+  let activeHighlightRegex = null;
+  let activeTextTerms = []; 
+  let activeParsedIncludes = []; 
+  let lastGlobalClickTime = 0; 
+  let activeChannels = ["All"];
+
+  const appContainer = document.getElementById("appContainer");
+  const cardContainer = document.getElementById("cardContainer");
+  const searchInput = document.getElementById("searchInput");
+  const resultsCounter = document.getElementById("resultsCounter");
+  const viewportMeta = document.querySelector('meta[name="viewport"]');
+
+  function generateSearchIndex(point) {
+    const visibleData = [
+      point["Short Name"], point["Full Name"], point["Channel Full Name"],
+      point["Channel Short Name"], point["Location"], point.Location,
+      point["Location Notes"], point.Needling, point.Actions, point.Indications, point.Commentary,
+      point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
+    ];
+    return visibleData
+      .filter(Boolean)
+      .map(v => String(v).toLowerCase())
+      .join(" ");
+  }
+
+  function processPoints(dataArray) {
+    const oldMap = {};
+    points.forEach(p => oldMap[p["Short Name"]] = p);
+
+    return dataArray.map(point => {
+      const old = oldMap[point["Short Name"]];
+      if (old && JSON.stringify(old) === JSON.stringify(point)) {
+        point._searchIndex = old._searchIndex;
+        point._shortNameLower = old._shortNameLower; 
+        point._fullNameLower = old._fullNameLower;   
+        point._paragraphs = old._paragraphs; 
+        return point;
+      }
+      point._searchIndex = generateSearchIndex(point);
+      point._shortNameLower = (point["Short Name"] || "").toString().toLowerCase();
+      point._fullNameLower = (point["Full Name"] || point[" Full Name"] || "").toString().toLowerCase();
+      
+      const fields = [
+        point["Short Name"], point["Full Name"] || point[" Full Name"], point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"],
+        point["Location "] || point.Location, point["Location Notes"], point.Needling,
+        point.Actions, point.Indications, point.Commentary,
+        point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
+      ];
+      let paras = [];
+      fields.forEach(f => {
+        if (f) paras.push(...String(f).split(/\\r?\\n/).filter(p => p.trim() !== ""));
+      });
+      point._paragraphs = paras;
+      
+      return point;
+    });
+  }
+
+  function initDropdown() {
+    const uniqueChannels = [...new Set(points.map(p => p["Channel Full Name"] || p[" Channel Full Name"]).filter(Boolean))];
+    const container = document.getElementById("channelCheckboxes");
+    container.innerHTML = "";
+    
+    const allLabel = document.createElement("label");
+    allLabel.className = "checkbox-label";
+    allLabel.innerHTML = \`<input type="checkbox" value="All" onchange="toggleChannel(this)" \${activeChannels.includes("All") ? "checked" : ""}> <strong>All Channels</strong>\`;
+    container.appendChild(allLabel);
+
+    uniqueChannels.forEach(chan => {
+      const lbl = document.createElement("label");
+      lbl.className = "checkbox-label";
+      lbl.innerHTML = \`<input type="checkbox" value="\${chan}" onchange="toggleChannel(this)" \${activeChannels.includes(chan) ? "checked" : ""}> \${chan}\`;
+      container.appendChild(lbl);
+    });
+  }
+
+  function toggleChannel(checkbox) {
+    const val = checkbox.value;
+    const checkboxes = document.getElementById("channelCheckboxes").querySelectorAll("input");
+    
+    if (val === "All" && checkbox.checked) {
+       checkboxes.forEach(cb => { if (cb.value !== "All") cb.checked = false; });
+    } else if (checkbox.checked) {
+       checkboxes[0].checked = false;
+    }
+    
+    const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+    if (!anyChecked) checkboxes[0].checked = true;
+  }
+
+  function openChannelModal() { document.getElementById("channelModal").style.display = "flex"; }
+  
+  function applyChannels() {
+    const checkboxes = document.getElementById("channelCheckboxes").querySelectorAll("input");
+    activeChannels = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+    document.getElementById("channelModal").style.display = "none";
+    handleSearch();
+  }
+  
+  function cancelFilter() { document.getElementById("channelModal").style.display = "none"; }
+
+  points = processPoints(rawPoints);
+  initDropdown();
+
+  function receiveBackgroundUpdate(dataPayload) {
+    try {
+      let newPoints = JSON.parse(dataPayload);
+      if (typeof newPoints === 'string') newPoints = JSON.parse(newPoints); 
+      
+      const processed = processPoints(newPoints);
+      const oldMap = {};
+      points.forEach(p => oldMap[p["Short Name"]] = p);
+      const changedIds = [];
+      processed.forEach(p => {
+        const old = oldMap[p["Short Name"]];
+        if (!old || JSON.stringify(old) !== JSON.stringify(p)) changedIds.push(p["Short Name"]);
+      });
+
+      const sameStructure = processed.length === points.length && processed.every((p, i) => points[i] && p["Short Name"] === points[i]["Short Name"]);
+
+      if (sameStructure) {
+        points = processed;
+        changedIds.forEach(id => {
+          const card = document.querySelector('.point-card[data-id="' + id + '"]');
+          if (!card) return;
+          const newPoint = processed.find(p => p["Short Name"] === id);
+          if (!newPoint) return;
+          const label = card.querySelector('.card-label');
+          if (label) label.innerHTML = highlightText(newPoint["Short Name"]);
+          const img = card.querySelector('img');
+          if (img) {
+            const newSrc = "DeadmanPhotos/" + newPoint["Image ID"] + ".jpg";
+            if (img.src !== newSrc) img.src = newSrc;
+          }
+        });
+        const openPanel = document.querySelector('.detail-panel.open');
+        if (openPanel && typeof window.refreshActivePanel === 'function') window.refreshActivePanel();
+      } else {
+        points = processed;
+        initDropdown();
+        handleSearch(true);
+      }
+      showToast("🔄 Data synced");
+    } catch(e) { console.log("Failed to process background data."); }
+  }
+
+  const imageObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        if (img.dataset.src) { img.src = img.dataset.src; img.removeAttribute('data-src'); }
+        observer.unobserve(img);
+      }
+    });
+  }, { root: null, rootMargin: '0px 300px 0px 300px' });
+
+  let currentLightboxIndex = 0; let currentLightboxPoints = []; let currentLightboxScroller = null;
+  let lbTouchStartX = null; let lbTouchStartY = null; let lbWasSwiped = false;
+
+  function openLightbox(index, pointsList, scrollerEl) {
+    viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0");
+    currentLightboxIndex = index; currentLightboxPoints = pointsList; currentLightboxScroller = scrollerEl;
+    const point = currentLightboxPoints[currentLightboxIndex];
+    document.getElementById("lightbox-title").textContent = point["Short Name"]; 
+    document.getElementById("lightbox-img").src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+    document.getElementById("lightbox").style.display = "flex";
+  }
+
+  function openLightboxSingle(pointId, imageId) {
+    viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0");
+    document.getElementById("lightbox-title").textContent = pointId; 
+    document.getElementById("lightbox-img").src = "DeadmanPhotos/" + imageId + ".jpg";
+    document.getElementById("lightbox").style.display = "flex";
+  }
+
+  function closeLightbox() {
+    if (lbWasSwiped) { lbWasSwiped = false; return; }
+    viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no");
+    document.getElementById("lightbox").style.display = "none";
+  }
+
+  const lightboxEl = document.getElementById("lightbox");
+  lightboxEl.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1 || (window.visualViewport && window.visualViewport.scale > 1.01)) { lbTouchStartX = null; return; }
+    lbTouchStartX = e.changedTouches[0].screenX; lbTouchStartY = e.changedTouches[0].screenY; lbWasSwiped = false;
+  }, {passive: true});
+
+  lightboxEl.addEventListener('touchend', (e) => {
+    if (lbTouchStartX === null) return;
+    let touchEndX = e.changedTouches[0].screenX; let touchEndY = e.changedTouches[0].screenY;
+    let deltaX = touchEndX - lbTouchStartX; let deltaY = touchEndY - lbTouchStartY;
+    
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50 && currentLightboxPoints.length > 0) {
+      lbWasSwiped = true; let newIndex = currentLightboxIndex;
+      if (deltaX < 0 && currentLightboxIndex < currentLightboxPoints.length - 1) newIndex++; 
+      else if (deltaX > 0 && currentLightboxIndex > 0) newIndex--; 
+      
+      if (newIndex !== currentLightboxIndex) {
+        currentLightboxIndex = newIndex; const point = currentLightboxPoints[currentLightboxIndex];
+        document.getElementById("lightbox-title").textContent = point["Short Name"]; 
+        document.getElementById("lightbox-img").src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+        if (currentLightboxScroller) {
+          const targetCard = currentLightboxScroller.children[currentLightboxIndex];
+          if (targetCard) { targetCard.dataset.isSilentOpen = "true"; targetCard.click(); }
+        }
+      }
+    }
+  }, {passive: true});
+
+  function updateStickyHeaderHeights() {
+    const mainHeader = document.getElementById("mainStickyHeader");
+    if (mainHeader) document.documentElement.style.setProperty('--header-height', mainHeader.getBoundingClientRect().height + 'px');
+  }
+  window.addEventListener('resize', updateStickyHeaderHeights);
+
+  // Dropdown Search Bar Logic
+  function toggleSearchDropdown() {
+    const dropdown = document.getElementById("searchDropdown");
+    dropdown.classList.toggle("expanded");
+    if (dropdown.classList.contains("expanded")) {
+      searchInput.focus();
+    }
+    updateStickyHeaderHeights(); 
+  }
+
+  document.addEventListener("click", (e) => {
+    const dropdown = document.getElementById("searchDropdown");
+    const topRow = document.querySelector(".header-top-row");
+    if (dropdown && dropdown.classList.contains("expanded") && !dropdown.contains(e.target) && !topRow.contains(e.target) && !e.target.closest("#searchHelpTooltip") && !e.target.closest(".help-icon")) {
+      dropdown.classList.remove("expanded");
+      updateStickyHeaderHeights(); 
+    }
+  });
+
+  function clearSearchText() { searchInput.value = ""; handleSearch(); searchInput.focus(); }
+  function clearAndCloseSearch() { searchInput.value = ""; handleSearch(); document.getElementById("searchDropdown").classList.remove("expanded"); updateStickyHeaderHeights(); }
+
+  function toggleHelp() { document.getElementById("searchHelpTooltip").classList.toggle("show"); }
+  document.addEventListener("click", (e) => {
+    const tooltip = document.getElementById("searchHelpTooltip");
+    if (tooltip && tooltip.classList.contains("show") && !e.target.closest("#searchHelpTooltip") && !e.target.closest(".help-icon")) {
+      tooltip.classList.remove("show");
+    }
+  });
+
+  // Expand standard abbreviations on the fly
+  function expandTCMPoint(term) {
+    term = term.trim();
+    const match = term.match(/^([a-z\\.]+)(?:[\\s\\-\\.]*)(\\d+)$/i);
+    if (!match) return [term];
+
+    let rawLetters = match[1].toLowerCase().replace(/\\./g, ""); 
+    let numbers = match[2];
+
+    const aliases = {
+      'li': ['li', 'l.i.'], 'ht': ['ht', 'he'], 'he': ['ht', 'he'],
+      'sj': ['sj', 'te', 'tb', 't.b.', 'th'], 'te': ['sj', 'te', 'tb', 't.b.', 'th'],
+      'tb': ['sj', 'te', 'tb', 't.b.', 'th'], 'th': ['sj', 'te', 'tb', 't.b.', 'th'],
+      'pc': ['pc', 'p'], 'p':  ['pc', 'p'], 'lr': ['lr', 'liv'], 'liv':['lr', 'liv'],
+      'ki': ['ki', 'kd'], 'kd': ['ki', 'kd'], 'bl': ['bl', 'ub'], 'ub': ['bl', 'ub'],
+      'cv': ['cv', 'rn', 'ren'], 'rn': ['cv', 'rn', 'ren'], 'ren':['cv', 'rn', 'ren'],
+      'gv': ['gv', 'du'], 'du': ['gv', 'du']
+    };
+
+    let baseLetters = aliases[rawLetters] || [rawLetters];
+    let variations = new Set();
+    
+    baseLetters.forEach(base => {
+      variations.add(base + numbers);         
+      variations.add(base + "-" + numbers);   
+      variations.add(base + " " + numbers);   
+      if (base.includes('.')) {
+        variations.add(base + numbers);       
+        variations.add(base + "-" + numbers); 
+        variations.add(base + " " + numbers); 
+      }
+    });
+    return Array.from(variations);
+  }
+
+  function handleSearch(preserveState = false) {
+    let currentScroll = 0; let activePointId = null; let activeCardIsShowingAllText = false;
+    
+    if (preserveState) {
+        currentScroll = appContainer.scrollTop;
+        const openPanel = document.querySelector('.detail-panel.open');
+        if (openPanel) { activePointId = openPanel.dataset.activeId; activeCardIsShowingAllText = openPanel.classList.contains("show-all-text"); }
+    }
+
+    let query = searchInput.value.trim();
+    const headerClearBtn = document.getElementById("headerClearBtn");
+    if (query.length > 0) headerClearBtn.style.display = "flex"; else headerClearBtn.style.display = "none";
+
+    query = query.replace(/\\s*\\|\\s*/g, "|");
+    const tokenRegex = /(?:[^\\s"]+|"[^"]*")+/g;
+    const rawKeywords = query.match(tokenRegex) || [];
+    
+    const headers = []; const fullNames = []; const exclude = []; const parsedIncludes = []; 
+    
+    rawKeywords.forEach(token => {
+      if (token.startsWith("<>")) {
+        const terms = token.slice(2).toLowerCase().split(",");
+        terms.forEach(t => exclude.push(...expandTCMPoint(t)));
+      } else if (token.startsWith("@")) {
+        const terms = token.slice(1).toLowerCase().split(",");
+        terms.forEach(t => headers.push(...expandTCMPoint(t)));
+      } else if (token.startsWith("#")) {
+        const terms = token.slice(1).toLowerCase().split(",");
+        terms.forEach(t => fullNames.push(...expandTCMPoint(t)));
+      } else {
+        const parts = token.split("|").filter(Boolean);
+        const orGroup = [];
+        parts.forEach(part => {
+          if (part.startsWith('"') && part.endsWith('"') && part.length >= 2) {
+            const phrase = part.slice(1, -1).toLowerCase();
+            const safePhrase = phrase.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&');
+            orGroup.push({ type: 'exact', regex: new RegExp("\\\\b" + safePhrase + "\\\\b", "i"), regexString: "\\\\b" + safePhrase + "\\\\b", text: phrase });
+          } else {
+            const phrase = part.toLowerCase();
+            const expandedTerms = expandTCMPoint(phrase);
+            expandedTerms.forEach(ext => {
+              const safePhrase = ext.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&');
+              orGroup.push({ type: 'substring', regexString: safePhrase, text: ext });
+            });
+          }
+        });
+        if (orGroup.length > 0) parsedIncludes.push(orGroup);
+      }
+    });
+
+    const regexParts = [];
+    activeTextTerms = []; activeParsedIncludes = parsedIncludes; 
+
+    parsedIncludes.forEach(group => { group.forEach(item => { regexParts.push(item.regexString); activeTextTerms.push(item.text); }); });
+    headers.forEach(h => { regexParts.push(h.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&')); activeTextTerms.push(h); });
+    fullNames.forEach(f => { regexParts.push(f.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&')); activeTextTerms.push(f); });
+
+    const validRegexParts = regexParts.filter(t => t.trim().length > 0).sort((a, b) => b.length - a.length);
+    if (validRegexParts.length > 0) activeHighlightRegex = new RegExp("(" + validRegexParts.join("|") + ")", "gi");
+    else activeHighlightRegex = null;
+
+    filteredPoints = points.filter(point => {
+      const chanFull = point["Channel Full Name"] || point[" Channel Full Name"] || "";
+      if (!(activeChannels.includes("All") || activeChannels.includes(chanFull))) return false;
+
+      if (parsedIncludes.length > 0) {
+        const passesPass1 = parsedIncludes.every(orGroup => {
+          return orGroup.some(term => {
+            if (term.type === 'exact') return term.regex.test(point._searchIndex);
+            else return point._searchIndex.includes(term.text);
+          });
+        });
+        if (!passesPass1) return false;
+
+        const hasValidParagraph = point._paragraphs.some(p => {
+          return parsedIncludes.every(orGroup => {
+            return orGroup.some(term => {
+              if (term.type === 'exact') {
+                term.regex.lastIndex = 0; return term.regex.test(p);
+              } else {
+                return p.toLowerCase().includes(term.text);
+              }
+            });
+          });
+        });
+        
+        if (!hasValidParagraph) return false; 
+      }
+
+      if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
+      if (headers.length > 0 && !headers.some(h => point._shortNameLower.includes(h))) return false;
+      if (fullNames.length > 0 && !fullNames.every(f => point._fullNameLower.includes(f))) return false;
+      
+      return true;
+    });
+    
+    resultsCounter.textContent = "Search Results: " + filteredPoints.length + " of " + points.length; 
+    
+    const queryDisplay = document.getElementById("searchQueryDisplay");
+    if (searchInput.value.trim().length > 0) {
+      queryDisplay.textContent = '"' + searchInput.value.trim() + '"';
+      queryDisplay.style.display = "block";
+    } else {
+      queryDisplay.style.display = "none";
+    }
+
+    setTimeout(updateStickyHeaderHeights, 10);
+    renderRows(preserveState, currentScroll, activePointId, activeCardIsShowingAllText);
+  }
+
+  function escapeHTML(str) { return !str ? "" : String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  
+  function highlightText(text) {
+    if (!text) return ""; 
+    let escaped = escapeHTML(text); 
+    if (!activeHighlightRegex) return escaped;
+    return escaped.replace(activeHighlightRegex, "<mark>$1</mark>");
+  }
+
+  // Parses Markdown Tables and supports Cell Merging (Colspan/Rowspan)
+  function formatTextWithTables(text) {
+    let normalizedText = text.replace(/\\r?\\n/g, '\\n');
+    if (!normalizedText.includes('|')) return normalizedText.replace(/\\n/g, "<br>");
+    
+    const lines = normalizedText.split('\\n');
+    let output = "";
+    let inTable = false;
+    let tableRows = [];
+    let isHeaderRow = [];
+
+    // Helper to render the collected table data into HTML
+    function renderCurrentTable() {
+      if (tableRows.length === 0) return "";
+      
+      // Create a grid object to track colspans, rowspans, and skipped cells
+      let grid = tableRows.map(row => row.map(cellText => ({
+        text: cellText.trim(), colspan: 1, rowspan: 1, skip: false
+      })));
+
+      // Calculate spans (Right-to-Left, Bottom-to-Top)
+      for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          
+          // Strip HTML tags (like <mark> from search) and decode escaped characters
+          let rawText = grid[r][c].text.replace(/<[^>]+>/g, '').trim();
+          
+          // Check for horizontal merge (>)
+          if (rawText === '&gt;' || rawText === '>') {
+            grid[r][c].skip = true;
+            // Find the closest non-skipped cell to the left and increase its colspan
+            for (let left = c - 1; left >= 0; left--) {
+              if (!grid[r][left].skip) {
+                grid[r][left].colspan += 1;
+                break;
+              }
+            }
+          }
+          // Check for vertical merge (^)
+          else if (rawText === '^') {
+            grid[r][c].skip = true;
+            // Find the closest non-skipped cell above and increase its rowspan
+            for (let up = r - 1; up >= 0; up--) {
+              if (!grid[up][c].skip) {
+                grid[up][c].rowspan += 1;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Generate the HTML string using standard concatenation
+      let html = '<table class="tcm-table"><tbody>';
+      for (let r = 0; r < grid.length; r++) {
+        html += '<tr>';
+        let tag = isHeaderRow[r] ? 'th' : 'td';
+        for (let c = 0; c < grid[r].length; c++) {
+          let cell = grid[r][c];
+          if (!cell.skip) {
+            let attrs = "";
+            if (cell.colspan > 1) attrs += ' colspan="' + cell.colspan + '"';
+            if (cell.rowspan > 1) attrs += ' rowspan="' + cell.rowspan + '"';
+            html += '<' + tag + attrs + '>' + cell.text + '</' + tag + '>';
+          }
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      return html;
+    }
+
+    // Process each line of text
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trim();
+      let cleanLine = line.replace(/<[^>]+>/g, '').replace(/\\s/g, ''); 
+      
+      if (line.startsWith('|') && line.endsWith('|')) {
+        if (!inTable) {
+          inTable = true;
+          tableRows = [];
+          isHeaderRow = [];
+        }
+        
+        // Detect markdown header separator (e.g., |---|---|)
+        if (/^\\|(?:[-:]+\\|)+$/.test(cleanLine)) {
+          if (tableRows.length > 0) isHeaderRow[tableRows.length - 1] = true;
+          continue; 
+        }
+        
+        // Split row into cells
+        let cells = line.split('|').slice(1, -1);
+        tableRows.push(cells);
+        isHeaderRow.push(false);
+      } else {
+        if (inTable) {
+          output += renderCurrentTable();
+          inTable = false;
+        }
+        output += line + (i < lines.length - 1 ? "<br>" : "");
+      }
+    }
+    
+    // Catch a table if it ends on the very last line of the text block
+    if (inTable) output += renderCurrentTable();
+    
+    return output;
+  }
+
+
+
+  // --- NEW: Linkify Points System ---
+  function linkifyPoints(htmlText) {
+    if (!htmlText) return "";
+    
+    // Regex to catch standard TCM point abbreviations (e.g. ST-36, ST 36, DU 20, EX-HN 3)
+    const regex = /\\b(LU|LI|L\\.I\\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|DU|GV|RN|REN|CV|EX-[A-Z]+)\\s*-?\\s*(\\d+)\\b/gi;
+    
+    // Split by HTML tags to avoid replacing text inside attributes or existing tags
+    const parts = htmlText.split(/(<[^>]*>)/g);
+    for (let i = 0; i < parts.length; i++) {
+      if (!parts[i].startsWith("<")) {
+        parts[i] = parts[i].replace(regex, (match, chan, num) => {
+          return \`<span class="point-link" onclick="event.stopPropagation(); openQuickPeek('\${chan}', '\${num}')">\${match}</span>\`;
+        });
+      }
+    }
+    return parts.join("");
+  }
+
+  function openQuickPeek(chan, num) {
+    // Standardize the channel prefix to match database IDs
+    chan = chan.toUpperCase().replace(/\\./g, "");
+    const aliases = {
+      'HE': 'HT', 'TB': 'SJ', 'TE': 'SJ', 'TH': 'SJ', 'P': 'PC',
+      'LIV': 'LV', 'KID': 'KD', 'UB': 'BL', 'REN': 'REN', 'RN': 'CV', 'DU': 'DU'
+    };
+    let stdChan = aliases[chan] || chan;
+    
+    // Try standard ID formats
+    let targetId1 = stdChan + "-" + num;
+    let targetId2 = stdChan + " " + num;
+    let targetId3 = stdChan + num;
+
+    let targetPoint = points.find(p => 
+      p["Short Name"].toUpperCase() === targetId1 ||
+      p["Short Name"].toUpperCase() === targetId2 ||
+      p["Short Name"].toUpperCase() === targetId3
+    );
+
+    if (!targetPoint) {
+      showToast("Point " + stdChan + "-" + num + " not found.");
+      return;
+    }
+
+    buildQuickPeekDOM(targetPoint);
+    document.getElementById("quickPeekModal").style.display = "flex";
+  }
+
+  function closeQuickPeek() {
+    document.getElementById("quickPeekModal").style.display = "none";
+    document.getElementById("quickPeekContainer").innerHTML = ""; // Clean memory
+  }
+
+  function buildQuickPeekDOM(point) {
+    const container = document.getElementById("quickPeekContainer");
+    container.innerHTML = ""; 
+
+    // Header Info (Identical to detail-panel but for modal)
+    const headerInfo = document.createElement("div"); headerInfo.className = "detail-header-info";
+    
+    const imgInfo = document.createElement("img"); 
+    imgInfo.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+    imgInfo.onclick = (e) => { e.stopPropagation(); openLightboxSingle(point["Short Name"], point["Image ID"]); };
+    
+    const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
+    const titleEl = document.createElement("div"); titleEl.className = "detail-title";
+    titleEl.innerHTML = point["Short Name"]; // No search highlights in Quick Peek
+    
+    const meta = document.createElement("div"); meta.className = "detail-meta";
+    const fullName = point["Full Name"] || point[" Full Name"] || "";
+    const shortChan = point["Channel Short Name"] || point[" Channel Short Name"] || "";
+    let metaHtml = "";
+    if (fullName) metaHtml += "<span>" + fullName + "</span>";
+    if (shortChan) metaHtml += "<span>" + shortChan + "</span>";
+    meta.innerHTML = metaHtml;
+    
+    titleGroup.appendChild(titleEl); titleGroup.appendChild(meta);
+    headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
+
+    const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
+    const closeBtn = document.createElement("button"); closeBtn.className = "detail-nav-btn"; closeBtn.innerHTML = "✕";
+    closeBtn.onclick = closeQuickPeek;
+    navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); container.appendChild(headerInfo);
+
+    // Body Sections
+    const addDetail = (label, value) => {
+      if (!value) return; 
+      const div = document.createElement("div"); 
+      div.className = "point-notes";
+      // We parse tables, then linkify. No search-highlighting needed in Quick Peek.
+      const fullHtml = linkifyPoints(formatTextWithTables(escapeHTML(value)));
+      div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'>" + fullHtml + "</div>";
+      container.appendChild(div);
+    };
+
+    addDetail("Location", point["Location "] || point.Location);
+    addDetail("Location Notes", point["Location Notes"]);
+    addDetail("Needling", point.Needling);
+    addDetail("Actions", point.Actions);
+    addDetail("Indications", point.Indications);
+    addDetail("Commentary", point.Commentary);
+    addDetail("Summary of Clinical Application", point["Summary of clinical application"]);
+    addDetail("Combinations", point.Combinations);
+    addDetail("Description", point.Description);
+    addDetail("Notes", point.Notes);
+    addDetail("CAM Notes", point["CAM Notes"]);
+  }
+  // --- END NEW SYSTEM ---
+
+  function showToast(msg) {
+    let toast = document.getElementById("toast");
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 3000);
+  }
+
+  function debounce(fn, delay = 300) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn.apply(this, args), delay); }; }
+  searchInput.addEventListener("input", debounce(() => handleSearch(false), 300));
+  searchInput.addEventListener("keydown", e => { if (e.key === "Escape") clearSearchText(); });
+
+  function buildPointDetailsDOM(point, index, channelPoints, scroller, panel, card, rowDiv) {
+    const details = document.createElement("div"); details.className = "point-details";
+    const headerInfo = document.createElement("div"); headerInfo.className = "detail-header-info";
+    
+    const imgInfo = document.createElement("img"); 
+    imgInfo.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+    imgInfo.onclick = (e) => { e.stopPropagation(); openLightbox(index, channelPoints, scroller); };
+    
+    const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
+    const titleEl = document.createElement("div"); titleEl.className = "detail-title";
+    titleEl.innerHTML = highlightText(point["Short Name"]);
+    
+    const meta = document.createElement("div"); meta.className = "detail-meta";
+    const fullName = point["Full Name"] || point[" Full Name"] || "";
+    const shortChan = point["Channel Short Name"] || point[" Channel Short Name"] || "";
+    let metaHtml = "";
+    if (fullName) metaHtml += "<span>" + highlightText(fullName) + "</span>";
+    if (shortChan) metaHtml += "<span>" + shortChan + "</span>";
+    meta.innerHTML = metaHtml;
+    
+    titleGroup.appendChild(titleEl); titleGroup.appendChild(meta);
+    headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
+
+    const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
+    const closeBtn = document.createElement("button"); closeBtn.className = "detail-nav-btn"; closeBtn.innerHTML = "✕";
+    
+    closeBtn.onclick = (e) => {
+      e.stopPropagation(); 
+      if (Date.now() - lastGlobalClickTime < 400) return; 
+      lastGlobalClickTime = Date.now();
+
+      panel.classList.remove("open"); panel.dataset.activeId = ""; card.classList.remove("active");
+      const cardCenter = card.offsetLeft + (card.clientWidth / 2);
+      const scrollerCenter = scroller.clientWidth / 2;
+      scroller.scrollTo({ left: cardCenter - scrollerCenter, behavior: 'smooth' });
+      const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+      appContainer.scrollTo({ top: rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
+    };
+
+    navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); details.appendChild(headerInfo);
+
+    let hasFilteredContent = false;
+    const addDetail = (label, value) => {
+      if (!value) return; 
+      const div = document.createElement("div"); 
+      const paras = value.split(/\\r?\\n/).filter(p => p.trim() !== "");
+      let matchingParas = []; let nonMatchingParas = [];
+
+      if (activeParsedIncludes && activeParsedIncludes.length > 0) {
+        paras.forEach(p => {
+          const passesAll = activeParsedIncludes.every(orGroup => {
+            return orGroup.some(term => {
+              if (term.type === 'exact') {
+                term.regex.lastIndex = 0; return term.regex.test(p);
+              } else {
+                return p.toLowerCase().includes(term.text);
+              }
+            });
+          });
+          if (passesAll) matchingParas.push(p); else nonMatchingParas.push(p); 
+        });
+      } else {
+        paras.forEach(p => matchingParas.push(p));
+      }
+
+      // ADDED: linkifyPoints wraps the fully formatted text
+      const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
+
+      if (activeHighlightRegex && nonMatchingParas.length > 0) {
+        hasFilteredContent = true;
+        if (matchingParas.length === 0) {
+          div.className = "point-notes hidden-section";
+          div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
+        } else {
+          div.className = "point-notes";
+          // ADDED: linkifyPoints wraps the filtered text too
+          const filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\\n\\n<span style='color:#999; font-size:11px;'>[...]</span>\\n\\n")));
+          div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
+        }
+      } else {
+        div.className = "point-notes";
+        div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'>" + fullHtml + "</div>";
+      }
+      details.appendChild(div);
+    };
+
+    addDetail("Location", point["Location "] || point.Location);
+    addDetail("Location Notes", point["Location Notes"]);
+    addDetail("Needling", point.Needling);
+    addDetail("Actions", point.Actions);
+    addDetail("Indications", point.Indications);
+    addDetail("Commentary", point.Commentary);
+    addDetail("Summary of Clinical Application", point["Summary of clinical application"]);
+    addDetail("Combinations", point.Combinations);
+    addDetail("Description", point.Description);
+    addDetail("Notes", point.Notes);
+    addDetail("CAM Notes", point["CAM Notes"]);
+
+    const buttons = document.createElement("div"); buttons.className = "action-buttons";
+    const updateNotesBtn = document.createElement("button"); updateNotesBtn.textContent = "Update Notes";
+    updateNotesBtn.addEventListener("click", e => { e.stopPropagation(); openEditModal(point, "Notes"); });
+    const updateCamBtn = document.createElement("button"); updateCamBtn.textContent = "Update CAM Notes";
+    updateCamBtn.addEventListener("click", e => { e.stopPropagation(); openEditModal(point, "CAM Notes"); });
+    buttons.append(updateNotesBtn, updateCamBtn); details.appendChild(buttons);
+
+    let touchStartX = 0; let touchStartY = 0; let lastSwipeTime = 0;
+    details.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }, {passive: true});
+        details.addEventListener('touchend', e => {
+      if (e.target.closest('.tcm-table') || e.target.closest('.point-link')) return; 
+
+      if (Date.now() - lastSwipeTime < 400) return; 
+      let touchEndX = e.changedTouches[0].screenX; let touchEndY = e.changedTouches[0].screenY;
+
+      let deltaX = touchEndX - touchStartX; let deltaY = touchEndY - touchStartY;
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 60) {
+        lastSwipeTime = Date.now(); let targetCard = null;
+        if (deltaX < 0 && index < channelPoints.length - 1) targetCard = scroller.children[index + 1];
+        else if (deltaX > 0 && index > 0) targetCard = scroller.children[index - 1];
+        if (targetCard) { targetCard.dataset.isSwipe = "true"; targetCard.click(); }
+      }
+    }, {passive: true});
+
+    return { detailsDOM: details, hasFilteredContent: hasFilteredContent, headerEl: headerInfo };
+  }
+
+  cardContainer.addEventListener('click', (e) => {
+    const card = e.target.closest('.point-card');
+    if (!card) return; 
+    
+    const isSwipe = card.dataset.isSwipe === "true"; const isSilentOpen = card.dataset.isSilentOpen === "true"; 
+    card.dataset.isSwipe = "false"; card.dataset.isSilentOpen = "false";
+
+    if (!isSwipe && !isSilentOpen) { if (Date.now() - lastGlobalClickTime < 400) return; lastGlobalClickTime = Date.now(); }
+    
+    const pointId = card.dataset.id;
+    const rowDiv = card.closest('.channel-row');
+    const scroller = rowDiv.querySelector('.scroller');
+    const panel = rowDiv.querySelector('.detail-panel');
+    const point = points.find(p => p["Short Name"] === pointId);
+    const channelPoints = Array.from(scroller.children).map(c => points.find(p => p["Short Name"] === c.dataset.id));
+    const index = Array.from(scroller.children).indexOf(card);
+    const exactScrollY = appContainer.scrollTop; 
+
+    if (panel.dataset.activeId === pointId && !isSilentOpen) {
+      panel.classList.remove("open"); panel.dataset.activeId = ""; card.classList.remove("active");
+      const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+      appContainer.scrollTo({ top: rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
+      return;
+    }
+    
+    scroller.querySelectorAll('.point-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active'); panel.innerHTML = "";
+    
+    const result = buildPointDetailsDOM(point, index, channelPoints, scroller, panel, card, rowDiv);
+    panel.appendChild(result.detailsDOM);
+
+    if (card.dataset.restoreShowAllText === "true") {
+       panel.classList.add("show-all-text"); card.dataset.restoreShowAllText = "false";
+    }
+
+    if (result.hasFilteredContent) {
+      const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
+      const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
+      toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
+      toggleBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        if (panel.classList.contains("show-all-text")) { panel.classList.remove("show-all-text"); toggleBtn.textContent = "Show full text"; }
+        else { panel.classList.add("show-all-text"); toggleBtn.textContent = "Show filtered text only"; }
+      };
+      stickyBtnContainer.appendChild(toggleBtn); result.detailsDOM.appendChild(stickyBtnContainer); 
+    }
+
+    panel.dataset.activeId = pointId; panel.classList.add("open");
+    if (isSwipe || isSilentOpen) appContainer.scrollTop = exactScrollY;
+
+    window.refreshActivePanel = () => {
+       const scrollPos = appContainer.scrollTop; panel.innerHTML = "";
+       const updatedPoint = points.find(p => p["Short Name"] === pointId);
+       const updatedChannelPoints = Array.from(scroller.children).map(c => points.find(p => p["Short Name"] === c.dataset.id));
+       const refreshedResult = buildPointDetailsDOM(updatedPoint, index, updatedChannelPoints, scroller, panel, card, rowDiv);
+       panel.appendChild(refreshedResult.detailsDOM);
+       if (refreshedResult.hasFilteredContent) {
+          const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
+          const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
+          toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
+          toggleBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            if (panel.classList.contains("show-all-text")) { panel.classList.remove("show-all-text"); toggleBtn.textContent = "Show full text"; }
+            else { panel.classList.add("show-all-text"); toggleBtn.textContent = "Show filtered text only"; }
+          };
+          stickyBtnContainer.appendChild(toggleBtn); refreshedResult.detailsDOM.appendChild(stickyBtnContainer); 
+       }
+       appContainer.scrollTop = scrollPos; 
+    };
+
+    const cardCenter = card.offsetLeft + (card.clientWidth / 2);
+    const scrollerCenter = scroller.clientWidth / 2;
+    scroller.scrollTo({ left: cardCenter - scrollerCenter, behavior: (isSilentOpen || isSwipe) ? 'auto' : 'smooth' });
+    
+    if (!isSilentOpen && !isSwipe) {
+      setTimeout(() => { 
+        const headerHeightPx = result.headerEl.getBoundingClientRect().height;
+        document.documentElement.style.setProperty('--detail-header-height', headerHeightPx + 'px');
+        const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+        appContainer.scrollTo({ top: rowDiv.offsetTop - mainHeaderH - 10, behavior: 'smooth' });
+      }, 50); 
+    } else {
+      const headerHeightPx = result.headerEl.getBoundingClientRect().height;
+      document.documentElement.style.setProperty('--detail-header-height', headerHeightPx + 'px');
+    }
+  });
+
+  function renderRows(preserveState = false, currentScroll = 0, activePointId = null, activeCardIsShowingAllText = false) {
+    const fragment = document.createDocumentFragment();
+
+    if (filteredPoints.length === 0) {
+      const noResults = document.createElement("div");
+      noResults.style.cssText = "text-align:center; padding: 40px; color:#888;";
+      noResults.textContent = "No points match your search.";
+      fragment.appendChild(noResults);
+    } else {
+      const grouped = {};
+      filteredPoints.forEach(p => {
+        const channel = p["Channel Full Name"] || p[" Channel Full Name"] || "Other";
+        if (!grouped[channel]) grouped[channel] = [];
+        grouped[channel].push(p);
+      });
+
+      const entries = Object.entries(grouped);
+
+      const buildRow = (channelName, channelPoints) => {
+        const rowDiv = document.createElement("div"); rowDiv.className = "channel-row";
+        const title = document.createElement("div"); title.className = "row-title"; title.textContent = channelName;
+        const scroller = document.createElement("div"); scroller.className = "scroller";
+        const panel = document.createElement("div"); panel.className = "detail-panel";
+
+        channelPoints.forEach((point) => {
+          const card = document.createElement("div"); card.className = "point-card";
+          card.dataset.id = point["Short Name"]; 
+          
+          const imgContainer = document.createElement("div"); imgContainer.className = "card-img-container";
+          const img = document.createElement("img"); img.dataset.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+          
+          const label = document.createElement("div"); label.className = "card-label";
+          label.innerHTML = highlightText(point["Short Name"]); 
+          
+          imgContainer.appendChild(img); card.appendChild(imgContainer); card.appendChild(label);
+          imageObserver.observe(img);
+          scroller.appendChild(card);
+        });
+
+        rowDiv.appendChild(title); rowDiv.appendChild(scroller); rowDiv.appendChild(panel);
+        return rowDiv;
+      };
+
+      entries.forEach(([name, pts]) => fragment.appendChild(buildRow(name, pts)));
+    }
+
+    cardContainer.innerHTML = "";
+    cardContainer.appendChild(fragment);
+
+    if (preserveState && activePointId) {
+        const cardToOpen = document.querySelector(".point-card[data-id='" + activePointId + "']");
+        if (cardToOpen) {
+            cardToOpen.dataset.isSilentOpen = "true";
+            if (activeCardIsShowingAllText) cardToOpen.dataset.restoreShowAllText = "true";
+            cardToOpen.click();
+        }
+    }
+
+    if (preserveState) appContainer.scrollTop = currentScroll; 
+    else appContainer.scrollTo({ top: 0, behavior: "auto" }); 
+  }
+
+  let currentEditingPoint = null; let currentEditingField = "";
+
+  function openEditModal(point, fieldName) {
+    currentEditingPoint = point; currentEditingField = fieldName;
+    document.getElementById("editTitle").textContent = "Update " + fieldName + " (" + point["Short Name"] + ")";
+    document.getElementById("editArea").value = point[fieldName] || "";
+    document.getElementById("editError").style.display = "none";
+    document.getElementById("editModal").style.display = "flex";
+  }
+
+  function closeEditModal() { document.getElementById("editModal").style.display = "none"; currentEditingPoint = null; currentEditingField = ""; }
+
+  function saveEdit() {
+    const newValue = document.getElementById("editArea").value;
+    document.getElementById("saveBtn").textContent = "Saving...";
+    document.getElementById("saveBtn").disabled = true; document.getElementById("cancelBtn").disabled = true;
+    document.getElementById("editError").style.display = "none";
+    const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
+    // Replace your old save interceptor with this standard push to Google:
+fetch(dataUrl, {
+  method: 'POST',
+  body: JSON.stringify(payload)
+})
+.then(response => response.text())
+.then(result => {
+  // Call your existing success function
+  completeSave(result); 
+})
+.catch(err => {
+  // Call your existing failure function
+  failSave("Network error or offline");
+});
+
+  }
+
+  function completeSave(newValue) {
+    currentEditingPoint[currentEditingField] = newValue; 
+    currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
+    
+    const fields = [
+      currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
+      currentEditingPoint.Actions, currentEditingPoint.Indications, currentEditingPoint.Commentary,
+      currentEditingPoint["Summary of clinical application"], currentEditingPoint.Combinations, currentEditingPoint.Description, 
+      currentEditingPoint.Notes, currentEditingPoint["CAM Notes"]
+    ];
+    let paras = [];
+    fields.forEach(f => {
+      if (f) paras.push(...String(f).split(/\\r?\\n/).filter(p => p.trim() !== ""));
+    });
+    currentEditingPoint._paragraphs = paras;
+
+    if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
+    else handleSearch(true); 
+    
+    closeEditModal(); resetModalButtons();
+  }
+
+  function failSave(errorMsg) {
+    document.getElementById("editError").textContent = errorMsg; document.getElementById("editError").style.display = "block"; resetModalButtons();
+  }
+
+  function resetModalButtons() { document.getElementById("saveBtn").textContent = "Save"; document.getElementById("saveBtn").disabled = false; document.getElementById("cancelBtn").disabled = false; }
+
+  handleSearch();
+</script>
+</body>
+</html>
