@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const APP_CACHE = `tcm-app-${CACHE_VERSION}`;
 const IMAGE_CACHE = `tcm-images-${CACHE_VERSION}`;
 
@@ -72,4 +72,27 @@ self.addEventListener('fetch', event => {
       return cachedResponse || fetch(event.request);
     })
   );
+});
+
+// 4. Eager Cache Listener: Silently grab new photos in the background so they are ready offline
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'PREFETCH_IMAGES') {
+    caches.open(IMAGE_CACHE).then(cache => {
+      event.data.urls.forEach(url => {
+        // Check if we already have it first to save battery!
+        cache.match(url).then(existingResponse => {
+          if (!existingResponse) {
+            // If we don't have it, go fetch it silently
+            fetch(url).then(networkResponse => {
+              if (networkResponse.ok) {
+                cache.put(url, networkResponse.clone());
+              }
+            }).catch(err => {
+              console.log('Skipping missing or offline photo:', url);
+            });
+          }
+        });
+      });
+    });
+  }
 });
