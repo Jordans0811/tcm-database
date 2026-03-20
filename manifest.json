@@ -3,8 +3,8 @@
   "short_name": "TCM",
   "display": "standalone",
   "start_url": "./index.html",
-  "background_color": "#1c1c1e",
-  "theme_color": "#1c1c1e",
+  "background_color": "#f0f0f0",
+  "theme_color": "#f0f0f0",
   "icons": [
     {
       "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Yin_and_Yang.svg/192px-Yin_and_Yang.svg.png",
