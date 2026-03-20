@@ -1341,27 +1341,38 @@ document.addEventListener("visibilitychange", () => {
   function closeEditModal() { document.getElementById("editModal").style.display = "none"; currentEditingPoint = null; currentEditingField = ""; }
 
   function saveEdit() {
-    const newValue = document.getElementById("editArea").value;
-    document.getElementById("saveBtn").textContent = "Saving...";
-    document.getElementById("saveBtn").disabled = true; document.getElementById("cancelBtn").disabled = true;
-    document.getElementById("editError").style.display = "none";
-    const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
-    // Replace your old save interceptor with this standard push to Google:
-fetch(dataUrl, {
-  method: 'POST',
-  body: JSON.stringify(payload)
-})
-.then(response => response.text())
-.then(result => {
-  // Call your existing success function
-  completeSave(result); 
-})
-.catch(err => {
-  // Call your existing failure function
-  failSave("Network error or offline");
-});
+  const newValue = document.getElementById("editArea").value;
+  document.getElementById("saveBtn").textContent = "Saving...";
+  document.getElementById("saveBtn").disabled = true; 
+  document.getElementById("cancelBtn").disabled = true;
+  document.getElementById("editError").style.display = "none";
+  
+  const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
+  
+  // The new CORS-bypassing fetch disguised as plain text
+  fetch(dataUrl, {
+    redirect: "follow", // Forces Safari to follow Google's internal routing
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8", // The magic disguise
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(response => response.json()) // Google sends the success message back
+  .then(result => {
+    if (result.success) {
+      // Pass the new text to your existing success function to update the screen
+      completeSave(newValue); 
+    } else {
+      // If Google couldn't find the row, show the error
+      failSave("Google error: " + result.error); 
+    }
+  })
+  .catch(err => {
+    failSave("Network error or offline");
+  });
+}
 
-  }
 
   function completeSave(newValue) {
     currentEditingPoint[currentEditingField] = newValue; 
