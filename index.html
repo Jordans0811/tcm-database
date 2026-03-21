@@ -359,7 +359,8 @@
     <div id="mainStickyHeader">
       <div class="header-top-row">
         <div>
-          <h1>Point Database</h1>
+          <h1 id="versionTapTarget">Point Database</h1>
+
           <p id="resultsCounter">Search Results: 0 of 0</p>
           <p id="searchQueryDisplay"></p>
         </div>
@@ -401,6 +402,25 @@ if ('serviceWorker' in navigator) {
 }
 
 const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
+
+// Change this string right here whenever you push a new update!
+const APP_VERSION = "03.20.26.v1"; 
+
+// The Secret Triple-Tap Logic
+let tapCount = 0;
+let tapTimer = null;
+document.getElementById("versionTapTarget").addEventListener("click", () => {
+  tapCount++;
+  clearTimeout(tapTimer);
+  if (tapCount >= 3) {
+    showToast("App Version: " + APP_VERSION);
+    tapCount = 0;
+  } else {
+    // Reset the counter if they don't tap 3 times within 1 second
+    tapTimer = setTimeout(() => { tapCount = 0; }, 1000);
+  }
+});
+
 
 // Fetch the database
 async function loadTCMData() {
