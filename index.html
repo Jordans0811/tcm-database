@@ -403,8 +403,6 @@ if ('serviceWorker' in navigator) {
 const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
 
 // Fetch the database
-// Fetch the database
-// Fetch the database
 async function loadTCMData() {
   try {
     let response = await fetch(dataUrl);
@@ -494,7 +492,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       ];
       let paras = [];
       fields.forEach(f => {
-        if (f) paras.push(...String(f).split(/\\r?\\n/).filter(p => p.trim() !== ""));
+        if (f) paras.push(...String(f).split(/\r?\n/).filter(p => p.trim() !== ""));
       });
       point._paragraphs = paras;
       
@@ -1242,9 +1240,21 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     }
 
     panel.dataset.activeId = pointId; panel.classList.add("open");
-    
-    // ONLY freeze the scroll position if the app is silently updating in the background
-    if (isSilentOpen) appContainer.scrollTop = exactScrollY;
+
+    const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+    const targetScrollTop = rowDiv.offsetTop - mainHeaderH - 10;
+
+    if (isSilentOpen) {
+      appContainer.scrollTop = exactScrollY;
+    } else if (isSwipe) {
+      // If we scrolled past the scroller (roughly 100px past the target), snap instantly to top
+      if (exactScrollY > targetScrollTop + 100) {
+        appContainer.scrollTo({ top: targetScrollTop, behavior: 'auto' });
+      } else {
+        // Scroller is still visible, maintain exact vertical scroll
+        appContainer.scrollTop = exactScrollY;
+      }
+    }
 
     window.refreshActivePanel = () => {
        const scrollPos = appContainer.scrollTop; panel.innerHTML = "";
@@ -1270,25 +1280,16 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     const scrollerCenter = scroller.clientWidth / 2;
     scroller.scrollTo({ left: cardCenter - scrollerCenter, behavior: (isSilentOpen || isSwipe) ? 'auto' : 'smooth' });
     
-    // The New Scroll Logic
-    setTimeout(() => { 
+    if (!isSilentOpen && !isSwipe) {
+      setTimeout(() => { 
+        const headerHeightPx = result.headerEl.getBoundingClientRect().height;
+        document.documentElement.style.setProperty('--detail-header-height', headerHeightPx + 'px');
+        appContainer.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+      }, 50); 
+    } else {
       const headerHeightPx = result.headerEl.getBoundingClientRect().height;
       document.documentElement.style.setProperty('--detail-header-height', headerHeightPx + 'px');
-      const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
-      
-      // Calculate the precise location of the Details Panel (ignoring the scroller)
-      const panelRect = panel.getBoundingClientRect();
-      const appRect = appContainer.getBoundingClientRect();
-      const targetScroll = appContainer.scrollTop + (panelRect.top - appRect.top) - mainHeaderH;
-      
-      if (!isSilentOpen && !isSwipe) {
-        // Normal Tap: Smooth glide exactly to the details sticky header
-        appContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
-      } else if (isSwipe) {
-        // Swipe: Instant snap directly to the sticky details header
-        appContainer.scrollTo({ top: targetScroll, behavior: 'auto' });
-      }
-    }, 50); 
+    }
   });
 
   function renderRows(preserveState = false, currentScroll = 0, activePointId = null, activeCardIsShowingAllText = false) {
@@ -1374,7 +1375,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     
     const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
     
-    // mode: 'no-cors' is the magic bypass for iOS Safari
     fetch(dataUrl, {
       method: "POST",
       mode: "no-cors",
@@ -1382,7 +1382,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       body: JSON.stringify(payload)
     })
     .then(() => {
-      // It will instantly hit this line and close the modal successfully
       completeSave(newValue); 
     })
     .catch(err => {
