@@ -265,7 +265,20 @@
     }
     #quickPeekModal .detail-header-info { top: 0; margin: 0; border-top-left-radius: 12px; border-top-right-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     #quickPeekModal .point-notes { margin: 12px; }
-    #quickPeekModal .section-label { top: 90px; } /* Sticky label adjustment for modal */
+    #quickPeekModal .section-label { top: 90px; } 
+
+    /* Dev Menu Styles */
+    #devModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10005; justify-content: center; align-items: center; }
+    .dev-content { background: white; padding: 25px; border-radius: 12px; width: 85%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .dev-title { margin: 0 0 15px 0; font-size: 20px; font-weight: 800; color: #333; }
+    .dev-stat { font-size: 15px; margin: 8px 0; color: #555; font-weight: 600; display: flex; justify-content: space-between; }
+    .dev-stat span { color: #007aff; }
+    .progress-track { height: 12px; background: #e3e3e8; border-radius: 6px; overflow: hidden; margin: 15px 0; }
+    .progress-fill { height: 100%; width: 0%; background: #34c759; transition: width 0.3s; }
+    .dev-btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    .dev-btn-sync { background: #007aff; color: white; }
+    .dev-btn-sync:disabled { background: #999; }
+    .dev-btn-close { background: #e5e5ea; color: black; }
 
     /* Dark Mode */
     @media (prefers-color-scheme: dark) {
@@ -307,6 +320,13 @@
       .point-link { color: #64b5f6; text-decoration-color: rgba(100, 181, 246, 0.4); }
       .point-link:active { background-color: rgba(100, 181, 246, 0.2); }
       #quickPeekModal .quick-peek-content { background: #000000; }
+      
+      /* Dark mode dev menu */
+      .dev-content { background: #1c1c1e; }
+      .dev-title { color: white; }
+      .dev-stat { color: #ccc; }
+      .progress-track { background: #3a3a3c; }
+      .dev-btn-close { background: #3a3a3c; color: white; }
     }
 
     /* iPad / Desktop Adaptive Layout */
@@ -323,6 +343,17 @@
   </div>
   
   <div id="toast">🔄 Data synced</div>
+
+  <div id="devModal">
+    <div class="dev-content">
+      <h3 class="dev-title">System Status</h3>
+      <div class="dev-stat">App Version: <span id="devAppVersion"></span></div>
+      <div class="dev-stat">Photos Cached: <span id="devPhotoStatus">Checking...</span></div>
+      <div class="progress-track"><div id="devProgressBar" class="progress-fill"></div></div>
+      <button id="devSyncBtn" class="dev-btn dev-btn-sync" onclick="syncMissingPhotos()">Download Missing Photos</button>
+      <button class="dev-btn dev-btn-close" onclick="document.getElementById('devModal').style.display='none'">Close Menu</button>
+    </div>
+  </div>
 
   <div id="channelModal">
     <div class="modal-content" style="max-height: 65vh;">
@@ -393,7 +424,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "03.20.26.v5";
+const APP_VERSION = "03.21.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -402,7 +433,7 @@ if ('serviceWorker' in navigator) {
     .catch(err => console.error('Bouncer failed:', err));
 }
 
-// The Secret Triple-Tap Logic
+// --- NEW SECERET CACHE MENU LOGIC ---
 let tapCount = 0;
 let tapTimer = null;
 document.addEventListener("DOMContentLoaded", () => {
@@ -412,7 +443,7 @@ document.addEventListener("DOMContentLoaded", () => {
       tapCount++;
       clearTimeout(tapTimer);
       if (tapCount >= 3) {
-        showToast("App Version: " + APP_VERSION);
+        openDevMenu();
         tapCount = 0;
       } else {
         tapTimer = setTimeout(() => { tapCount = 0; }, 1000);
@@ -420,6 +451,86 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+async function openDevMenu() {
+    document.getElementById("devAppVersion").textContent = APP_VERSION;
+    document.getElementById("devModal").style.display = "flex";
+    await checkCacheStatus();
+}
+
+async function checkCacheStatus() {
+    if (!window.caches) return;
+    
+    let expectedIds = new Set();
+    points.forEach(p => { if (p["Image ID"]) expectedIds.add(p["Image ID"]); });
+    const totalExpected = expectedIds.size;
+
+    let cachedUrls = new Set();
+    const cacheNames = await caches.keys();
+    for (let name of cacheNames) {
+        const cache = await caches.open(name);
+        const reqs = await cache.keys();
+        reqs.forEach(req => {
+            if (req.url.includes('DeadmanPhotos')) cachedUrls.add(req.url);
+        });
+    }
+    
+    const cachedCount = cachedUrls.size;
+    document.getElementById("devPhotoStatus").textContent = `${cachedCount} / ${totalExpected}`;
+    document.getElementById("devProgressBar").style.width = totalExpected === 0 ? "0%" : Math.min(100, (cachedCount / totalExpected * 100)) + "%";
+    
+    const btn = document.getElementById("devSyncBtn");
+    if (cachedCount >= totalExpected) {
+        btn.textContent = "All Photos Cached!";
+        btn.disabled = true;
+    } else {
+        btn.textContent = "Download Missing Photos";
+        btn.disabled = false;
+    }
+    
+    return { expectedIds, cachedUrls };
+}
+
+async function syncMissingPhotos() {
+    const btn = document.getElementById("devSyncBtn");
+    btn.disabled = true;
+    btn.textContent = "Calculating...";
+
+    const status = await checkCacheStatus();
+    
+    // Build precise URLs so we can match them against what is cached
+    const baseOrigin = new URL('.', document.baseURI).href;
+    let expectedUrls = Array.from(status.expectedIds).map(id => baseOrigin + `DeadmanPhotos/${id}.jpg`);
+    let missingUrls = expectedUrls.filter(url => !status.cachedUrls.has(url));
+
+    let successCount = status.cachedUrls.size;
+    const totalExpected = status.expectedIds.size;
+
+    // Put them directly in a safe vault compartment so they are ready for offline use
+    const photoCache = await caches.open('tcm-vault-photos');
+
+    // We fetch in small batches of 5 so iOS doesn't panic and kill the app
+    for (let i = 0; i < missingUrls.length; i += 5) {
+        const batch = missingUrls.slice(i, i + 5);
+        await Promise.all(batch.map(async (url) => {
+            try {
+                const response = await fetch(url, { cache: 'no-store' }); 
+                if (response.ok || response.type === 'opaque') {
+                    await photoCache.put(url, response.clone());
+                    successCount++;
+                }
+            } catch(e) { console.log("Failed to fetch: " + url); }
+        }));
+        
+        document.getElementById("devPhotoStatus").textContent = `${successCount} / ${totalExpected}`;
+        document.getElementById("devProgressBar").style.width = (successCount / totalExpected * 100) + "%";
+        btn.textContent = `Downloading... ${Math.round(successCount / totalExpected * 100)}%`;
+    }
+
+    btn.textContent = "Download Complete";
+    await checkCacheStatus();
+}
+// --- END SECERET CACHE MENU LOGIC ---
 
 const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
 
@@ -430,12 +541,17 @@ async function loadTCMData() {
     let textData = await response.text(); 
     let oldData = localStorage.getItem("tcmpoints_vault") || "[]";
     
+    // Normalize both strings to ignore invisible formatting differences
     let newClean = JSON.stringify(JSON.parse(textData));
     let oldClean = JSON.stringify(JSON.parse(oldData));
 
+    // Only update if the actual data is different
     if (newClean !== oldClean && newClean.length > 50) {
+      console.log("New data found! Updating local cache and UI...");
       localStorage.setItem("tcmpoints_vault", newClean); 
       receiveBackgroundUpdate(newClean); 
+    } else {
+      console.log("Data is identical. No update needed.");
     }
   } catch (e) {
     console.log("Offline or failed to fetch. Relying on local storage.");
@@ -445,9 +561,10 @@ async function loadTCMData() {
 // Initial Load
 loadTCMData();
 
-// The Visibility Tripwire 
+// The Visibility Tripwire (Syncs instantly when you switch back to the app)
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
+    console.log("App resumed. Silently checking for updates...");
     loadTCMData();
   }
 });
@@ -1183,7 +1300,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     return { detailsDOM: details, hasFilteredContent: hasFilteredContent, headerEl: headerInfo };
   }
 
-    cardContainer.addEventListener('click', (e) => {
+  cardContainer.addEventListener('click', (e) => {
     const card = e.target.closest('.point-card');
     if (!card) return; 
     
@@ -1306,9 +1423,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       document.documentElement.style.setProperty('--detail-header-height', detailHeaderH + 'px');
     }
   });
-
-  // --- NEW SCROLL MATH BLOCK END ---
-
 
   function renderRows(preserveState = false, currentScroll = 0, activePointId = null, activeCardIsShowingAllText = false) {
     const fragment = document.createDocumentFragment();
