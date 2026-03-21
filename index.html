@@ -32,7 +32,6 @@
 
    #mainStickyHeader {
       position: sticky; top: 0; background: #f0f0f0; z-index: 100;
-      /* env(safe-area-inset-top) automatically calculates the size of your notch/clock */
       padding: calc(12px + env(safe-area-inset-top)) 0 0 0; 
       border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
     }
@@ -360,7 +359,6 @@
       <div class="header-top-row">
         <div>
           <h1 id="versionTapTarget">Point Database</h1>
-
           <p id="resultsCounter">Search Results: 0 of 0</p>
           <p id="searchQueryDisplay"></p>
         </div>
@@ -394,6 +392,9 @@
   </div>
 
 <script>
+// --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
+const APP_VERSION = "03.20.26.v3";
+
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js')
@@ -401,26 +402,26 @@ if ('serviceWorker' in navigator) {
     .catch(err => console.error('Bouncer failed:', err));
 }
 
-const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
-
-// Change this string right here whenever you push a new update!
-const APP_VERSION = "03.20.26.v1"; 
-
 // The Secret Triple-Tap Logic
 let tapCount = 0;
 let tapTimer = null;
-document.getElementById("versionTapTarget").addEventListener("click", () => {
-  tapCount++;
-  clearTimeout(tapTimer);
-  if (tapCount >= 3) {
-    showToast("App Version: " + APP_VERSION);
-    tapCount = 0;
-  } else {
-    // Reset the counter if they don't tap 3 times within 1 second
-    tapTimer = setTimeout(() => { tapCount = 0; }, 1000);
+document.addEventListener("DOMContentLoaded", () => {
+  const headerTitle = document.getElementById("versionTapTarget");
+  if(headerTitle) {
+    headerTitle.addEventListener("click", () => {
+      tapCount++;
+      clearTimeout(tapTimer);
+      if (tapCount >= 3) {
+        showToast("App Version: " + APP_VERSION);
+        tapCount = 0;
+      } else {
+        tapTimer = setTimeout(() => { tapCount = 0; }, 1000);
+      }
+    });
   }
 });
 
+const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
 
 // Fetch the database
 async function loadTCMData() {
@@ -429,17 +430,12 @@ async function loadTCMData() {
     let textData = await response.text(); 
     let oldData = localStorage.getItem("tcmpoints_vault") || "[]";
     
-    // Normalize both strings to ignore invisible formatting differences
     let newClean = JSON.stringify(JSON.parse(textData));
     let oldClean = JSON.stringify(JSON.parse(oldData));
 
-    // Only update if the actual data is different
     if (newClean !== oldClean && newClean.length > 50) {
-      console.log("New data found! Updating local cache and UI...");
       localStorage.setItem("tcmpoints_vault", newClean); 
       receiveBackgroundUpdate(newClean); 
-    } else {
-      console.log("Data is identical. No update needed.");
     }
   } catch (e) {
     console.log("Offline or failed to fetch. Relying on local storage.");
@@ -449,15 +445,14 @@ async function loadTCMData() {
 // Initial Load
 loadTCMData();
 
-// The Visibility Tripwire (Syncs instantly when you switch back to the app)
+// The Visibility Tripwire 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
-    console.log("App resumed. Silently checking for updates...");
     loadTCMData();
   }
 });
 
-// Instant Offline Boot (Replaces Scriptable's INJECT_DATA_HERE)
+// Instant Offline Boot
 let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   
   let points = [];
@@ -677,7 +672,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   }
   window.addEventListener('resize', updateStickyHeaderHeights);
 
-  // Dropdown Search Bar Logic
   function toggleSearchDropdown() {
     const dropdown = document.getElementById("searchDropdown");
     dropdown.classList.toggle("expanded");
@@ -707,7 +701,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     }
   });
 
-  // Expand standard abbreviations on the fly
   function expandTCMPoint(term) {
     term = term.trim();
     const match = term.match(/^([a-z\.]+)(?:[\s\-\.]*)(\d+)$/i);
@@ -861,7 +854,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     return escaped.replace(activeHighlightRegex, "<mark>$1</mark>");
   }
 
-  // Parses Markdown Tables and supports Cell Merging (Colspan/Rowspan)
   function formatTextWithTables(text) {
     let normalizedText = text.replace(/\r?\n/g, '\n');
     if (!normalizedText.includes('|')) return normalizedText.replace(/\n/g, "<br>");
@@ -872,26 +864,20 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     let tableRows = [];
     let isHeaderRow = [];
 
-    // Helper to render the collected table data into HTML
     function renderCurrentTable() {
       if (tableRows.length === 0) return "";
       
-      // Create a grid object to track colspans, rowspans, and skipped cells
       let grid = tableRows.map(row => row.map(cellText => ({
         text: cellText.trim(), colspan: 1, rowspan: 1, skip: false
       })));
 
-      // Calculate spans (Right-to-Left, Bottom-to-Top)
       for (let r = 0; r < grid.length; r++) {
         for (let c = 0; c < grid[r].length; c++) {
           
-          // Strip HTML tags (like <mark> from search) and decode escaped characters
           let rawText = grid[r][c].text.replace(/<[^>]+>/g, '').trim();
           
-          // Check for horizontal merge (>)
           if (rawText === '&gt;' || rawText === '>') {
             grid[r][c].skip = true;
-            // Find the closest non-skipped cell to the left and increase its colspan
             for (let left = c - 1; left >= 0; left--) {
               if (!grid[r][left].skip) {
                 grid[r][left].colspan += 1;
@@ -899,10 +885,8 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
               }
             }
           }
-          // Check for vertical merge (^)
           else if (rawText === '^') {
             grid[r][c].skip = true;
-            // Find the closest non-skipped cell above and increase its rowspan
             for (let up = r - 1; up >= 0; up--) {
               if (!grid[up][c].skip) {
                 grid[up][c].rowspan += 1;
@@ -913,7 +897,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
         }
       }
 
-      // Generate the HTML string using standard concatenation
       let html = '<table class="tcm-table"><tbody>';
       for (let r = 0; r < grid.length; r++) {
         html += '<tr>';
@@ -933,7 +916,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       return html;
     }
 
-    // Process each line of text
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i].trim();
       let cleanLine = line.replace(/<[^>]+>/g, '').replace(/\s/g, ''); 
@@ -945,13 +927,11 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
           isHeaderRow = [];
         }
         
-        // Detect markdown header separator (e.g., |---|---|)
         if (/^\|(?:[-:]+\|)+$/.test(cleanLine)) {
           if (tableRows.length > 0) isHeaderRow[tableRows.length - 1] = true;
           continue; 
         }
         
-        // Split row into cells
         let cells = line.split('|').slice(1, -1);
         tableRows.push(cells);
         isHeaderRow.push(false);
@@ -964,20 +944,16 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       }
     }
     
-    // Catch a table if it ends on the very last line of the text block
     if (inTable) output += renderCurrentTable();
     
     return output;
   }
 
-  // --- NEW: Linkify Points System ---
   function linkifyPoints(htmlText) {
     if (!htmlText) return "";
     
-    // Regex to catch standard TCM point abbreviations (e.g. ST-36, ST 36, DU 20, EX-HN 3)
     const regex = /\b(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*(\d+)\b/gi;
     
-    // Split by HTML tags to avoid replacing text inside attributes or existing tags
     const parts = htmlText.split(/(<[^>]*>)/g);
     for (let i = 0; i < parts.length; i++) {
       if (!parts[i].startsWith("<")) {
@@ -990,7 +966,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   }
 
   function openQuickPeek(chan, num) {
-    // Standardize the channel prefix to match database IDs
     chan = chan.toUpperCase().replace(/\./g, "");
     const aliases = {
       'HE': 'HT', 'TB': 'SJ', 'TE': 'SJ', 'TH': 'SJ', 'P': 'PC',
@@ -998,7 +973,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     };
     let stdChan = aliases[chan] || chan;
     
-    // Try standard ID formats
     let targetId1 = stdChan + "-" + num;
     let targetId2 = stdChan + " " + num;
     let targetId3 = stdChan + num;
@@ -1020,14 +994,13 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
   function closeQuickPeek() {
     document.getElementById("quickPeekModal").style.display = "none";
-    document.getElementById("quickPeekContainer").innerHTML = ""; // Clean memory
+    document.getElementById("quickPeekContainer").innerHTML = ""; 
   }
 
   function buildQuickPeekDOM(point) {
     const container = document.getElementById("quickPeekContainer");
     container.innerHTML = ""; 
 
-    // Header Info (Identical to detail-panel but for modal)
     const headerInfo = document.createElement("div"); headerInfo.className = "detail-header-info";
     
     const imgInfo = document.createElement("img"); 
@@ -1036,7 +1009,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     
     const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
     const titleEl = document.createElement("div"); titleEl.className = "detail-title";
-    titleEl.innerHTML = point["Short Name"]; // No search highlights in Quick Peek
+    titleEl.innerHTML = point["Short Name"]; 
     
     const meta = document.createElement("div"); meta.className = "detail-meta";
     const fullName = point["Full Name"] || point[" Full Name"] || "";
@@ -1054,12 +1027,10 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     closeBtn.onclick = closeQuickPeek;
     navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); container.appendChild(headerInfo);
 
-    // Body Sections
     const addDetail = (label, value) => {
       if (!value) return; 
       const div = document.createElement("div"); 
       div.className = "point-notes";
-      // We parse tables, then linkify. No search-highlighting needed in Quick Peek.
       const fullHtml = linkifyPoints(formatTextWithTables(escapeHTML(value)));
       div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'>" + fullHtml + "</div>";
       container.appendChild(div);
@@ -1237,6 +1208,12 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       return;
     }
     
+    // NEW: Height-Freeze Trick to prevent native browser phantom jumping
+    const currentPanelHeight = panel.getBoundingClientRect().height;
+    if (panel.classList.contains("open")) {
+        panel.style.minHeight = currentPanelHeight + "px";
+    }
+
     scroller.querySelectorAll('.point-card').forEach(c => c.classList.remove('active'));
     card.classList.add('active'); panel.innerHTML = "";
     
@@ -1260,18 +1237,21 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     }
 
     panel.dataset.activeId = pointId; panel.classList.add("open");
+    panel.style.minHeight = ""; // Release the height freeze
 
     const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
     const targetScrollTop = rowDiv.offsetTop - mainHeaderH - 10;
+    const detailHeaderH = result.headerEl.getBoundingClientRect().height;
+    const snapThreshold = targetScrollTop + detailHeaderH;
 
     if (isSilentOpen) {
       appContainer.scrollTop = exactScrollY;
     } else if (isSwipe) {
-      // If we scrolled past the scroller (roughly 100px past the target), snap instantly to top
-      if (exactScrollY > targetScrollTop + 100) {
-        appContainer.scrollTo({ top: targetScrollTop, behavior: 'auto' });
+      if (exactScrollY > snapThreshold) {
+        // Scrolled deep: Snap to the top of the detail panel instantly
+        appContainer.scrollTop = targetScrollTop;
       } else {
-        // Scroller is still visible, maintain exact vertical scroll
+        // Still looking at the scroller: Freeze scroll perfectly
         appContainer.scrollTop = exactScrollY;
       }
     }
@@ -1302,13 +1282,11 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     
     if (!isSilentOpen && !isSwipe) {
       setTimeout(() => { 
-        const headerHeightPx = result.headerEl.getBoundingClientRect().height;
-        document.documentElement.style.setProperty('--detail-header-height', headerHeightPx + 'px');
+        document.documentElement.style.setProperty('--detail-header-height', detailHeaderH + 'px');
         appContainer.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
       }, 50); 
     } else {
-      const headerHeightPx = result.headerEl.getBoundingClientRect().height;
-      document.documentElement.style.setProperty('--detail-header-height', headerHeightPx + 'px');
+      document.documentElement.style.setProperty('--detail-header-height', detailHeaderH + 'px');
     }
   });
 
@@ -1414,7 +1392,6 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     currentEditingPoint[currentEditingField] = newValue; 
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
     
-    // Update the clean vault so it matches Google's exact data
     let cleanVault = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     let targetPoint = cleanVault.find(p => p["Short Name"] === currentEditingPoint["Short Name"]);
     if (targetPoint) {
