@@ -393,7 +393,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "03.20.26.v3";
+const APP_VERSION = "03.20.26.v4";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1239,19 +1239,24 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     panel.dataset.activeId = pointId; panel.classList.add("open");
     panel.style.minHeight = ""; // Release the height freeze
 
+    // --- NEW SCROLL MATH BLOCK START ---
     const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
-    const targetScrollTop = rowDiv.offsetTop - mainHeaderH - 10;
     const detailHeaderH = result.headerEl.getBoundingClientRect().height;
-    const snapThreshold = targetScrollTop + detailHeaderH;
+    
+    // Y-Coordinate 1: The row title and horizontal scroller
+    const rowScrollTop = rowDiv.offsetTop - mainHeaderH - 10;
+    
+    // Y-Coordinate 2: Just the detail panel (horizontal scroller is scrolled out of view)
+    const panelScrollTop = panel.offsetTop - mainHeaderH;
 
     if (isSilentOpen) {
       appContainer.scrollTop = exactScrollY;
     } else if (isSwipe) {
-      if (exactScrollY > snapThreshold) {
-        // Scrolled deep: Snap to the top of the detail panel instantly
-        appContainer.scrollTop = targetScrollTop;
+      if (exactScrollY > panelScrollTop) {
+        // You are deep in the card. Snap to the Detail Header, NOT the scroller.
+        appContainer.scrollTop = panelScrollTop;
       } else {
-        // Still looking at the scroller: Freeze scroll perfectly
+        // The scroller is still visible. Do not move vertically.
         appContainer.scrollTop = exactScrollY;
       }
     }
@@ -1283,12 +1288,15 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     if (!isSilentOpen && !isSwipe) {
       setTimeout(() => { 
         document.documentElement.style.setProperty('--detail-header-height', detailHeaderH + 'px');
-        appContainer.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+        // Normal click smoothly scrolls to show the horizontal scroller
+        appContainer.scrollTo({ top: rowScrollTop, behavior: 'smooth' });
       }, 50); 
     } else {
       document.documentElement.style.setProperty('--detail-header-height', detailHeaderH + 'px');
     }
   });
+  // --- NEW SCROLL MATH BLOCK END ---
+
 
   function renderRows(preserveState = false, currentScroll = 0, activePointId = null, activeCardIsShowingAllText = false) {
     const fragment = document.createDocumentFragment();
