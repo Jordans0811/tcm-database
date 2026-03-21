@@ -1183,7 +1183,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     return { detailsDOM: details, hasFilteredContent: hasFilteredContent, headerEl: headerInfo };
   }
 
-  cardContainer.addEventListener('click', (e) => {
+    cardContainer.addEventListener('click', (e) => {
     const card = e.target.closest('.point-card');
     if (!card) return; 
     
@@ -1201,14 +1201,15 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     const index = Array.from(scroller.children).indexOf(card);
     const exactScrollY = appContainer.scrollTop; 
 
+    const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+
     if (panel.dataset.activeId === pointId && !isSilentOpen) {
       panel.classList.remove("open"); panel.dataset.activeId = ""; card.classList.remove("active");
-      const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
       appContainer.scrollTo({ top: rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
       return;
     }
     
-    // NEW: Height-Freeze Trick to prevent native browser phantom jumping
+    // Height-Freeze Trick to prevent native browser phantom jumping
     const currentPanelHeight = panel.getBoundingClientRect().height;
     if (panel.classList.contains("open")) {
         panel.style.minHeight = currentPanelHeight + "px";
@@ -1224,14 +1225,23 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
        panel.classList.add("show-all-text"); card.dataset.restoreShowAllText = "false";
     }
 
+    // --- TOGGLE BUTTON CREATION ---
     if (result.hasFilteredContent) {
       const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
       const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
       toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
       toggleBtn.onclick = (ev) => {
         ev.stopPropagation();
-        if (panel.classList.contains("show-all-text")) { panel.classList.remove("show-all-text"); toggleBtn.textContent = "Show full text"; }
-        else { panel.classList.add("show-all-text"); toggleBtn.textContent = "Show filtered text only"; }
+        if (panel.classList.contains("show-all-text")) { 
+          // SHRINKING TEXT: Snap back to the Detail Header
+          panel.classList.remove("show-all-text"); 
+          toggleBtn.textContent = "Show full text"; 
+          appContainer.scrollTo({ top: panel.offsetTop - document.getElementById("mainStickyHeader").offsetHeight, behavior: 'auto' });
+        } else { 
+          // EXPANDING TEXT
+          panel.classList.add("show-all-text"); 
+          toggleBtn.textContent = "Show filtered text only"; 
+        }
       };
       stickyBtnContainer.appendChild(toggleBtn); result.detailsDOM.appendChild(stickyBtnContainer); 
     }
@@ -1239,24 +1249,17 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     panel.dataset.activeId = pointId; panel.classList.add("open");
     panel.style.minHeight = ""; // Release the height freeze
 
-    // --- NEW SCROLL MATH BLOCK START ---
-    const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
     const detailHeaderH = result.headerEl.getBoundingClientRect().height;
-    
-    // Y-Coordinate 1: The row title and horizontal scroller
     const rowScrollTop = rowDiv.offsetTop - mainHeaderH - 10;
-    
-    // Y-Coordinate 2: Just the detail panel (horizontal scroller is scrolled out of view)
     const panelScrollTop = panel.offsetTop - mainHeaderH;
 
+    // --- SWIPE SCROLL MATH ---
     if (isSilentOpen) {
       appContainer.scrollTop = exactScrollY;
     } else if (isSwipe) {
       if (exactScrollY > panelScrollTop) {
-        // You are deep in the card. Snap to the Detail Header, NOT the scroller.
         appContainer.scrollTop = panelScrollTop;
       } else {
-        // The scroller is still visible. Do not move vertically.
         appContainer.scrollTop = exactScrollY;
       }
     }
@@ -1267,14 +1270,23 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
        const updatedChannelPoints = Array.from(scroller.children).map(c => points.find(p => p["Short Name"] === c.dataset.id));
        const refreshedResult = buildPointDetailsDOM(updatedPoint, index, updatedChannelPoints, scroller, panel, card, rowDiv);
        panel.appendChild(refreshedResult.detailsDOM);
+       
        if (refreshedResult.hasFilteredContent) {
           const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
           const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
           toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
           toggleBtn.onclick = (ev) => {
             ev.stopPropagation();
-            if (panel.classList.contains("show-all-text")) { panel.classList.remove("show-all-text"); toggleBtn.textContent = "Show full text"; }
-            else { panel.classList.add("show-all-text"); toggleBtn.textContent = "Show filtered text only"; }
+            if (panel.classList.contains("show-all-text")) { 
+              // SHRINKING TEXT: Snap back to the Detail Header
+              panel.classList.remove("show-all-text"); 
+              toggleBtn.textContent = "Show full text"; 
+              appContainer.scrollTo({ top: panel.offsetTop - document.getElementById("mainStickyHeader").offsetHeight, behavior: 'auto' });
+            } else { 
+              // EXPANDING TEXT
+              panel.classList.add("show-all-text"); 
+              toggleBtn.textContent = "Show filtered text only"; 
+            }
           };
           stickyBtnContainer.appendChild(toggleBtn); refreshedResult.detailsDOM.appendChild(stickyBtnContainer); 
        }
@@ -1288,13 +1300,13 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     if (!isSilentOpen && !isSwipe) {
       setTimeout(() => { 
         document.documentElement.style.setProperty('--detail-header-height', detailHeaderH + 'px');
-        // Normal click smoothly scrolls to show the horizontal scroller
         appContainer.scrollTo({ top: rowScrollTop, behavior: 'smooth' });
       }, 50); 
     } else {
       document.documentElement.style.setProperty('--detail-header-height', detailHeaderH + 'px');
     }
   });
+
   // --- NEW SCROLL MATH BLOCK END ---
 
 
