@@ -424,7 +424,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "03.23.26.v1";
+const APP_VERSION = "03.23.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1069,7 +1069,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   function linkifyPoints(htmlText) {
     if (!htmlText) return "";
     
-    const regex = /\b(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*(\d+)\b/gi;
+    const regex = /\b(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*(\d+)\b/gi;
     
     const parts = htmlText.split(/(<[^>]*>)/g);
     for (let i = 0; i < parts.length; i++) {
@@ -1086,7 +1086,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     chan = chan.toUpperCase().replace(/\./g, "");
     const aliases = {
       'HE': 'HT', 'TB': 'SJ', 'TE': 'SJ', 'TH': 'SJ', 'P': 'PC',
-      'LIV': 'LV', 'KID': 'KD', 'UB': 'BL', 'REN': 'REN', 'RN': 'CV', 'DU': 'DU'
+      'LIV': 'LV', 'LV': 'LV', 'KID': 'KD', 'UB': 'BL', 'REN': 'REN', 'RN': 'CV', 'DU': 'DU'
     };
     let stdChan = aliases[chan] || chan;
     
