@@ -2011,8 +2011,8 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     compareZoomLevel += changeAmount;
     
     // Set safety limits so it doesn't break the UI
-    if (compareZoomLevel < 0.55) compareZoomLevel = 0.55; // Max zoom out (~55%)
-    if (compareZoomLevel > 1.90) compareZoomLevel = 1.90; // Max zoom in (~190%)
+    if (compareZoomLevel < 0.40) compareZoomLevel = 0.40; // Max zoom out (~55%)
+    if (compareZoomLevel > 2.20) compareZoomLevel = 2.10 // Max zoom in (~190%)
     
     // Apply the math to the CSS variables
     document.getElementById("compareTable").style.setProperty('--comp-zoom', compareZoomLevel);
