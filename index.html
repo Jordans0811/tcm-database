@@ -14,10 +14,11 @@
       --header-height: 100px; 
       --detail-header-height: 105px; 
     }
-    html, body {
+        html, body {
       height: 100%; overflow: hidden; margin: 0; padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: #f0f0f0; font-size: 14px;
+      overscroll-behavior: none; /* Stops the main window from bouncing */
     }
    #appContainer {
       height: 100%;
@@ -28,7 +29,9 @@
       transform: translateZ(0);
       will-change: scroll-position;
       contain: layout style paint;
+      overscroll-behavior-y: none; /* Stops the content list from pulling down the header */
     }
+
 
    #mainStickyHeader {
       position: sticky; top: 0; background: #f0f0f0; z-index: 100;
@@ -36,10 +39,15 @@
       border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
     }
     
-    .header-top-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0 15px 12px 15px; }
+    .header-top-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0 15px 4px 15px; }
     h1 { font-size: 22px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
     #resultsCounter { font-size: 13px; color: #8e8e93; margin: 0; font-weight: 500;}
-    #searchQueryDisplay { font-size: 12px; color: #8e8e93; margin: 2px 0 0 0; font-style: italic; display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65vw; }
+        #searchQueryDisplay { 
+      font-size: 12px; color: #8e8e93; margin: 2px 0 0 0; font-style: italic; 
+      display: block; visibility: hidden; min-height: 10px; /* Reserves the space permanently */
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65vw; 
+    }
+
     
     /* Header & Icon Buttons */
     .header-actions { display: flex; gap: 10px; align-items: center; }
@@ -58,7 +66,7 @@
     #searchDropdown {
       display: none; 
       background: #f0f0f0; 
-      padding: 10px 15px 15px 15px; 
+      padding: 4px 15px 15px 15px; 
       border-bottom: 1px solid #d1d1d6;
     }
     #searchDropdown.expanded {
@@ -259,13 +267,43 @@
     }
     .point-link:active { background-color: rgba(0, 122, 255, 0.15); }
 
-    /* Quick Peek Modal Specifics */
-    #quickPeekModal .quick-peek-content {
-      max-height: 85vh; width: 95%; max-width: 600px; padding: 0; overflow-y: auto; background: #f0f0f5;
+    /* Quick Peek Modal Specifics - Side Sheet Layout */
+    #quickPeekModal {
+      justify-content: flex-end; /* Pushes the panel to the right side */
+      align-items: stretch; /* Stretches it to the very top and bottom */
+      padding: 0;
     }
-    #quickPeekModal .detail-header-info { top: 0; margin: 0; border-top-left-radius: 12px; border-top-right-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    #quickPeekModal .point-notes { margin: 12px; }
+    
+    #quickPeekModal .quick-peek-content {
+      height: 100%; 
+      max-height: 100%; 
+      width: 88%; /* Takes up most of the screen on phones */
+      max-width: 420px; /* Locks to a nice reading width on iPads/Desktop */
+      margin: 0; 
+      padding: 0; 
+      overflow-y: auto; 
+      background: #f0f0f5;
+      border-radius: 20px 0 0 20px; /* Rounds only the left corners */
+      box-shadow: -5px 0 25px rgba(0,0,0,0.15); /* Casts a shadow to the left */
+      
+      /* Lightning-fast slide-in animation */
+      animation: slideInRight 0.15s cubic-bezier(0.0, 0.0, 0.2, 1) forwards;
+    }
+
+    @keyframes slideInRight {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+
+    #quickPeekModal .detail-header-info { 
+      top: 0; margin: 0; 
+      border-radius: 20px 0 0 0; /* Match the panel's left corner curve */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); 
+    }
+    
+    #quickPeekModal .point-notes { margin: 0 10px 7px 10px; }
     #quickPeekModal .section-label { top: 90px; } 
+ 
 
     /* Dev Menu Styles */
     #devModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10005; justify-content: center; align-items: center; }
@@ -279,6 +317,46 @@
     .dev-btn-sync { background: #007aff; color: white; }
     .dev-btn-sync:disabled { background: #999; }
     .dev-btn-close { background: #e5e5ea; color: black; }
+    
+    
+        /* Format Toolbar & Dropdown */
+    #editFieldSelect { width: 100%; padding: 10px; font-size: 14px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; background-color: #f8f8f8; color: #333; font-weight: bold; }
+    .format-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+    .format-toolbar button { padding: 6px 12px; font-size: 15px; border: 1px solid #c7c7cc; border-radius: 6px; background: #e3e3e8; cursor: pointer; color: black; transition: background 0.1s; }
+    .format-toolbar button:active { background: #d1d1d6; }
+    .format-toolbar input[type="color"] { width: 34px; height: 34px; padding: 0; border: none; cursor: pointer; border-radius: 6px; background: transparent; }
+    
+    
+    
+        .clear-format-btn { font-size: 13px !important; color: #ff3b30 !important; font-weight: 800; margin-left: auto; }
+    .section-edit-btn { float: right; cursor: pointer; color: #007aff; font-size: 10px; background: transparent; border: none; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+    .section-edit-btn:active { background: #e3e3e8; }
+    
+        .add-field-btn {
+      background: transparent; color: #007aff; border: 1px dashed #007aff;
+      border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600;
+      cursor: pointer; width: 100%; transition: background 0.2s; margin-top: 5px;
+    }
+    .add-field-btn:active { background: rgba(0, 122, 255, 0.1); }
+
+
+        .rich-text-editor {
+      /* Add these two properties to your existing block */
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      
+      height: 200px; width: 100%; box-sizing: border-box; font-family: inherit; font-size: 14px; 
+      padding: 10px; border: 1px solid #ccc; border-radius: 6px; overflow-y: auto; 
+      background: white; color: black; outline: none; line-height: 1.4;
+    }
+
+    .rich-text-editor:empty:before { content: attr(placeholder); color: #8e8e93; pointer-events: none; display: block; }
+    .rich-text-editor:focus { border-color: #007aff; box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3); }
+
+
+
+
+
 
     /* Dark Mode */
     @media (prefers-color-scheme: dark) {
@@ -319,7 +397,22 @@
 
       .point-link { color: #64b5f6; text-decoration-color: rgba(100, 181, 246, 0.4); }
       .point-link:active { background-color: rgba(100, 181, 246, 0.2); }
-      #quickPeekModal .quick-peek-content { background: #000000; }
+      #quickPeekModal 
+      .quick-peek-content { background: #000000; border-left: 1px solid #38383a; }
+      #quickPeekModal 
+      .detail-header-info { border-radius: 20px 0 0 0; }
+
+      
+      .clear-format-btn { color: #ff453a !important; }
+    .section-edit-btn { color: #0a84ff; }
+    .section-edit-btn:active { background: #3a3a3c; }
+
+            .add-field-btn { color: #0a84ff; border-color: #38383a; }
+      .add-field-btn:active { background: rgba(10, 132, 255, 0.15); }
+
+      .rich-text-editor { background: #1c1c1e; color: #ffffff; border-color: #38383a; }
+
+      
       
       /* Dark mode dev menu */
       .dev-content { background: #1c1c1e; }
@@ -331,8 +424,19 @@
 
     /* iPad / Desktop Adaptive Layout */
     @media (min-width: 1900px) {
-      #searchDropdown { display: block !important; padding: 10px 15px 15px 15px; border-bottom: 1px solid #d1d1d6; }
+      #searchDropdown { display: block !important; padding: 4px 15px 15px 15px; border-bottom: 1px solid #d1d1d6; }
       .search-toggle-btn { display: none !important; } 
+    
+          #editFieldSelect { background: #1c1c1e; color: #ffffff; border-color: #38383a; }
+      .format-toolbar button { background: #3a3a3c; color: white; border-color: #555; }
+      .format-toolbar button:active { background: #2c2c2e; }
+
+    
+    
+    
+    
+    
+    
     }
   </style>
 </head>
@@ -373,17 +477,31 @@
       </div>
   </div>
 
-  <div id="editModal">
+     <div id="editModal">
     <div class="modal-content">
-      <h3 id="editTitle" class="modal-title">Edit Notes</h3>
-      <textarea id="editArea" placeholder="Type your notes here..."></textarea>
+      <h3 id="editTitle" class="modal-title">Edit Point Data</h3>
+      
+      <select id="editFieldSelect" onchange="changeEditField()"></select>
+      
+      <div class="format-toolbar">
+        <button onclick="execFormat('bold')" title="Bold"><b>B</b></button>
+        <button onclick="execFormat('italic')" title="Italicize"><i>I</i></button>
+        <button onclick="execFormat('underline')" title="Underline"><u>U</u></button>
+        <input type="color" id="colorPicker" value="#CC5500" onchange="execFormat('foreColor', this.value)" title="Text Color">
+        <button onclick="execFormat('removeFormat')" class="clear-format-btn" title="Remove formatting">Tx</button>
+      </div>
+
+      <div id="editArea" contenteditable="true" class="rich-text-editor" placeholder="Type your notes here..."></div>
+      
       <div id="editError"></div>
       <div class="modal-buttons">
-        <button id="cancelBtn" class="cancel-btn" onclick="closeEditModal()">Cancel</button>
+        <button id="cancelBtnEdit" class="cancel-btn" onclick="closeEditModal()">Cancel</button>
         <button id="saveBtn" class="save-btn" onclick="saveEdit()">Save</button>
       </div>
     </div>
   </div>
+
+
 
   <div id="appContainer">
     <div id="mainStickyHeader">
@@ -851,6 +969,32 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     });
     return Array.from(variations);
   }
+  
+       const editArea = document.getElementById('editArea');
+
+  // 1. Prevent standard Enter behavior on KeyDown (Stops double-lines on PC/Mac)
+  editArea.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter' || event.keyCode === 13) {
+      event.preventDefault(); 
+    }
+  });
+
+  // 2. The iPad Bluetooth Workaround (Catching it on KeyUp!)
+  editArea.addEventListener('keyup', function(event) {
+    // Incorporating your StackOverflow logic
+    if (event.key === 'Enter' || event.keyCode === 13) {
+      event.preventDefault();
+      
+      // Because we added 'white-space: pre-wrap' to your CSS earlier,
+      // a standard '\n' character will create a perfect, database-safe line break!
+      document.execCommand('insertText', false, '\n');
+    }
+  });
+
+
+
+
+  
 
   function handleSearch(preserveState = false) {
     let currentScroll = 0; let activePointId = null; let activeCardIsShowingAllText = false;
@@ -950,13 +1094,14 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     
     resultsCounter.textContent = "Search Results: " + filteredPoints.length + " of " + points.length; 
     
-    const queryDisplay = document.getElementById("searchQueryDisplay");
+        const queryDisplay = document.getElementById("searchQueryDisplay");
     if (searchInput.value.trim().length > 0) {
       queryDisplay.textContent = '"' + searchInput.value.trim() + '"';
-      queryDisplay.style.display = "block";
+      queryDisplay.style.visibility = "visible"; // Changed from display = "block"
     } else {
-      queryDisplay.style.display = "none";
+      queryDisplay.style.visibility = "hidden"; // Changed from display = "none"
     }
+
 
     setTimeout(updateStickyHeaderHeights, 10);
     renderRows(preserveState, currentScroll, activePointId, activeCardIsShowingAllText);
@@ -964,12 +1109,29 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
   function escapeHTML(str) { return !str ? "" : String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   
-  function highlightText(text) {
+    function highlightText(text) {
     if (!text) return ""; 
     let escaped = escapeHTML(text); 
-    if (!activeHighlightRegex) return escaped;
-    return escaped.replace(activeHighlightRegex, "<mark>$1</mark>");
+    
+    // Parse BBCode into standard HTML
+    let withBB = escaped
+      .replace(/\[b\](.*?)\[\/b\]/gi, "<strong>$1</strong>")
+      .replace(/\[i\](.*?)\[\/i\]/gi, "<em>$1</em>")
+      .replace(/\[u\](.*?)\[\/u\]/gi, "<u>$1</u>")
+      .replace(/\[color=([^\]]+)\](.*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>");
+      
+    if (!activeHighlightRegex) return withBB;
+    
+    // Highlight text while ignoring anything inside HTML brackets
+    let parts = withBB.split(/(<[^>]*>)/g);
+    for (let i = 0; i < parts.length; i++) {
+      if (!parts[i].startsWith("<")) {
+        parts[i] = parts[i].replace(activeHighlightRegex, "<mark>$1</mark>");
+      }
+    }
+    return parts.join("");
   }
+
 
   function formatTextWithTables(text) {
     let normalizedText = text.replace(/\r?\n/g, '\n');
@@ -1114,7 +1276,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     document.getElementById("quickPeekContainer").innerHTML = ""; 
   }
 
-  function buildQuickPeekDOM(point) {
+    function buildQuickPeekDOM(point) {
     const container = document.getElementById("quickPeekContainer");
     container.innerHTML = ""; 
 
@@ -1145,10 +1307,12 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); container.appendChild(headerInfo);
 
     const addDetail = (label, value) => {
-      if (!value) return; 
+      // Hide empty fields in Quick Peek
+      if (!value || String(value).trim() === "") return; 
+      
       const div = document.createElement("div"); 
       div.className = "point-notes";
-      const fullHtml = linkifyPoints(formatTextWithTables(escapeHTML(value)));
+      const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
       div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'>" + fullHtml + "</div>";
       container.appendChild(div);
     };
@@ -1166,6 +1330,8 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     addDetail("CAM Notes", point["CAM Notes"]);
   }
 
+
+
   function showToast(msg) {
     let toast = document.getElementById("toast");
     toast.textContent = msg;
@@ -1177,7 +1343,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   searchInput.addEventListener("input", debounce(() => handleSearch(false), 300));
   searchInput.addEventListener("keydown", e => { if (e.key === "Escape") clearSearchText(); });
 
-  function buildPointDetailsDOM(point, index, channelPoints, scroller, panel, card, rowDiv) {
+    function buildPointDetailsDOM(point, index, channelPoints, scroller, panel, card, rowDiv) {
     const details = document.createElement("div"); details.className = "point-details";
     const headerInfo = document.createElement("div"); headerInfo.className = "detail-header-info";
     
@@ -1219,8 +1385,13 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); details.appendChild(headerInfo);
 
     let hasFilteredContent = false;
-    const addDetail = (label, value) => {
-      if (!value) return; 
+    
+    const addDetail = (label, value, fieldName) => {
+      // Hide the entire section if it's empty!
+      if (!value || String(value).trim() === "") return; 
+      
+      const editIcon = `<button class="section-edit-btn" onclick="event.stopPropagation(); window.triggerEdit('${point["Short Name"]}', '${fieldName}')">✏️</button>`;
+      
       const div = document.createElement("div"); 
       const paras = value.split(/\r?\n/).filter(p => p.trim() !== "");
       let matchingParas = []; let nonMatchingParas = [];
@@ -1243,47 +1414,52 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       }
 
       const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
+      const headerHtml = "<div class='section-label'>" + label + editIcon + "</div>";
 
       if (activeHighlightRegex && nonMatchingParas.length > 0) {
         hasFilteredContent = true;
         if (matchingParas.length === 0) {
           div.className = "point-notes hidden-section";
-          div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
+          div.innerHTML = headerHtml + "<div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
         } else {
           div.className = "point-notes";
           const filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
-          div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
+          div.innerHTML = headerHtml + "<div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
         }
       } else {
         div.className = "point-notes";
-        div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'>" + fullHtml + "</div>";
+        div.innerHTML = headerHtml + "<div class='section-content'>" + fullHtml + "</div>";
       }
       details.appendChild(div);
     };
 
-    addDetail("Location", point["Location "] || point.Location);
-    addDetail("Location Notes", point["Location Notes"]);
-    addDetail("Needling", point.Needling);
-    addDetail("Actions", point.Actions);
-    addDetail("Indications", point.Indications);
-    addDetail("Commentary", point.Commentary);
-    addDetail("Summary of Clinical Application", point["Summary of clinical application"]);
-    addDetail("Combinations", point.Combinations);
-    addDetail("Description", point.Description);
-    addDetail("Notes", point.Notes);
-    addDetail("CAM Notes", point["CAM Notes"]);
+    addDetail("Location", point["Location "] || point.Location, point.hasOwnProperty("Location ") ? "Location " : "Location");
+    addDetail("Location Notes", point["Location Notes"], "Location Notes");
+    addDetail("Needling", point.Needling, "Needling");
+    addDetail("Actions", point.Actions, "Actions");
+    addDetail("Indications", point.Indications, "Indications");
+    addDetail("Commentary", point.Commentary, "Commentary");
+    addDetail("Summary of Clinical Application", point["Summary of clinical application"], "Summary of clinical application");
+    addDetail("Combinations", point.Combinations, "Combinations");
+    addDetail("Description", point.Description, "Description");
+    addDetail("Notes", point.Notes, "Notes");
+    addDetail("CAM Notes", point["CAM Notes"], "CAM Notes");
 
-    const buttons = document.createElement("div"); buttons.className = "action-buttons";
-    const updateNotesBtn = document.createElement("button"); updateNotesBtn.textContent = "Update Notes";
-    updateNotesBtn.addEventListener("click", e => { e.stopPropagation(); openEditModal(point, "Notes"); });
-    const updateCamBtn = document.createElement("button"); updateCamBtn.textContent = "Update CAM Notes";
-    updateCamBtn.addEventListener("click", e => { e.stopPropagation(); openEditModal(point, "CAM Notes"); });
-    buttons.append(updateNotesBtn, updateCamBtn); details.appendChild(buttons);
+    // --- The "Add / Edit Field" Shortcut Button ---
+    const addFieldBtn = document.createElement("button");
+    addFieldBtn.className = "add-field-btn";
+    addFieldBtn.innerHTML = "➕ Add / Edit Field";
+    addFieldBtn.onclick = (e) => { 
+      e.stopPropagation(); 
+      window.triggerEdit(point["Short Name"], "Notes"); // Defaults to Notes, but they can pick anything from the dropdown
+    };
+    details.appendChild(addFieldBtn);
 
     let touchStartX = 0; let touchStartY = 0; let lastSwipeTime = 0;
     details.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }, {passive: true});
-        details.addEventListener('touchend', e => {
-      if (e.target.closest('.tcm-table') || e.target.closest('.point-link')) return; 
+    details.addEventListener('touchend', e => {
+      // Prevent swiping when tapping links or buttons inside the card
+      if (e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button')) return; 
 
       if (Date.now() - lastSwipeTime < 400) return; 
       let touchEndX = e.changedTouches[0].screenX; let touchEndY = e.changedTouches[0].screenY;
@@ -1299,6 +1475,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
     return { detailsDOM: details, hasFilteredContent: hasFilteredContent, headerEl: headerInfo };
   }
+
 
   cardContainer.addEventListener('click', (e) => {
     const card = e.target.closest('.point-card');
@@ -1486,42 +1663,147 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     else appContainer.scrollTo({ top: 0, behavior: "auto" }); 
   }
 
-  let currentEditingPoint = null; let currentEditingField = "";
+  let currentEditingPoint = null; 
+  let currentEditingField = "";
 
-  function openEditModal(point, fieldName) {
-    currentEditingPoint = point; currentEditingField = fieldName;
-    document.getElementById("editTitle").textContent = "Update " + fieldName + " (" + point["Short Name"] + ")";
-    document.getElementById("editArea").value = point[fieldName] || "";
+  function openEditModal(point, defaultField = "Notes") {
+    currentEditingPoint = point; 
+    
+    // Safely fetch field names (handling your data's "Location " trailing space quirk)
+    const fields = [
+      "Notes", "CAM Notes", 
+      point.hasOwnProperty("Location ") ? "Location " : "Location", 
+      "Location Notes", "Needling", "Actions", "Indications", 
+      "Commentary", "Summary of clinical application", 
+      "Combinations", "Description"
+    ];
+    
+    const select = document.getElementById("editFieldSelect");
+    select.innerHTML = "";
+    fields.forEach(field => {
+      const opt = document.createElement("option");
+      opt.value = field;
+      opt.textContent = field.trim(); // Hide trailing spaces from user
+      if (field === defaultField) opt.selected = true;
+      select.appendChild(opt);
+    });
+    
+    changeEditField();
+    
+    document.getElementById("editTitle").textContent = "Edit Data (" + point["Short Name"] + ")";
     document.getElementById("editError").style.display = "none";
     document.getElementById("editModal").style.display = "flex";
   }
 
-  function closeEditModal() { document.getElementById("editModal").style.display = "none"; currentEditingPoint = null; currentEditingField = ""; }
+  function changeEditField() {
+    currentEditingField = document.getElementById("editFieldSelect").value;
+    document.getElementById("editArea").value = currentEditingPoint[currentEditingField] || "";
+  }
 
+    // --- Global helper to trigger edits from inline HTML ---
+  window.triggerEdit = (pointId, fieldName) => {
+    const p = points.find(x => x["Short Name"] === pointId);
+    if (p) openEditModal(p, fieldName);
+  };
+
+    // --- 1. WYSIWYG Editor Commands ---
+  function execFormat(command, value = null) {
+    document.execCommand(command, false, value);
+    document.getElementById('editArea').focus();
+  }
+
+  // --- 2. Translators: BBCode <-> HTML ---
+  function bbcodeToHtml(text) {
+    if (!text) return "";
+    return escapeHTML(text)
+      .replace(/\[b\](.*?)\[\/b\]/gi, "<b>$1</b>")
+      .replace(/\[i\](.*?)\[\/i\]/gi, "<i>$1</i>")
+      .replace(/\[u\](.*?)\[\/u\]/gi, "<u>$1</u>")
+      .replace(/\[color=([^\]]+)\](.*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>")
+      .replace(/\n/g, "<br>"); // Convert newlines for the editable div
+  }
+
+  function htmlToBbcode(node) {
+    let out = "";
+    for (let child of node.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        out += child.nodeValue;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        let inner = htmlToBbcode(child);
+        let tag = child.tagName.toLowerCase();
+        
+        // Browsers handle rich text weirdly, this catches all variations securely
+        if (tag === 'b' || tag === 'strong') out += `[b]${inner}[/b]`;
+        else if (tag === 'i' || tag === 'em') out += `[i]${inner}[/i]`;
+        else if (tag === 'u') out += `[u]${inner}[/u]`;
+        else if (tag === 'span' && child.style.color) out += `[color=${child.style.color}]${inner}[/color]`;
+        else if (tag === 'font' && child.color) out += `[color=${child.color}]${inner}[/color]`;
+        else if (tag === 'br') out += `\n`;
+        else if (tag === 'div' || tag === 'p') out += (out.length > 0 ? `\n` : ``) + inner; // Handle Enter key
+        else out += inner;
+      }
+    }
+    return out;
+  }
+
+  // --- 3. Update the Modal Load logic ---
+  function changeEditField() {
+    currentEditingField = document.getElementById("editFieldSelect").value;
+    const rawData = currentEditingPoint[currentEditingField] || "";
+    // Inject Live HTML into the editor instead of raw tags
+    document.getElementById("editArea").innerHTML = bbcodeToHtml(rawData); 
+  }
+
+  // --- 4. The Safest Save Function (with Timeout) ---
   function saveEdit() {
-    const newValue = document.getElementById("editArea").value;
+    if (!navigator.onLine) {
+      failSave("No internet connection. Edits cannot be saved offline.");
+      return;
+    }
+
+    // Extract the HTML and convert it back to BBCode for Google Sheets
+    const editor = document.getElementById("editArea");
+    const newValue = htmlToBbcode(editor).trim();
+    
     document.getElementById("saveBtn").textContent = "Saving...";
     document.getElementById("saveBtn").disabled = true; 
-    document.getElementById("cancelBtn").disabled = true;
+    document.getElementById("cancelBtnEdit").disabled = true;
     document.getElementById("editError").style.display = "none";
     
     const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
     
+    // Set up the 10-Second Timeout Abort Controller
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); 
+
     fetch(dataUrl, {
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: controller.signal // Tie the timeout to the fetch
     })
     .then(() => {
+      clearTimeout(timeoutId); // Success! Clear the timeout.
       completeSave(newValue); 
     })
     .catch(err => {
-      failSave("Network error or offline");
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        failSave("Save timed out. Google took too long. Please try again.");
+      } else {
+        failSave("Network error. Your edit was NOT saved.");
+      }
     });
   }
 
+  function closeEditModal() { 
+    document.getElementById("editModal").style.display = "none"; 
+    currentEditingPoint = null; 
+    currentEditingField = ""; 
+  }
 
+  
   function completeSave(newValue) {
     currentEditingPoint[currentEditingField] = newValue; 
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
@@ -1555,7 +1837,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     document.getElementById("editError").textContent = errorMsg; document.getElementById("editError").style.display = "block"; resetModalButtons();
   }
 
-  function resetModalButtons() { document.getElementById("saveBtn").textContent = "Save"; document.getElementById("saveBtn").disabled = false; document.getElementById("cancelBtn").disabled = false; }
+  function resetModalButtons() { document.getElementById("saveBtn").textContent = "Save"; document.getElementById("saveBtn").disabled = false; document.getElementById("cancelBtnEdit").disabled = false; }
 
   handleSearch();
 </script>
