@@ -357,6 +357,65 @@
     .rich-text-editor:focus { border-color: #007aff; box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3); }
 
 
+    /* Floating Compare Basket */
+    #compareBasket {
+      position: fixed; bottom: -80px; left: 50%; transform: translateX(-50%);
+      background: #2c2c2e; color: white; padding: 12px 24px; border-radius: 30px;
+      display: flex; align-items: center; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10001;
+      cursor: pointer; font-weight: 800; font-size: 14px; white-space: nowrap;
+    }
+    #compareBasket.visible { bottom: 40px; }
+    #compareBasket button { background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 15px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: bold; transition: background 0.2s; }
+    #compareBasket button:active { background: rgba(255,255,255,0.4); }
+
+        /* Compare Matrix Modal Base Layout */
+    #compareModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f0f5; z-index: 10004; flex-direction: column; }
+    .compare-content { display: flex; flex-direction: column; height: 100%; width: 100%; }
+    .compare-header { display: flex; justify-content: space-between; align-items: center; padding: calc(15px + env(safe-area-inset-top)) 20px 15px 20px; background: white; border-bottom: 1px solid #d1d1d6; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    .compare-header h2 { margin: 0; font-size: 22px; color: #333; font-weight: 800; }
+    .compare-table-container { flex: 1; overflow: auto; padding: 0; -webkit-overflow-scrolling: touch; }
+    
+    /* Compare Modal Header Controls */
+    .compare-actions { display: flex; align-items: center; gap: 15px; }
+    .zoom-controls { display: flex; background: #e3e3e8; border-radius: 8px; overflow: hidden; }
+    .zoom-controls button { background: transparent; border: none; padding: 6px 12px; font-weight: bold; font-size: 15px; color: #333; cursor: pointer; border-right: 1px solid #d1d1d6; transition: background 0.1s; }
+    .zoom-controls button:last-child { border-right: none; }
+    .zoom-controls button:active { background: #c7c7cc; }
+
+    /* Responsive Matrix Table (With Dynamic Zoom Math) */
+    .compare-table { 
+      --comp-zoom: 1; /* Default Zoom Level */
+      width: max-content; min-width: 100%; background: white; margin: 0; border: none; 
+      box-shadow: none; border-collapse: separate; border-spacing: 0; 
+      font-size: calc(14px * var(--comp-zoom)); 
+      transition: font-size 0.2s;
+    }
+    .compare-table th, .compare-table td { 
+      min-width: calc(280px * var(--comp-zoom)); 
+      max-width: calc(400px * var(--comp-zoom)); 
+      vertical-align: top; border: none; border-bottom: 1px solid #e0e0e0; border-right: 1px solid #e0e0e0; 
+      padding: calc(15px * var(--comp-zoom)); 
+      transition: min-width 0.2s, max-width 0.2s, padding 0.2s;
+    }
+    
+    /* Sticky Row & Column Headers for Mobile Scrolling */
+    .compare-table th:first-child, .compare-table td:first-child { 
+      position: sticky; left: 0; background: #f8f8f8; z-index: 2; font-weight: 800; 
+      min-width: calc(110px * var(--comp-zoom)); 
+      max-width: calc(110px * var(--comp-zoom)); 
+      text-transform: uppercase; 
+      font-size: calc(12px * var(--comp-zoom)); 
+      color: #cc5500; border-right: 2px solid #ccc; box-shadow: 2px 0 5px rgba(0,0,0,0.03);
+    }
+    .compare-table thead th { 
+      position: sticky; top: 0; background: #e3e3e8; z-index: 3; 
+      font-size: calc(18px * var(--comp-zoom)); 
+      color: #333; border-bottom: 2px solid #ccc; 
+    }
+    .compare-table thead th:first-child { z-index: 4; border-right: 2px solid #ccc; } 
+
+
 
 
 
@@ -414,6 +473,21 @@
       .add-field-btn:active { background: rgba(10, 132, 255, 0.15); }
 
       .rich-text-editor { background: #1c1c1e; color: #ffffff; border-color: #38383a; }
+      
+      
+      
+          #compareModal { background: #000000; }
+    .compare-header, .compare-table { background: #1c1c1e; border-color: #38383a; }
+    .compare-header h2, .compare-table thead th { color: white; background: #2c2c2e; border-color: #555; }
+    .compare-table th:first-child, .compare-table td:first-child { background: #2c2c2e; border-color: #555; }
+    .compare-table td { border-color: #38383a; }
+
+    .zoom-controls { background: #3a3a3c; }
+    .zoom-controls button { color: #eee; border-color: #555; }
+    .zoom-controls button:active { background: #555; }
+
+      
+      
 
       
       
@@ -505,6 +579,36 @@
   </div>
 
 
+  <div id="compareBasket" onclick="openCompareModal()">
+    <span id="compareText">0 Points Selected</span>
+    <button onclick="event.stopPropagation(); clearCompare()">Clear</button>
+  </div>
+
+      <div id="compareModal">
+    <div class="compare-content">
+      
+      <div class="compare-header">
+        <h2>Compare Points</h2>
+        <div class="compare-actions">
+          <div class="zoom-controls">
+            <button onclick="adjustCompareZoom(-0.15)" title="Zoom Out">A-</button>
+            <button onclick="adjustCompareZoom(0.15)" title="Zoom In">A+</button>
+          </div>
+          <button class="detail-nav-btn" onclick="closeCompareModal()" style="font-size:24px; color:#555;">✕</button>
+        </div>
+      </div>
+      
+      <div class="compare-table-container">
+        <table id="compareTable" class="tcm-table compare-table">
+          </table>
+      </div>
+
+    </div>
+  </div>
+
+
+
+
 
   <div id="appContainer">
     <div id="mainStickyHeader">
@@ -545,7 +649,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "03.30.26.v1";
+const APP_VERSION = "03.30.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1379,7 +1483,17 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
 
     const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
+    
+    // NEW: Compare Button
+    const compareBtn = document.createElement("button"); 
+    compareBtn.className = "detail-nav-btn"; 
+    compareBtn.innerHTML = "⚖️";
+    compareBtn.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
+    navGroup.appendChild(compareBtn);
+
+    // Existing Close Button
     const closeBtn = document.createElement("button"); closeBtn.className = "detail-nav-btn"; closeBtn.innerHTML = "✕";
+
     
     closeBtn.onclick = (e) => {
       e.stopPropagation(); 
@@ -1816,6 +1930,97 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   }
 
   
+    // --- COMPARE FEATURE LOGIC ---
+  let compareList = [];
+
+  function toggleCompare(pointId) {
+    if (compareList.includes(pointId)) {
+      compareList = compareList.filter(id => id !== pointId);
+      showToast("Removed from Compare");
+    } else {
+      if (compareList.length >= 3) {
+        showToast("You can only compare up to 3 points.");
+        return;
+      }
+      compareList.push(pointId);
+      showToast("Added to Compare");
+    }
+    updateCompareBasketUI();
+  }
+
+  function clearCompare() {
+    compareList = [];
+    updateCompareBasketUI();
+    closeCompareModal();
+  }
+
+  function updateCompareBasketUI() {
+    const basket = document.getElementById("compareBasket");
+    const text = document.getElementById("compareText");
+    if (compareList.length > 0) {
+      text.innerHTML = `<strong>${compareList.length} Point${compareList.length > 1 ? "s" : ""}</strong> Selected [View]`;
+      basket.classList.add("visible");
+    } else {
+      basket.classList.remove("visible");
+    }
+  }
+
+  function openCompareModal() {
+    if (compareList.length === 0) return;
+    const table = document.getElementById("compareTable");
+    
+    // The fields to display in the matrix rows
+    const fields = [
+      { key: "Location ", altKey: "Location", label: "Location" },
+      { key: "Needling", label: "Needling" },
+      { key: "Actions", label: "Actions" },
+      { key: "Indications", label: "Indications" },
+      { key: "Combinations", label: "Combinations" },
+      { key: "Commentary", label: "Commentary" }
+    ];
+
+    let pts = compareList.map(id => points.find(p => p["Short Name"] === id)).filter(Boolean);
+
+    let html = `<thead><tr><th>Data</th>`;
+    pts.forEach(p => { html += `<th>${p["Short Name"]}</th>`; });
+    html += `</tr></thead><tbody>`;
+
+    fields.forEach(f => {
+      html += `<tr><td>${f.label}</td>`;
+      pts.forEach(p => {
+         let rawVal = p[f.key] || p[f.altKey] || "";
+         let formatted = linkifyPoints(formatTextWithTables(highlightText(rawVal)));
+         html += `<td>${formatted || "<span style='color:#999;font-style:italic;'>No data</span>"}</td>`;
+      });
+      html += `</tr>`;
+    });
+
+    html += `</tbody>`;
+    table.innerHTML = html;
+    document.getElementById("compareModal").style.display = "flex";
+  }
+
+  function closeCompareModal() {
+    document.getElementById("compareModal").style.display = "none";
+  }
+
+  // --- COMPARE ZOOM LOGIC ---
+  let compareZoomLevel = 1.0;
+  
+  function adjustCompareZoom(changeAmount) {
+    compareZoomLevel += changeAmount;
+    
+    // Set safety limits so it doesn't break the UI
+    if (compareZoomLevel < 0.40) compareZoomLevel = 0.40; // Max zoom out (~55%)
+    if (compareZoomLevel > 2.20) compareZoomLevel = 2.10 // Max zoom in (~190%)
+    
+    // Apply the math to the CSS variables
+    document.getElementById("compareTable").style.setProperty('--comp-zoom', compareZoomLevel);
+  }
+
+
+
+  // --- STANDARD SAVE LOGIC ---
   function completeSave(newValue) {
     currentEditingPoint[currentEditingField] = newValue; 
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
@@ -1844,6 +2049,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     
     closeEditModal(); resetModalButtons();
   }
+
 
   function failSave(errorMsg) {
     document.getElementById("editError").textContent = errorMsg; document.getElementById("editError").style.display = "block"; resetModalButtons();
