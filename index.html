@@ -302,7 +302,10 @@
     }
     
     #quickPeekModal .point-notes { margin: 0 10px 7px 10px; }
-    #quickPeekModal .section-label { top: 90px; } 
+        #quickPeekModal .section-label { 
+      top: var(--qp-header-height, 90px); 
+    } 
+
  
 
     /* Dev Menu Styles */
@@ -542,7 +545,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "03.23.26.v2";
+const APP_VERSION = "03.30.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1244,7 +1247,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     return parts.join("");
   }
 
-  function openQuickPeek(chan, num) {
+    function openQuickPeek(chan, num) {
     chan = chan.toUpperCase().replace(/\./g, "");
     const aliases = {
       'HE': 'HT', 'TB': 'SJ', 'TE': 'SJ', 'TH': 'SJ', 'P': 'PC',
@@ -1269,7 +1272,16 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
     buildQuickPeekDOM(targetPoint);
     document.getElementById("quickPeekModal").style.display = "flex";
+
+    // NEW: Dynamically measure the header height so the sections stick perfectly
+    setTimeout(() => {
+      const qpHeader = document.querySelector('#quickPeekModal .detail-header-info');
+      if (qpHeader) {
+        document.documentElement.style.setProperty('--qp-header-height', qpHeader.getBoundingClientRect().height + 'px');
+      }
+    }, 10);
   }
+
 
   function closeQuickPeek() {
     document.getElementById("quickPeekModal").style.display = "none";
