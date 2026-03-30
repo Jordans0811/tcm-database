@@ -649,7 +649,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "03.30.26.v2";
+const APP_VERSION = "03.30.26.v3";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1976,7 +1976,12 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       { key: "Actions", label: "Actions" },
       { key: "Indications", label: "Indications" },
       { key: "Combinations", label: "Combinations" },
-      { key: "Commentary", label: "Commentary" }
+      { key: "Commentary", label: "Commentary" },
+      { key: "Summary of clinical application", label: "Summary of Clinical Application" },
+      { key: "Description", label: "Description" },
+      { key: "Notes", label: "Notes" },
+      { key: "CAM Notes", label: "CAM Notes" }
+      
     ];
 
     let pts = compareList.map(id => points.find(p => p["Short Name"] === id)).filter(Boolean);
