@@ -141,25 +141,44 @@
       border-top-left-radius: 10px; border-top-right-radius: 10px;
     }
     .detail-header-info img { width: 50px; height: 70px; object-fit: contain; border-radius: 4px; cursor: pointer; background: white; padding: 2px; flex-shrink: 0; }
-    .detail-title-group { flex: 1; min-width: 0; }
-    .detail-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .detail-title-group { 
+      flex: 1; 
+      min-width: 0; 
+      padding-top: 15px; /* Pushes the title and meta text down so it clears the floating buttons */
+    }
+    
+    .detail-title { 
+      font-size: 18px; 
+      font-weight: 800; 
+      margin-bottom: 4px; 
+      white-space: normal; /* Allows long point names to wrap naturally across the full width of the screen */
+      line-height: 1.2;
+    }
+
+
     .detail-meta { font-size: 12px; color: #666; display: flex; flex-wrap: wrap; gap: 4px; line-height: 1.2; }
     .detail-meta span:not(:last-child)::after { content: "•"; margin-left: 5px; color: #ccc; }
 
-        .detail-nav-group {
+        
+    
+              /* Floating Horizontal Control Pill (Top Right) */
+    .detail-nav-group {
+      position: absolute; /* Takes the buttons out of the layout flow */
+      top: 12px;
+      right: 15px;
       display: flex;
-      flex-direction: column; /* Stacks the buttons vertically */
+      flex-direction: row; 
       background: white; 
-      border-radius: 10px; /* Squares it off slightly */
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+      border-radius: 20px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
       overflow: hidden; 
-      flex-shrink: 0;
+      z-index: 10; /* Ensures they stay clickable over the text */
     }
     
     .detail-nav-btn {
-      padding: 8px 14px; 
+      padding: 8px 12px; 
       border: none;
-      border-bottom: 1px solid #f0f0f5; /* Adds subtle dividing lines */
+      border-right: 1px solid #f0f0f5; 
       background: transparent; 
       font-size: 16px;
       font-weight: bold; 
@@ -168,10 +187,12 @@
     }
     
     .detail-nav-btn:last-child {
-      border-bottom: none; /* Removes the line under the 'X' */
+      border-right: none; 
     }
     
     .detail-nav-btn:active { background: #f0f0f0; }
+
+
 
 
     .sticky-toggle-container {
@@ -1543,8 +1564,8 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     imgInfo.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
     imgInfo.onclick = (e) => { e.stopPropagation(); openLightbox(index, channelPoints, scroller); };
     
-    const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
-        // NEW: Grab the importance data and create the HTML span
+        const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
+    
     const imp = point.Important ? String(point.Important).trim() : "";
     const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
 
@@ -1559,20 +1580,30 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     if (shortChan) metaHtml += "<span>" + shortChan + "</span>";
     meta.innerHTML = metaHtml;
     
-    titleGroup.appendChild(titleEl); titleGroup.appendChild(meta);
-    headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
+    titleGroup.appendChild(titleEl); 
+    titleGroup.appendChild(meta);
+    headerInfo.appendChild(imgInfo); 
+    headerInfo.appendChild(titleGroup);
 
-        const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
+    // NEW: Horizontal Top-Right Button Group
+    const navGroup = document.createElement("div"); 
+    navGroup.className = "detail-nav-group";
     
-    // 1. Importance Button (Top)
     const impBtn = document.createElement("button"); 
     impBtn.className = "detail-nav-btn"; 
     impBtn.innerHTML = "❗";
     impBtn.onclick = (e) => { e.stopPropagation(); cycleImportance(point["Short Name"]); };
     navGroup.appendChild(impBtn);
 
-    // 2. Close Button (Middle)
-    const closeBtn = document.createElement("button"); closeBtn.className = "detail-nav-btn"; closeBtn.innerHTML = "✕";
+    const compareBtn = document.createElement("button"); 
+    compareBtn.className = "detail-nav-btn"; 
+    compareBtn.innerHTML = "⚖️";
+    compareBtn.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
+    navGroup.appendChild(compareBtn);
+
+    const closeBtn = document.createElement("button"); 
+    closeBtn.className = "detail-nav-btn"; 
+    closeBtn.innerHTML = "✕";
     closeBtn.onclick = (e) => {
       e.stopPropagation(); 
       if (Date.now() - lastGlobalClickTime < 400) return; 
@@ -1587,16 +1618,9 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     };
     navGroup.appendChild(closeBtn);
 
-    // 3. Compare Button (Bottom)
-    const compareBtn = document.createElement("button"); 
-    compareBtn.className = "detail-nav-btn"; 
-    compareBtn.innerHTML = "⚖️";
-    compareBtn.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
-    navGroup.appendChild(compareBtn);
-
-    // Final Assembly (Only done ONCE at the very end!)
     headerInfo.appendChild(navGroup); 
     details.appendChild(headerInfo);
+
 
 
     let hasFilteredContent = false;
@@ -1985,7 +2009,9 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   }
   
   
-    // --- INSTANT IMPORTANCE TOGGLE ---
+      // --- INSTANT IMPORTANCE TOGGLE (WITH DEBOUNCE) ---
+  let importanceSyncTimers = {}; // This dictionary tracks the timers to protect Google Sheets
+
   function cycleImportance(pointId) {
     if (!navigator.onLine) {
       showToast("Cannot update importance while offline.");
@@ -2002,7 +2028,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     else if (current === "!") next = "!!";
     else if (current === "!!") next = "!!!";
     else if (current === "!!!") next = "";
-    else next = "!"; // Failsafe if it contains weird data
+    else next = "!"; 
 
     // 1. Optimistic UI Update (Instantly update local memory)
     p.Important = next;
@@ -2015,38 +2041,43 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       localStorage.setItem("tcmpoints_vault", JSON.stringify(cleanVault));
     }
 
-    // 2. Background Cloud Sync (Silent save to Google Sheets)
-    const payload = { id: pointId, field: "Important", value: next };
-    fetch(dataUrl, {
-      method: "POST", mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    }).catch(err => console.log("Background importance sync failed.", err));
-
-        // 3. Refresh the Screen
+    // 2. Refresh the Panels Instantly
     if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
     else handleSearch(true);
     
-    // 4. NEW: Instantly update the red bubble on the main scrolling card
+    // Instantly update the red bubble on the main scrolling card behind the modal
     const card = document.querySelector(`.point-card[data-id="${pointId}"]`);
     if (card) {
       let badge = card.querySelector(".card-importance");
       if (next === "") {
-        if (badge) badge.remove(); // Remove bubble if set to None
+        if (badge) badge.remove(); 
       } else {
         if (!badge) {
-          // Create bubble if it doesn't exist yet
           badge = document.createElement("div");
           badge.className = "card-importance";
           card.appendChild(badge);
         }
-        badge.textContent = next; // Update the text (!, !!, !!!)
+        badge.textContent = next; 
       }
     }
 
     showToast(`Importance set to ${next === "" ? "None" : next}`);
 
+    // 3. Smart Background Sync (Debounced for Google Sheets)
+    // Clear any pending saves for this specific point
+    clearTimeout(importanceSyncTimers[pointId]);
+    
+    // Wait 1.5 seconds after they STOP clicking before sending the final data to Google
+    importanceSyncTimers[pointId] = setTimeout(() => {
+      const payload = { id: pointId, field: "Important", value: next };
+      fetch(dataUrl, {
+        method: "POST", mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      }).catch(err => console.log("Background importance sync failed.", err));
+    }, 1500);
   }
+
 
   
   
