@@ -146,15 +146,33 @@
     .detail-meta { font-size: 12px; color: #666; display: flex; flex-wrap: wrap; gap: 4px; line-height: 1.2; }
     .detail-meta span:not(:last-child)::after { content: "•"; margin-left: 5px; color: #ccc; }
 
-    .detail-nav-group {
-      display: flex; background: white; border-radius: 20px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow: hidden; flex-shrink: 0;
+        .detail-nav-group {
+      display: flex;
+      flex-direction: column; /* Stacks the buttons vertically */
+      background: white; 
+      border-radius: 10px; /* Squares it off slightly */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+      overflow: hidden; 
+      flex-shrink: 0;
     }
+    
     .detail-nav-btn {
-      padding: 8px 14px; border: none; background: transparent; font-size: 16px;
-      font-weight: bold; color: #cc5500; cursor: pointer;
+      padding: 8px 14px; 
+      border: none;
+      border-bottom: 1px solid #f0f0f5; /* Adds subtle dividing lines */
+      background: transparent; 
+      font-size: 16px;
+      font-weight: bold; 
+      color: #cc5500; 
+      cursor: pointer;
     }
+    
+    .detail-nav-btn:last-child {
+      border-bottom: none; /* Removes the line under the 'X' */
+    }
+    
     .detail-nav-btn:active { background: #f0f0f0; }
+
 
     .sticky-toggle-container {
       position: sticky; bottom: 20px; z-index: 89; 
@@ -417,6 +435,24 @@
 
 
 
+        /* Importance Badges */
+    .point-card { position: relative; } /* Ensures the badge anchors to the card */
+    
+    .card-importance { 
+      position: absolute; top: 6px; right: 6px; 
+      background: rgba(255, 255, 255, 0.95); color: #ff3b30; 
+      font-weight: 900; padding: 2px 6px; border-radius: 10px; 
+      font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.15); 
+      z-index: 10; letter-spacing: 1px; pointer-events: none; 
+    }
+    
+    .importance-badge { 
+      color: #ff3b30; font-weight: 900; letter-spacing: 1px; 
+      margin-left: 8px; font-size: 20px; 
+      text-shadow: 0 1px 2px rgba(255, 59, 48, 0.2); 
+    }
+
+
 
 
 
@@ -486,7 +522,10 @@
     .zoom-controls button { color: #eee; border-color: #555; }
     .zoom-controls button:active { background: #555; }
 
-      
+    .card-importance { background: rgba(28, 28, 30, 0.95); }
+
+    .detail-nav-btn { border-bottom-color: #333; }
+
       
 
       
@@ -813,7 +852,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
   function generateSearchIndex(point) {
     const visibleData = [
-      point["Short Name"], point["Full Name"], point["Channel Full Name"],
+      point.Important, point["Short Name"], point["Full Name"], point["Channel Full Name"],
       point["Channel Short Name"], point["Location"], point.Location,
       point["Location Notes"], point.Needling, point.Actions, point.Indications, point.Commentary,
       point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
@@ -842,7 +881,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       point._fullNameLower = (point["Full Name"] || point[" Full Name"] || "").toString().toLowerCase();
       
       const fields = [
-        point["Short Name"], point["Full Name"] || point[" Full Name"], point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"],
+        point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"],
         point["Location "] || point.Location, point["Location Notes"], point.Needling,
         point.Actions, point.Indications, point.Commentary,
         point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
@@ -919,24 +958,43 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
       const sameStructure = processed.length === points.length && processed.every((p, i) => points[i] && p["Short Name"] === points[i]["Short Name"]);
 
-      if (sameStructure) {
+            if (sameStructure) {
         points = processed;
         changedIds.forEach(id => {
           const card = document.querySelector('.point-card[data-id="' + id + '"]');
           if (!card) return;
           const newPoint = processed.find(p => p["Short Name"] === id);
           if (!newPoint) return;
+          
           const label = card.querySelector('.card-label');
           if (label) label.innerHTML = highlightText(newPoint["Short Name"]);
+          
           const img = card.querySelector('img');
           if (img) {
             const newSrc = "DeadmanPhotos/" + newPoint["Image ID"] + ".jpg";
             if (img.src !== newSrc) img.src = newSrc;
           }
+
+          // --- NEW: Sync the Importance Bubble instantly ---
+          const imp = newPoint.Important ? String(newPoint.Important).trim() : "";
+          let badge = card.querySelector(".card-importance");
+          if (imp === "") {
+            if (badge) badge.remove(); 
+          } else {
+            if (!badge) {
+              badge = document.createElement("div");
+              badge.className = "card-importance";
+              card.appendChild(badge);
+            }
+            badge.textContent = imp;
+          }
+          // -----------------------------------------------
+          
         });
         const openPanel = document.querySelector('.detail-panel.open');
         if (openPanel && typeof window.refreshActivePanel === 'function') window.refreshActivePanel();
-      } else {
+      }
+ else {
         points = processed;
         initDropdown();
         handleSearch(true);
@@ -1120,10 +1178,15 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
     const rawKeywords = query.match(tokenRegex) || [];
     
-    const headers = []; const fullNames = []; const exclude = []; const parsedIncludes = []; 
+        const headers = []; const fullNames = []; const exclude = []; const parsedIncludes = []; const strictImportance = []; 
+
     
     rawKeywords.forEach(token => {
-      if (token.startsWith("<>")) {
+           // NEW: Intercept strings that are purely exclamation marks
+      if (token.match(/^!+$/)) {
+        strictImportance.push(token);
+      } 
+        else if (token.startsWith("<>")) {
         const terms = token.slice(2).toLowerCase().split(",");
         terms.forEach(t => exclude.push(...expandTCMPoint(t)));
       } else if (token.startsWith("@")) {
@@ -1167,6 +1230,15 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     filteredPoints = points.filter(point => {
       const chanFull = point["Channel Full Name"] || point[" Channel Full Name"] || "";
       if (!(activeChannels.includes("All") || activeChannels.includes(chanFull))) return false;
+
+            // NEW: Apply Strict Importance Filter
+      if (strictImportance.length > 0) {
+        const imp = point.Important ? String(point.Important).trim() : "";
+        // If the point doesn't EXACTLY match the number of exclamation marks typed, hide it
+        if (!strictImportance.includes(imp)) return false; 
+      }
+
+
 
       if (parsedIncludes.length > 0) {
         const passesPass1 = parsedIncludes.every(orGroup => {
@@ -1403,9 +1475,13 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     imgInfo.onclick = (e) => { e.stopPropagation(); openLightboxSingle(point["Short Name"], point["Image ID"]); };
     
     const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
+        // NEW: Grab the importance data and create the HTML span
+    const imp = point.Important ? String(point.Important).trim() : "";
+    const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
+
     const titleEl = document.createElement("div"); titleEl.className = "detail-title";
-    titleEl.innerHTML = point["Short Name"]; 
-    
+    titleEl.innerHTML = highlightText(point["Short Name"]) + impHtml;
+
     const meta = document.createElement("div"); meta.className = "detail-meta";
     const fullName = point["Full Name"] || point[" Full Name"] || "";
     const shortChan = point["Channel Short Name"] || point[" Channel Short Name"] || "";
@@ -1468,9 +1544,13 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     imgInfo.onclick = (e) => { e.stopPropagation(); openLightbox(index, channelPoints, scroller); };
     
     const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
+        // NEW: Grab the importance data and create the HTML span
+    const imp = point.Important ? String(point.Important).trim() : "";
+    const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
+
     const titleEl = document.createElement("div"); titleEl.className = "detail-title";
-    titleEl.innerHTML = highlightText(point["Short Name"]);
-    
+    titleEl.innerHTML = highlightText(point["Short Name"]) + impHtml;
+
     const meta = document.createElement("div"); meta.className = "detail-meta";
     const fullName = point["Full Name"] || point[" Full Name"] || "";
     const shortChan = point["Channel Short Name"] || point[" Channel Short Name"] || "";
@@ -1482,19 +1562,17 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     titleGroup.appendChild(titleEl); titleGroup.appendChild(meta);
     headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
 
-    const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
+        const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
     
-    // NEW: Compare Button
-    const compareBtn = document.createElement("button"); 
-    compareBtn.className = "detail-nav-btn"; 
-    compareBtn.innerHTML = "⚖️";
-    compareBtn.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
-    navGroup.appendChild(compareBtn);
+    // 1. Importance Button (Top)
+    const impBtn = document.createElement("button"); 
+    impBtn.className = "detail-nav-btn"; 
+    impBtn.innerHTML = "❗";
+    impBtn.onclick = (e) => { e.stopPropagation(); cycleImportance(point["Short Name"]); };
+    navGroup.appendChild(impBtn);
 
-    // Existing Close Button
+    // 2. Close Button (Middle)
     const closeBtn = document.createElement("button"); closeBtn.className = "detail-nav-btn"; closeBtn.innerHTML = "✕";
-
-    
     closeBtn.onclick = (e) => {
       e.stopPropagation(); 
       if (Date.now() - lastGlobalClickTime < 400) return; 
@@ -1507,8 +1585,19 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
       appContainer.scrollTo({ top: rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
     };
+    navGroup.appendChild(closeBtn);
 
-    navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); details.appendChild(headerInfo);
+    // 3. Compare Button (Bottom)
+    const compareBtn = document.createElement("button"); 
+    compareBtn.className = "detail-nav-btn"; 
+    compareBtn.innerHTML = "⚖️";
+    compareBtn.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
+    navGroup.appendChild(compareBtn);
+
+    // Final Assembly (Only done ONCE at the very end!)
+    headerInfo.appendChild(navGroup); 
+    details.appendChild(headerInfo);
+
 
     let hasFilteredContent = false;
     
@@ -1727,7 +1816,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     }
   });
 
-  function renderRows(preserveState = false, currentScroll = 0, activePointId = null, activeCardIsShowingAllText = false) {
+    function renderRows(preserveState = false, currentScroll = 0, activePointId = null, activeCardIsShowingAllText = false) {
     const fragment = document.createDocumentFragment();
 
     if (filteredPoints.length === 0) {
@@ -1762,11 +1851,24 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
           label.innerHTML = highlightText(point["Short Name"]); 
           
           imgContainer.appendChild(img); card.appendChild(imgContainer); card.appendChild(label);
+          
+          // Inject the Importance Badge if it exists
+          const imp = point.Important ? String(point.Important).trim() : "";
+          if (imp !== "") {
+            const badge = document.createElement("div");
+            badge.className = "card-importance";
+            badge.textContent = imp;
+            card.appendChild(badge);
+          }
+
           imageObserver.observe(img);
           scroller.appendChild(card);
         });
 
-        rowDiv.appendChild(title); rowDiv.appendChild(scroller); rowDiv.appendChild(panel);
+        // --- THESE LINES WERE MISSING! ---
+        rowDiv.appendChild(title); 
+        rowDiv.appendChild(scroller); 
+        rowDiv.appendChild(panel);
         return rowDiv;
       };
 
@@ -1775,6 +1877,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
     cardContainer.innerHTML = "";
     cardContainer.appendChild(fragment);
+    // ---------------------------------
 
     if (preserveState && activePointId) {
         const cardToOpen = document.querySelector(".point-card[data-id='" + activePointId + "']");
@@ -1789,6 +1892,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     else appContainer.scrollTo({ top: 0, behavior: "auto" }); 
   }
 
+
   let currentEditingPoint = null; 
   let currentEditingField = "";
 
@@ -1797,7 +1901,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     
     // Safely fetch field names (handling your data's "Location " trailing space quirk)
     const fields = [
-      "Notes", "CAM Notes", 
+      "Important", "Notes", "CAM Notes", 
       point.hasOwnProperty("Location ") ? "Location " : "Location", 
       "Location Notes", "Needling", "Actions", "Indications", 
       "Commentary", "Summary of clinical application", 
@@ -1879,6 +1983,73 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     // Inject Live HTML into the editor instead of raw tags
     document.getElementById("editArea").innerHTML = bbcodeToHtml(rawData); 
   }
+  
+  
+    // --- INSTANT IMPORTANCE TOGGLE ---
+  function cycleImportance(pointId) {
+    if (!navigator.onLine) {
+      showToast("Cannot update importance while offline.");
+      return;
+    }
+
+    let p = points.find(x => x["Short Name"] === pointId);
+    if (!p) return;
+
+    // Determine the next level in the cycle
+    let current = (p.Important || "").trim();
+    let next = "";
+    if (current === "") next = "!";
+    else if (current === "!") next = "!!";
+    else if (current === "!!") next = "!!!";
+    else if (current === "!!!") next = "";
+    else next = "!"; // Failsafe if it contains weird data
+
+    // 1. Optimistic UI Update (Instantly update local memory)
+    p.Important = next;
+    p._searchIndex = generateSearchIndex(p);
+    
+    let cleanVault = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
+    let targetPoint = cleanVault.find(x => x["Short Name"] === pointId);
+    if (targetPoint) {
+      targetPoint.Important = next;
+      localStorage.setItem("tcmpoints_vault", JSON.stringify(cleanVault));
+    }
+
+    // 2. Background Cloud Sync (Silent save to Google Sheets)
+    const payload = { id: pointId, field: "Important", value: next };
+    fetch(dataUrl, {
+      method: "POST", mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    }).catch(err => console.log("Background importance sync failed.", err));
+
+        // 3. Refresh the Screen
+    if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
+    else handleSearch(true);
+    
+    // 4. NEW: Instantly update the red bubble on the main scrolling card
+    const card = document.querySelector(`.point-card[data-id="${pointId}"]`);
+    if (card) {
+      let badge = card.querySelector(".card-importance");
+      if (next === "") {
+        if (badge) badge.remove(); // Remove bubble if set to None
+      } else {
+        if (!badge) {
+          // Create bubble if it doesn't exist yet
+          badge = document.createElement("div");
+          badge.className = "card-importance";
+          card.appendChild(badge);
+        }
+        badge.textContent = next; // Update the text (!, !!, !!!)
+      }
+    }
+
+    showToast(`Importance set to ${next === "" ? "None" : next}`);
+
+  }
+
+  
+  
 
   // --- 4. The Safest Save Function (with Timeout) ---
   function saveEdit() {
@@ -2038,7 +2209,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     }
     
     const fields = [
-      currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
+      currentEditingPoint.Important, currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
       currentEditingPoint.Actions, currentEditingPoint.Indications, currentEditingPoint.Commentary,
       currentEditingPoint["Summary of clinical application"], currentEditingPoint.Combinations, currentEditingPoint.Description, 
       currentEditingPoint.Notes, currentEditingPoint["CAM Notes"]
