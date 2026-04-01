@@ -108,10 +108,12 @@
     }
     .row-title { font-size: 18px; font-weight: 700; padding: 0 15px; margin-bottom: 10px; color: #333; }
     
-    .scroller {
+       .scroller {
+      position: relative; /* FIX: Restores local coordinates for horizontal card centering */
       display: flex; overflow-x: auto; padding: 0 15px 15px 15px; gap: 12px;
       -webkit-overflow-scrolling: touch; scrollbar-width: none;
     }
+
     .scroller::-webkit-scrollbar { display: none; }
 
     .point-card {
@@ -141,20 +143,59 @@
       border-top-left-radius: 10px; border-top-right-radius: 10px;
     }
     .detail-header-info img { width: 50px; height: 70px; object-fit: contain; border-radius: 4px; cursor: pointer; background: white; padding: 2px; flex-shrink: 0; }
-    .detail-title-group { flex: 1; min-width: 0; }
-    .detail-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .detail-title-group { 
+      flex: 1; 
+      min-width: 0; 
+      padding-top: 15px; /* Pushes the title and meta text down so it clears the floating buttons */
+    }
+    
+    .detail-title { 
+      font-size: 18px; 
+      font-weight: 800; 
+      margin-bottom: 4px; 
+      white-space: normal; /* Allows long point names to wrap naturally across the full width of the screen */
+      line-height: 1.2;
+    }
+
+
     .detail-meta { font-size: 12px; color: #666; display: flex; flex-wrap: wrap; gap: 4px; line-height: 1.2; }
     .detail-meta span:not(:last-child)::after { content: "•"; margin-left: 5px; color: #ccc; }
 
+        
+    
+              /* Floating Horizontal Control Pill (Top Right) */
     .detail-nav-group {
-      display: flex; background: white; border-radius: 20px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow: hidden; flex-shrink: 0;
+      position: absolute; /* Takes the buttons out of the layout flow */
+      top: 12px;
+      right: 15px;
+      display: flex;
+      flex-direction: row; 
+      background: white; 
+      border-radius: 20px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+      overflow: hidden; 
+      z-index: 10; /* Ensures they stay clickable over the text */
     }
+    
     .detail-nav-btn {
-      padding: 8px 14px; border: none; background: transparent; font-size: 16px;
-      font-weight: bold; color: #cc5500; cursor: pointer;
+      padding: 8px 12px; 
+      border: none;
+      border-right: 1px solid #f0f0f5; 
+      background: transparent; 
+      font-size: 16px;
+      font-weight: bold; 
+      color: #cc5500; 
+      cursor: pointer;
     }
+    
+    .detail-nav-btn:last-child {
+      border-right: none; 
+    }
+    
     .detail-nav-btn:active { background: #f0f0f0; }
+
+
+
 
     .sticky-toggle-container {
       position: sticky; bottom: 20px; z-index: 89; 
@@ -417,6 +458,30 @@
 
 
 
+        /* Importance Badges */
+    .point-card { position: relative; } /* Ensures the badge anchors to the card */
+    
+    .card-importance { 
+      position: absolute; top: 6px; right: 6px; 
+      background: rgba(255, 255, 255, 0.95); color: #ff3b30; 
+      font-weight: 900; padding: 2px 6px; border-radius: 10px; 
+      font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.15); 
+      z-index: 10; letter-spacing: 1px; pointer-events: none; 
+    }
+    
+    .importance-badge { 
+      color: #ff3b30; font-weight: 900; letter-spacing: 1px; 
+      margin-left: 8px; font-size: 20px; 
+      text-shadow: 0 1px 2px rgba(255, 59, 48, 0.2); 
+    }
+
+
+    .channel-wrapper {
+      contain: content;
+      width: 100%;
+    }
+
+
 
 
 
@@ -486,7 +551,10 @@
     .zoom-controls button { color: #eee; border-color: #555; }
     .zoom-controls button:active { background: #555; }
 
-      
+    .card-importance { background: rgba(28, 28, 30, 0.95); }
+
+    .detail-nav-btn { border-bottom-color: #333; }
+
       
 
       
@@ -649,7 +717,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "03.30.26.v3";
+const APP_VERSION = "04.01.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -757,6 +825,44 @@ async function syncMissingPhotos() {
 }
 // --- END SECERET CACHE MENU LOGIC ---
 
+// --- INDEXEDDB VAULT ENGINE ---
+const DB_NAME = "TCMVaultDB";
+const STORE_NAME = "pointsStore";
+
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getVaultData() {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const request = tx.objectStore(STORE_NAME).get("all_points");
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveVaultData(dataArray) {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).put(dataArray, "all_points");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
 
 // Fetch the database
@@ -764,29 +870,25 @@ async function loadTCMData() {
   try {
     let response = await fetch(dataUrl);
     let textData = await response.text(); 
-    let oldData = localStorage.getItem("tcmpoints_vault") || "[]";
+    let newArray = JSON.parse(textData);
     
-    // Normalize both strings to ignore invisible formatting differences
-    let newClean = JSON.stringify(JSON.parse(textData));
-    let oldClean = JSON.stringify(JSON.parse(oldData));
+    let oldArray = await getVaultData();
+    let newClean = JSON.stringify(newArray);
+    let oldClean = JSON.stringify(oldArray);
 
-    // Only update if the actual data is different
     if (newClean !== oldClean && newClean.length > 50) {
       console.log("New data found! Updating local cache and UI...");
-      localStorage.setItem("tcmpoints_vault", newClean); 
+      await saveVaultData(newArray); 
       receiveBackgroundUpdate(newClean); 
     } else {
       console.log("Data is identical. No update needed.");
     }
   } catch (e) {
-    console.log("Offline or failed to fetch. Relying on local storage.");
+    console.log("Offline or failed to fetch. Relying on IndexedDB cache.");
   }
 }
 
-// Initial Load
-loadTCMData();
-
-// The Visibility Tripwire (Syncs instantly when you switch back to the app)
+// The Visibility Tripwire
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     console.log("App resumed. Silently checking for updates...");
@@ -794,34 +896,58 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-// Instant Offline Boot
-let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
-  
-  let points = [];
-  let filteredPoints = []; 
-  let activeHighlightRegex = null;
-  let activeTextTerms = []; 
-  let activeParsedIncludes = []; 
-  let lastGlobalClickTime = 0; 
-  let activeChannels = ["All"];
+// Define Globals
+let points = [];
+let filteredPoints = []; 
+let activeHighlightRegex = null;
+let activeTextTerms = []; 
+let activeParsedIncludes = []; 
+let lastGlobalClickTime = 0; 
+let activeChannels = ["All"];
 
-  const appContainer = document.getElementById("appContainer");
-  const cardContainer = document.getElementById("cardContainer");
-  const searchInput = document.getElementById("searchInput");
-  const resultsCounter = document.getElementById("resultsCounter");
-  const viewportMeta = document.querySelector('meta[name="viewport"]');
+const appContainer = document.getElementById("appContainer");
+const cardContainer = document.getElementById("cardContainer");
+const searchInput = document.getElementById("searchInput");
+const resultsCounter = document.getElementById("resultsCounter");
+const viewportMeta = document.querySelector('meta[name="viewport"]');
+
+// NEW: Instant Offline Boot (Async)
+async function bootApp() {
+  let rawPoints = await getVaultData();
+  
+  if (rawPoints.length === 0 && localStorage.getItem("tcmpoints_vault")) {
+    console.log("Migrating database...");
+    rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault"));
+    await saveVaultData(rawPoints);
+  }
+
+  points = processPoints(rawPoints);
+  initDropdown();
+  handleSearch(); // Renders the initial UI
+  
+  loadTCMData(); // Background sync
+}
+
+bootApp(); // Start the engine
+
+
+
+
+    // NEW: Strips formatting tags from the invisible index to make searching faster and more accurate
+  function stripBBCode(str) {
+    if (!str) return "";
+    return String(str).replace(/\[\/?(b|i|u|color(?:=[^\]]+)?)\]/gi, "");
+  }
 
   function generateSearchIndex(point) {
     const visibleData = [
-      point["Short Name"], point["Full Name"], point["Channel Full Name"],
+      point.Important, point["Short Name"], point["Full Name"], point["Channel Full Name"],
       point["Channel Short Name"], point["Location"], point.Location,
       point["Location Notes"], point.Needling, point.Actions, point.Indications, point.Commentary,
       point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
     ];
-    return visibleData
-      .filter(Boolean)
-      .map(v => String(v).toLowerCase())
-      .join(" ");
+    // Strip BBCode and lowercase once during boot
+    return stripBBCode(visibleData.filter(Boolean).map(v => String(v)).join(" ")).toLowerCase(); 
   }
 
   function processPoints(dataArray) {
@@ -842,20 +968,26 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       point._fullNameLower = (point["Full Name"] || point[" Full Name"] || "").toString().toLowerCase();
       
       const fields = [
-        point["Short Name"], point["Full Name"] || point[" Full Name"], point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"],
+        point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"],
         point["Location "] || point.Location, point["Location Notes"], point.Needling,
         point.Actions, point.Indications, point.Commentary,
         point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
       ];
+      
       let paras = [];
       fields.forEach(f => {
-        if (f) paras.push(...String(f).split(/\r?\n/).filter(p => p.trim() !== ""));
+        if (f) {
+           // PRE-COMPUTE: Strip BBCode, split by line, and pre-lowercase every paragraph to save 200,000+ calculations during search
+           const cleanText = stripBBCode(String(f));
+           paras.push(...cleanText.split(/\r?\n/).filter(p => p.trim() !== "").map(p => p.toLowerCase()));
+        }
       });
       point._paragraphs = paras;
       
       return point;
     });
   }
+
 
   function initDropdown() {
     const uniqueChannels = [...new Set(points.map(p => p["Channel Full Name"] || p[" Channel Full Name"]).filter(Boolean))];
@@ -900,8 +1032,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   
   function cancelFilter() { document.getElementById("channelModal").style.display = "none"; }
 
-  points = processPoints(rawPoints);
-  initDropdown();
+  
 
   function receiveBackgroundUpdate(dataPayload) {
     try {
@@ -919,24 +1050,43 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
       const sameStructure = processed.length === points.length && processed.every((p, i) => points[i] && p["Short Name"] === points[i]["Short Name"]);
 
-      if (sameStructure) {
+            if (sameStructure) {
         points = processed;
         changedIds.forEach(id => {
           const card = document.querySelector('.point-card[data-id="' + id + '"]');
           if (!card) return;
           const newPoint = processed.find(p => p["Short Name"] === id);
           if (!newPoint) return;
+          
           const label = card.querySelector('.card-label');
           if (label) label.innerHTML = highlightText(newPoint["Short Name"]);
+          
           const img = card.querySelector('img');
           if (img) {
             const newSrc = "DeadmanPhotos/" + newPoint["Image ID"] + ".jpg";
             if (img.src !== newSrc) img.src = newSrc;
           }
+
+          // --- NEW: Sync the Importance Bubble instantly ---
+          const imp = newPoint.Important ? String(newPoint.Important).trim() : "";
+          let badge = card.querySelector(".card-importance");
+          if (imp === "") {
+            if (badge) badge.remove(); 
+          } else {
+            if (!badge) {
+              badge = document.createElement("div");
+              badge.className = "card-importance";
+              card.appendChild(badge);
+            }
+            badge.textContent = imp;
+          }
+          // -----------------------------------------------
+          
         });
         const openPanel = document.querySelector('.detail-panel.open');
         if (openPanel && typeof window.refreshActivePanel === 'function') window.refreshActivePanel();
-      } else {
+      }
+ else {
         points = processed;
         initDropdown();
         handleSearch(true);
@@ -945,15 +1095,23 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     } catch(e) { console.log("Failed to process background data."); }
   }
 
-  const imageObserver = new IntersectionObserver((entries, observer) => {
+    const imageObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
+      const img = entry.target;
       if (entry.isIntersecting) {
-        const img = entry.target;
-        if (img.dataset.src) { img.src = img.dataset.src; img.removeAttribute('data-src'); }
-        observer.unobserve(img);
+        // IN VIEW: Pull the image from the cache and put it in RAM
+        if (img.getAttribute('src') !== img.dataset.src) { 
+          img.setAttribute('src', img.dataset.src); 
+        }
+      } else {
+        // OUT OF VIEW: Clear the image from RAM (but leave it safely in the cache!)
+        if (img.hasAttribute('src')) { 
+          img.removeAttribute('src'); 
+        }
       }
     });
-  }, { root: null, rootMargin: '0px 300px 0px 300px' });
+  }, { root: null, rootMargin: '500px 500px 500px 500px' });
+
 
   let currentLightboxIndex = 0; let currentLightboxPoints = []; let currentLightboxScroller = null;
   let lbTouchStartX = null; let lbTouchStartY = null; let lbWasSwiped = false;
@@ -1120,10 +1278,15 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
     const rawKeywords = query.match(tokenRegex) || [];
     
-    const headers = []; const fullNames = []; const exclude = []; const parsedIncludes = []; 
+        const headers = []; const fullNames = []; const exclude = []; const parsedIncludes = []; const strictImportance = []; 
+
     
     rawKeywords.forEach(token => {
-      if (token.startsWith("<>")) {
+           // NEW: Intercept strings that are purely exclamation marks
+      if (token.match(/^!+$/)) {
+        strictImportance.push(token);
+      } 
+        else if (token.startsWith("<>")) {
         const terms = token.slice(2).toLowerCase().split(",");
         terms.forEach(t => exclude.push(...expandTCMPoint(t)));
       } else if (token.startsWith("@")) {
@@ -1164,11 +1327,30 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     if (validRegexParts.length > 0) activeHighlightRegex = new RegExp("(" + validRegexParts.join("|") + ")", "gi");
     else activeHighlightRegex = null;
 
-    filteredPoints = points.filter(point => {
+        filteredPoints = points.filter(point => {
+      // 1. CHANNEL CHECK (Fastest Check - Bails instantly if hidden)
       const chanFull = point["Channel Full Name"] || point[" Channel Full Name"] || "";
       if (!(activeChannels.includes("All") || activeChannels.includes(chanFull))) return false;
 
+      // 2. IMPORTANCE FILTER (Fast Check)
+      if (strictImportance.length > 0) {
+        const imp = point.Important ? String(point.Important).trim() : "";
+        if (!strictImportance.includes(imp)) return false; 
+      }
+
+      // 3. EXCLUSIONS <> (Fast Check)
+      if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
+
+      // 4. SHORT NAMES @ (Fast Check)
+      if (headers.length > 0 && !headers.some(h => point._shortNameLower.includes(h))) return false;
+
+      // 5. FULL NAMES # (Fast Check)
+      if (fullNames.length > 0 && !fullNames.every(f => point._fullNameLower.includes(f))) return false;
+
+      // 6. GENERAL SEARCH & PARAGRAPH LOGIC (Heavy Lifter)
       if (parsedIncludes.length > 0) {
+        
+        // Pass 1: Quick flat check on the whole string. Bails out instantly if the word isn't in the point at all.
         const passesPass1 = parsedIncludes.every(orGroup => {
           return orGroup.some(term => {
             if (term.type === 'exact') return term.regex.test(point._searchIndex);
@@ -1177,13 +1359,15 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
         });
         if (!passesPass1) return false;
 
+        // Pass 2: The strict paragraph-scoping check. 
+        // Only runs if the point survives Pass 1!
         const hasValidParagraph = point._paragraphs.some(p => {
           return parsedIncludes.every(orGroup => {
             return orGroup.some(term => {
               if (term.type === 'exact') {
                 term.regex.lastIndex = 0; return term.regex.test(p);
               } else {
-                return p.toLowerCase().includes(term.text);
+                return p.includes(term.text); // NO .toLowerCase() needed here anymore! Lightning fast.
               }
             });
           });
@@ -1191,13 +1375,10 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
         
         if (!hasValidParagraph) return false; 
       }
-
-      if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
-      if (headers.length > 0 && !headers.some(h => point._shortNameLower.includes(h))) return false;
-      if (fullNames.length > 0 && !fullNames.every(f => point._fullNameLower.includes(f))) return false;
       
-      return true;
+      return true; // If it survives all rules, keep it!
     });
+
     
     resultsCounter.textContent = "Search Results: " + filteredPoints.length + " of " + points.length; 
     
@@ -1403,9 +1584,13 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     imgInfo.onclick = (e) => { e.stopPropagation(); openLightboxSingle(point["Short Name"], point["Image ID"]); };
     
     const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
+        // NEW: Grab the importance data and create the HTML span
+    const imp = point.Important ? String(point.Important).trim() : "";
+    const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
+
     const titleEl = document.createElement("div"); titleEl.className = "detail-title";
-    titleEl.innerHTML = point["Short Name"]; 
-    
+    titleEl.innerHTML = highlightText(point["Short Name"]) + impHtml;
+
     const meta = document.createElement("div"); meta.className = "detail-meta";
     const fullName = point["Full Name"] || point[" Full Name"] || "";
     const shortChan = point["Channel Short Name"] || point[" Channel Short Name"] || "";
@@ -1467,10 +1652,14 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     imgInfo.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
     imgInfo.onclick = (e) => { e.stopPropagation(); openLightbox(index, channelPoints, scroller); };
     
-    const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
-    const titleEl = document.createElement("div"); titleEl.className = "detail-title";
-    titleEl.innerHTML = highlightText(point["Short Name"]);
+        const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
     
+    const imp = point.Important ? String(point.Important).trim() : "";
+    const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
+
+    const titleEl = document.createElement("div"); titleEl.className = "detail-title";
+    titleEl.innerHTML = highlightText(point["Short Name"]) + impHtml;
+
     const meta = document.createElement("div"); meta.className = "detail-meta";
     const fullName = point["Full Name"] || point[" Full Name"] || "";
     const shortChan = point["Channel Short Name"] || point[" Channel Short Name"] || "";
@@ -1479,22 +1668,30 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     if (shortChan) metaHtml += "<span>" + shortChan + "</span>";
     meta.innerHTML = metaHtml;
     
-    titleGroup.appendChild(titleEl); titleGroup.appendChild(meta);
-    headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
+    titleGroup.appendChild(titleEl); 
+    titleGroup.appendChild(meta);
+    headerInfo.appendChild(imgInfo); 
+    headerInfo.appendChild(titleGroup);
 
-    const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
+    // NEW: Horizontal Top-Right Button Group
+    const navGroup = document.createElement("div"); 
+    navGroup.className = "detail-nav-group";
     
-    // NEW: Compare Button
+    const impBtn = document.createElement("button"); 
+    impBtn.className = "detail-nav-btn"; 
+    impBtn.innerHTML = "❗";
+    impBtn.onclick = (e) => { e.stopPropagation(); cycleImportance(point["Short Name"]); };
+    navGroup.appendChild(impBtn);
+
     const compareBtn = document.createElement("button"); 
     compareBtn.className = "detail-nav-btn"; 
     compareBtn.innerHTML = "⚖️";
     compareBtn.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
     navGroup.appendChild(compareBtn);
 
-    // Existing Close Button
-    const closeBtn = document.createElement("button"); closeBtn.className = "detail-nav-btn"; closeBtn.innerHTML = "✕";
-
-    
+        const closeBtn = document.createElement("button"); 
+    closeBtn.className = "detail-nav-btn"; 
+    closeBtn.innerHTML = "✕";
     closeBtn.onclick = (e) => {
       e.stopPropagation(); 
       if (Date.now() - lastGlobalClickTime < 400) return; 
@@ -1504,11 +1701,18 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
       const cardCenter = card.offsetLeft + (card.clientWidth / 2);
       const scrollerCenter = scroller.clientWidth / 2;
       scroller.scrollTo({ left: cardCenter - scrollerCenter, behavior: 'smooth' });
+      
       const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
-      appContainer.scrollTo({ top: rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
+      const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop; // NEW: Get the wrapper's distance
+      appContainer.scrollTo({ top: wrapperOffset + rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
     };
 
-    navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); details.appendChild(headerInfo);
+    navGroup.appendChild(closeBtn);
+
+    headerInfo.appendChild(navGroup); 
+    details.appendChild(headerInfo);
+
+
 
     let hasFilteredContent = false;
     
@@ -1603,7 +1807,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
   }
 
 
-  cardContainer.addEventListener('click', (e) => {
+    cardContainer.addEventListener('click', (e) => {
     const card = e.target.closest('.point-card');
     if (!card) return; 
     
@@ -1622,10 +1826,13 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     const exactScrollY = appContainer.scrollTop; 
 
     const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+    
+    // NEW: Calculate the distance of the parent wrapper to fix 'contain: content' zero-math
+    const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop;
 
     if (panel.dataset.activeId === pointId && !isSilentOpen) {
       panel.classList.remove("open"); panel.dataset.activeId = ""; card.classList.remove("active");
-      appContainer.scrollTo({ top: rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
+      appContainer.scrollTo({ top: wrapperOffset + rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
       return;
     }
     
@@ -1656,7 +1863,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
           // SHRINKING TEXT: Snap back to the Detail Header
           panel.classList.remove("show-all-text"); 
           toggleBtn.textContent = "Show full text"; 
-          appContainer.scrollTo({ top: panel.offsetTop - document.getElementById("mainStickyHeader").offsetHeight, behavior: 'auto' });
+          appContainer.scrollTo({ top: wrapperOffset + panel.offsetTop - document.getElementById("mainStickyHeader").offsetHeight, behavior: 'auto' });
         } else { 
           // EXPANDING TEXT
           panel.classList.add("show-all-text"); 
@@ -1670,8 +1877,10 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     panel.style.minHeight = ""; // Release the height freeze
 
     const detailHeaderH = result.headerEl.getBoundingClientRect().height;
-    const rowScrollTop = rowDiv.offsetTop - mainHeaderH - 10;
-    const panelScrollTop = panel.offsetTop - mainHeaderH;
+    
+    // NEW: Apply wrapper offset math to scrolling anchors
+    const rowScrollTop = wrapperOffset + rowDiv.offsetTop - mainHeaderH - 10;
+    const panelScrollTop = wrapperOffset + panel.offsetTop - mainHeaderH;
 
     // --- SWIPE SCROLL MATH ---
     if (isSilentOpen) {
@@ -1701,7 +1910,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
               // SHRINKING TEXT: Snap back to the Detail Header
               panel.classList.remove("show-all-text"); 
               toggleBtn.textContent = "Show full text"; 
-              appContainer.scrollTo({ top: panel.offsetTop - document.getElementById("mainStickyHeader").offsetHeight, behavior: 'auto' });
+              appContainer.scrollTo({ top: wrapperOffset + panel.offsetTop - document.getElementById("mainStickyHeader").offsetHeight, behavior: 'auto' });
             } else { 
               // EXPANDING TEXT
               panel.classList.add("show-all-text"); 
@@ -1727,8 +1936,89 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     }
   });
 
+
+      // --- ADD THIS GLOBAL VARIABLE ---
+  let windowingObserver = null;
+
+  // --- EXTRACTED BUILDER FUNCTION ---
+  function buildRow(channelName, channelPoints) {
+    const rowDiv = document.createElement("div"); rowDiv.className = "channel-row";
+    const title = document.createElement("div"); title.className = "row-title"; title.textContent = channelName;
+    const scroller = document.createElement("div"); scroller.className = "scroller";
+    const panel = document.createElement("div"); panel.className = "detail-panel";
+
+    channelPoints.forEach((point) => {
+      const card = document.createElement("div"); card.className = "point-card";
+      card.dataset.id = point["Short Name"]; 
+      
+      const imgContainer = document.createElement("div"); imgContainer.className = "card-img-container";
+      const img = document.createElement("img"); img.dataset.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+      
+      const label = document.createElement("div"); label.className = "card-label";
+      label.innerHTML = highlightText(point["Short Name"]); 
+      
+      imgContainer.appendChild(img); card.appendChild(imgContainer); card.appendChild(label);
+      
+      const imp = point.Important ? String(point.Important).trim() : "";
+      if (imp !== "") {
+        const badge = document.createElement("div");
+        badge.className = "card-importance";
+        badge.textContent = imp;
+        card.appendChild(badge);
+      }
+
+      imageObserver.observe(img);
+      scroller.appendChild(card);
+    });
+
+    rowDiv.appendChild(title); 
+    rowDiv.appendChild(scroller); 
+    rowDiv.appendChild(panel);
+    return rowDiv;
+  }
+
+  // --- NEW VIRTUALIZED RENDER FUNCTION ---
   function renderRows(preserveState = false, currentScroll = 0, activePointId = null, activeCardIsShowingAllText = false) {
     const fragment = document.createDocumentFragment();
+
+    // 1. Reset Observer to prevent memory leaks during rapid searching
+    if (windowingObserver) windowingObserver.disconnect();
+
+    // 2. Initialize the Virtual Windowing Observer
+    // rootMargin '1500px' ensures we build the DOM roughly 1.5 screens before the user sees it
+    windowingObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const wrapper = entry.target;
+        const isVisible = entry.isIntersecting;
+        const channelName = wrapper.dataset.channel;
+        const hasContent = wrapper.hasChildNodes();
+
+        // Do not cull (delete) the wrapper if it contains the user's currently open detail panel
+        const hasActivePanel = activePointId && wrapper.querySelector(`.detail-panel.open`);
+
+        if (isVisible && !hasContent) {
+          // RENDER: Element is approaching viewport
+          wrapper.style.height = ''; // Remove hardcoded height to allow natural expansion
+          const pts = wrapper._pointsData;
+          wrapper.appendChild(buildRow(channelName, pts));
+
+          // Restore active state if it happens to fall inside this newly rendered chunk
+          if (activePointId && pts.some(p => p["Short Name"] === activePointId)) {
+             const cardToOpen = wrapper.querySelector(".point-card[data-id='" + activePointId + "']");
+             if (cardToOpen) {
+                 cardToOpen.dataset.isSilentOpen = "true";
+                 if (activeCardIsShowingAllText) cardToOpen.dataset.restoreShowAllText = "true";
+                 cardToOpen.click();
+             }
+          }
+        } else if (!isVisible && hasContent && !hasActivePanel) {
+          // CULL: Element left viewport safely. Freeze its height to prevent the scrollbar from violently jumping
+          wrapper.style.height = wrapper.getBoundingClientRect().height + "px";
+          wrapper.innerHTML = ""; // Wipe DOM nodes from memory entirely
+        }
+      });
+    }, { root: appContainer, rootMargin: '150% 0px 150% 0px' });
+
 
     if (filteredPoints.length === 0) {
       const noResults = document.createElement("div");
@@ -1745,49 +2035,52 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
       const entries = Object.entries(grouped);
 
-      const buildRow = (channelName, channelPoints) => {
-        const rowDiv = document.createElement("div"); rowDiv.className = "channel-row";
-        const title = document.createElement("div"); title.className = "row-title"; title.textContent = channelName;
-        const scroller = document.createElement("div"); scroller.className = "scroller";
-        const panel = document.createElement("div"); panel.className = "detail-panel";
+      entries.forEach(([name, pts]) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "channel-wrapper";
+        wrapper.dataset.channel = name;
+        wrapper._pointsData = pts; // Attach data for the observer to use later
 
-        channelPoints.forEach((point) => {
-          const card = document.createElement("div"); card.className = "point-card";
-          card.dataset.id = point["Short Name"]; 
-          
-          const imgContainer = document.createElement("div"); imgContainer.className = "card-img-container";
-          const img = document.createElement("img"); img.dataset.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
-          
-          const label = document.createElement("div"); label.className = "card-label";
-          label.innerHTML = highlightText(point["Short Name"]); 
-          
-          imgContainer.appendChild(img); card.appendChild(imgContainer); card.appendChild(label);
-          imageObserver.observe(img);
-          scroller.appendChild(card);
-        });
+        // FORCE RENDER synchronously if this chunk contains the active panel
+        // This prevents scroll restoration bugs when panels stay open during search
+        let shouldForceRender = false;
+        if (preserveState && activePointId && pts.some(p => p["Short Name"] === activePointId)) {
+            shouldForceRender = true;
+        }
 
-        rowDiv.appendChild(title); rowDiv.appendChild(scroller); rowDiv.appendChild(panel);
-        return rowDiv;
-      };
+        if (shouldForceRender) {
+            wrapper.appendChild(buildRow(name, pts));
+        } else {
+            wrapper.style.minHeight = "180px"; // Default estimated row height 
+        }
 
-      entries.forEach(([name, pts]) => fragment.appendChild(buildRow(name, pts)));
+        fragment.appendChild(wrapper);
+      });
     }
 
     cardContainer.innerHTML = "";
     cardContainer.appendChild(fragment);
 
+    // 3. Attach observer to all wrappers AFTER they are in the DOM
+    const wrappers = cardContainer.querySelectorAll(".channel-wrapper");
+    wrappers.forEach(w => windowingObserver.observe(w));
+
+    // 4. State restoration fallbacks
     if (preserveState && activePointId) {
         const cardToOpen = document.querySelector(".point-card[data-id='" + activePointId + "']");
-        if (cardToOpen) {
+        if (cardToOpen && !cardToOpen.closest('.channel-wrapper').dataset.hasRestored) {
             cardToOpen.dataset.isSilentOpen = "true";
             if (activeCardIsShowingAllText) cardToOpen.dataset.restoreShowAllText = "true";
             cardToOpen.click();
+            cardToOpen.closest('.channel-wrapper').dataset.hasRestored = "true";
         }
     }
 
     if (preserveState) appContainer.scrollTop = currentScroll; 
     else appContainer.scrollTo({ top: 0, behavior: "auto" }); 
   }
+
+
 
   let currentEditingPoint = null; 
   let currentEditingField = "";
@@ -1797,7 +2090,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     
     // Safely fetch field names (handling your data's "Location " trailing space quirk)
     const fields = [
-      "Notes", "CAM Notes", 
+      "Important", "Notes", "CAM Notes", 
       point.hasOwnProperty("Location ") ? "Location " : "Location", 
       "Location Notes", "Needling", "Actions", "Indications", 
       "Commentary", "Summary of clinical application", 
@@ -1879,6 +2172,82 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
     // Inject Live HTML into the editor instead of raw tags
     document.getElementById("editArea").innerHTML = bbcodeToHtml(rawData); 
   }
+  
+  
+      // --- INSTANT IMPORTANCE TOGGLE (WITH DEBOUNCE) ---
+  let importanceSyncTimers = {}; // This dictionary tracks the timers to protect Google Sheets
+
+  async function cycleImportance(pointId) {
+    if (!navigator.onLine) {
+      showToast("Cannot update importance while offline.");
+      return;
+    }
+
+    let p = points.find(x => x["Short Name"] === pointId);
+    if (!p) return;
+
+    // Determine the next level in the cycle
+    let current = (p.Important || "").trim();
+    let next = "";
+    if (current === "") next = "!";
+    else if (current === "!") next = "!!";
+    else if (current === "!!") next = "!!!";
+    else if (current === "!!!") next = "";
+    else next = "!"; 
+
+    // 1. Optimistic UI Update (Instantly update local memory)
+    p.Important = next;
+    p._searchIndex = generateSearchIndex(p);
+    
+        // Update local DB instantly
+    let cleanVault = await getVaultData();
+    let targetPoint = cleanVault.find(x => x["Short Name"] === pointId);
+    if (targetPoint) {
+      targetPoint.Important = next;
+      await saveVaultData(cleanVault);
+    }
+
+
+    // 2. Refresh the Panels Instantly
+    if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
+    else handleSearch(true);
+    
+    // Instantly update the red bubble on the main scrolling card behind the modal
+    const card = document.querySelector(`.point-card[data-id="${pointId}"]`);
+    if (card) {
+      let badge = card.querySelector(".card-importance");
+      if (next === "") {
+        if (badge) badge.remove(); 
+      } else {
+        if (!badge) {
+          badge = document.createElement("div");
+          badge.className = "card-importance";
+          card.appendChild(badge);
+        }
+        badge.textContent = next; 
+      }
+    }
+
+    showToast(`Importance set to ${next === "" ? "None" : next}`);
+
+    // 3. Smart Background Sync (Debounced for Google Sheets)
+    // Clear any pending saves for this specific point
+    clearTimeout(importanceSyncTimers[pointId]);
+    
+    // Wait 1.5 seconds after they STOP clicking before sending the final data to Google
+    importanceSyncTimers[pointId] = setTimeout(() => {
+      const payload = { id: pointId, field: "Important", value: next };
+      fetch(dataUrl, {
+        method: "POST", mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      }).catch(err => console.log("Background importance sync failed.", err));
+    }, 1500);
+  }
+
+
+  
+  
 
   // --- 4. The Safest Save Function (with Timeout) ---
   function saveEdit() {
@@ -2026,34 +2395,45 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
 
   // --- STANDARD SAVE LOGIC ---
-  function completeSave(newValue) {
+  async function completeSave(newValue) {
+    // 1. Update active memory
     currentEditingPoint[currentEditingField] = newValue; 
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
     
-    let cleanVault = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
+    // 2. Save securely to IndexedDB
+    let cleanVault = await getVaultData();
     let targetPoint = cleanVault.find(p => p["Short Name"] === currentEditingPoint["Short Name"]);
     if (targetPoint) {
       targetPoint[currentEditingField] = newValue;
-      localStorage.setItem("tcmpoints_vault", JSON.stringify(cleanVault));
+      await saveVaultData(cleanVault);
     }
-    
+
+    // 3. Rebuild the Paragraph Array for the Search Engine
     const fields = [
-      currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
+      currentEditingPoint.Important, currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
       currentEditingPoint.Actions, currentEditingPoint.Indications, currentEditingPoint.Commentary,
       currentEditingPoint["Summary of clinical application"], currentEditingPoint.Combinations, currentEditingPoint.Description, 
       currentEditingPoint.Notes, currentEditingPoint["CAM Notes"]
     ];
+    
     let paras = [];
     fields.forEach(f => {
-      if (f) paras.push(...String(f).split(/\r?\n/).filter(p => p.trim() !== ""));
+      if (f) {
+         // FIXED: Strip BBCode and lowercase so the point doesn't vanish from the new search index!
+         const cleanText = stripBBCode(String(f));
+         paras.push(...cleanText.split(/\r?\n/).filter(p => p.trim() !== "").map(p => p.toLowerCase()));
+      }
     });
     currentEditingPoint._paragraphs = paras;
 
+    // 4. Update the UI
     if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
     else handleSearch(true); 
     
-    closeEditModal(); resetModalButtons();
+    closeEditModal(); 
+    resetModalButtons();
   }
+
 
 
   function failSave(errorMsg) {
@@ -2062,7 +2442,7 @@ let rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault") || "[]");
 
   function resetModalButtons() { document.getElementById("saveBtn").textContent = "Save"; document.getElementById("saveBtn").disabled = false; document.getElementById("cancelBtnEdit").disabled = false; }
 
-  handleSearch();
+  
 </script>
 </body>
 </html>
