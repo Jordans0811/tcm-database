@@ -933,6 +933,12 @@ bootApp(); // Start the engine
 
 
 
+    // NEW: Strips formatting tags from the invisible index to make searching faster and more accurate
+  function stripBBCode(str) {
+    if (!str) return "";
+    return String(str).replace(/\[\/?(b|i|u|color(?:=[^\]]+)?)\]/gi, "");
+  }
+
   function generateSearchIndex(point) {
     const visibleData = [
       point.Important, point["Short Name"], point["Full Name"], point["Channel Full Name"],
@@ -940,10 +946,8 @@ bootApp(); // Start the engine
       point["Location Notes"], point.Needling, point.Actions, point.Indications, point.Commentary,
       point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
     ];
-    return visibleData
-      .filter(Boolean)
-      .map(v => String(v).toLowerCase())
-      .join(" ");
+    // Strip BBCode and lowercase once during boot
+    return stripBBCode(visibleData.filter(Boolean).map(v => String(v)).join(" ")).toLowerCase(); 
   }
 
   function processPoints(dataArray) {
@@ -969,15 +973,21 @@ bootApp(); // Start the engine
         point.Actions, point.Indications, point.Commentary,
         point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
       ];
+      
       let paras = [];
       fields.forEach(f => {
-        if (f) paras.push(...String(f).split(/\r?\n/).filter(p => p.trim() !== ""));
+        if (f) {
+           // PRE-COMPUTE: Strip BBCode, split by line, and pre-lowercase every paragraph to save 200,000+ calculations during search
+           const cleanText = stripBBCode(String(f));
+           paras.push(...cleanText.split(/\r?\n/).filter(p => p.trim() !== "").map(p => p.toLowerCase()));
+        }
       });
       point._paragraphs = paras;
       
       return point;
     });
   }
+
 
   function initDropdown() {
     const uniqueChannels = [...new Set(points.map(p => p["Channel Full Name"] || p[" Channel Full Name"]).filter(Boolean))];
@@ -1317,20 +1327,30 @@ bootApp(); // Start the engine
     if (validRegexParts.length > 0) activeHighlightRegex = new RegExp("(" + validRegexParts.join("|") + ")", "gi");
     else activeHighlightRegex = null;
 
-    filteredPoints = points.filter(point => {
+        filteredPoints = points.filter(point => {
+      // 1. CHANNEL CHECK (Fastest Check - Bails instantly if hidden)
       const chanFull = point["Channel Full Name"] || point[" Channel Full Name"] || "";
       if (!(activeChannels.includes("All") || activeChannels.includes(chanFull))) return false;
 
-            // NEW: Apply Strict Importance Filter
+      // 2. IMPORTANCE FILTER (Fast Check)
       if (strictImportance.length > 0) {
         const imp = point.Important ? String(point.Important).trim() : "";
-        // If the point doesn't EXACTLY match the number of exclamation marks typed, hide it
         if (!strictImportance.includes(imp)) return false; 
       }
 
+      // 3. EXCLUSIONS <> (Fast Check)
+      if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
 
+      // 4. SHORT NAMES @ (Fast Check)
+      if (headers.length > 0 && !headers.some(h => point._shortNameLower.includes(h))) return false;
 
+      // 5. FULL NAMES # (Fast Check)
+      if (fullNames.length > 0 && !fullNames.every(f => point._fullNameLower.includes(f))) return false;
+
+      // 6. GENERAL SEARCH & PARAGRAPH LOGIC (Heavy Lifter)
       if (parsedIncludes.length > 0) {
+        
+        // Pass 1: Quick flat check on the whole string. Bails out instantly if the word isn't in the point at all.
         const passesPass1 = parsedIncludes.every(orGroup => {
           return orGroup.some(term => {
             if (term.type === 'exact') return term.regex.test(point._searchIndex);
@@ -1339,13 +1359,15 @@ bootApp(); // Start the engine
         });
         if (!passesPass1) return false;
 
+        // Pass 2: The strict paragraph-scoping check. 
+        // Only runs if the point survives Pass 1!
         const hasValidParagraph = point._paragraphs.some(p => {
           return parsedIncludes.every(orGroup => {
             return orGroup.some(term => {
               if (term.type === 'exact') {
                 term.regex.lastIndex = 0; return term.regex.test(p);
               } else {
-                return p.toLowerCase().includes(term.text);
+                return p.includes(term.text); // NO .toLowerCase() needed here anymore! Lightning fast.
               }
             });
           });
@@ -1353,13 +1375,10 @@ bootApp(); // Start the engine
         
         if (!hasValidParagraph) return false; 
       }
-
-      if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
-      if (headers.length > 0 && !headers.some(h => point._shortNameLower.includes(h))) return false;
-      if (fullNames.length > 0 && !fullNames.every(f => point._fullNameLower.includes(f))) return false;
       
-      return true;
+      return true; // If it survives all rules, keep it!
     });
+
     
     resultsCounter.textContent = "Search Results: " + filteredPoints.length + " of " + points.length; 
     
