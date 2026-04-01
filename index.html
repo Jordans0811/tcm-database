@@ -717,7 +717,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "03.30.26.v3";
+const APP_VERSION = "04.01.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1085,15 +1085,23 @@ bootApp(); // Start the engine
     } catch(e) { console.log("Failed to process background data."); }
   }
 
-  const imageObserver = new IntersectionObserver((entries, observer) => {
+    const imageObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
+      const img = entry.target;
       if (entry.isIntersecting) {
-        const img = entry.target;
-        if (img.dataset.src) { img.src = img.dataset.src; img.removeAttribute('data-src'); }
-        observer.unobserve(img);
+        // IN VIEW: Pull the image from the cache and put it in RAM
+        if (img.getAttribute('src') !== img.dataset.src) { 
+          img.setAttribute('src', img.dataset.src); 
+        }
+      } else {
+        // OUT OF VIEW: Clear the image from RAM (but leave it safely in the cache!)
+        if (img.hasAttribute('src')) { 
+          img.removeAttribute('src'); 
+        }
       }
     });
-  }, { root: null, rootMargin: '0px 300px 0px 300px' });
+  }, { root: null, rootMargin: '500px 500px 500px 500px' });
+
 
   let currentLightboxIndex = 0; let currentLightboxPoints = []; let currentLightboxScroller = null;
   let lbTouchStartX = null; let lbTouchStartY = null; let lbWasSwiped = false;
