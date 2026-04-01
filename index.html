@@ -2396,34 +2396,44 @@ bootApp(); // Start the engine
 
   // --- STANDARD SAVE LOGIC ---
   async function completeSave(newValue) {
+    // 1. Update active memory
     currentEditingPoint[currentEditingField] = newValue; 
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
     
-        let cleanVault = await getVaultData();
+    // 2. Save securely to IndexedDB
+    let cleanVault = await getVaultData();
     let targetPoint = cleanVault.find(p => p["Short Name"] === currentEditingPoint["Short Name"]);
     if (targetPoint) {
       targetPoint[currentEditingField] = newValue;
       await saveVaultData(cleanVault);
     }
 
-    
+    // 3. Rebuild the Paragraph Array for the Search Engine
     const fields = [
       currentEditingPoint.Important, currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
       currentEditingPoint.Actions, currentEditingPoint.Indications, currentEditingPoint.Commentary,
       currentEditingPoint["Summary of clinical application"], currentEditingPoint.Combinations, currentEditingPoint.Description, 
       currentEditingPoint.Notes, currentEditingPoint["CAM Notes"]
     ];
+    
     let paras = [];
     fields.forEach(f => {
-      if (f) paras.push(...String(f).split(/\r?\n/).filter(p => p.trim() !== ""));
+      if (f) {
+         // FIXED: Strip BBCode and lowercase so the point doesn't vanish from the new search index!
+         const cleanText = stripBBCode(String(f));
+         paras.push(...cleanText.split(/\r?\n/).filter(p => p.trim() !== "").map(p => p.toLowerCase()));
+      }
     });
     currentEditingPoint._paragraphs = paras;
 
+    // 4. Update the UI
     if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
     else handleSearch(true); 
     
-    closeEditModal(); resetModalButtons();
+    closeEditModal(); 
+    resetModalButtons();
   }
+
 
 
   function failSave(errorMsg) {
