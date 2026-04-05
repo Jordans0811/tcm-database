@@ -134,6 +134,10 @@
 
     .point-details { width: 100%; padding: 12px; background: #f0f0f5; box-sizing: border-box; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
     
+    .point-details {
+  scroll-margin-top: calc(var(--header-height) + var(--detail-header-height) + 10px);
+}
+    
     .detail-header-info { 
       position: sticky; top: var(--header-height); z-index: 90;
       background: rgba(240, 240, 245, 0.98); backdrop-filter: blur(8px);
@@ -163,36 +167,7 @@
 
         
     
-              /* Floating Horizontal Control Pill (Top Right) */
-    .detail-nav-group {
-      position: absolute; /* Takes the buttons out of the layout flow */
-      top: 12px;
-      right: 15px;
-      display: flex;
-      flex-direction: row; 
-      background: white; 
-      border-radius: 20px; 
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-      overflow: hidden; 
-      z-index: 10; /* Ensures they stay clickable over the text */
-    }
-    
-    .detail-nav-btn {
-      padding: 8px 12px; 
-      border: none;
-      border-right: 1px solid #f0f0f5; 
-      background: transparent; 
-      font-size: 16px;
-      font-weight: bold; 
-      color: #cc5500; 
-      cursor: pointer;
-    }
-    
-    .detail-nav-btn:last-child {
-      border-right: none; 
-    }
-    
-    .detail-nav-btn:active { background: #f0f0f0; }
+        
 
 
 
@@ -315,26 +290,30 @@
       padding: 0;
     }
     
-    #quickPeekModal .quick-peek-content {
-      height: 100%; 
-      max-height: 100%; 
-      width: 88%; /* Takes up most of the screen on phones */
-      max-width: 420px; /* Locks to a nice reading width on iPads/Desktop */
-      margin: 0; 
-      padding: 0; 
-      overflow-y: auto; 
-      background: #f0f0f5;
-      border-radius: 20px 0 0 20px; /* Rounds only the left corners */
-      box-shadow: -5px 0 25px rgba(0,0,0,0.15); /* Casts a shadow to the left */
+       #quickPeekModal .quick-peek-content {
+      height: 100%; max-height: 100%; width: 88%; max-width: 420px; 
+      margin: 0; padding: 0; overflow-y: auto; background: #f0f0f5;
+      border-radius: 20px 0 0 20px; box-shadow: -5px 0 25px rgba(0,0,0,0.15); 
       
-      /* Lightning-fast slide-in animation */
-      animation: slideInRight 0.15s cubic-bezier(0.0, 0.0, 0.2, 1) forwards;
+      /* Slowed down slightly for a smoother feel */
+      animation: slideInRight 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
+    
+    /* The new slide-out class */
+    #quickPeekModal.closing .quick-peek-content {
+      animation: slideOutRight 0.2s cubic-bezier(0.4, 0.0, 1, 1) forwards;
     }
 
     @keyframes slideInRight {
       from { transform: translateX(100%); }
       to { transform: translateX(0); }
     }
+    
+    @keyframes slideOutRight {
+      from { transform: translateX(0); }
+      to { transform: translateX(100%); }
+    }
+
 
     #quickPeekModal .detail-header-info { 
       top: 0; margin: 0; 
@@ -481,7 +460,85 @@
       width: 100%;
     }
 
+/* 1. The Absolute Corner X (Now White & Orange) */
+.absolute-close-btn {
+  position: absolute;
+  top: 12px; 
+  right: 12px;
+  background: #ffffff; /* White background */
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0px solid #cc5500; /* Crisp orange border */
+  font-size: 16px;
+  font-weight: bold;
+  color: #cc5500; /* TCM Orange X */
+  cursor: pointer;
+  z-index: 100;
+  transition: background 0.1s, transform 0.1s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1); /* Subtle generic shadow */
+}
+.absolute-close-btn:active { background: #fff0e6; transform: scale(0.95); }
 
+
+/* 2. The Prime-Style Action Row (Now Centered) */
+.point-action-row {
+  display: flex;
+  justify-content: center; /* This perfectly centers the icons! */
+  gap: 15px;
+  padding: 0 5px 15px 5px; 
+  margin-top: -5px;
+  overflow-x: auto; 
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.point-action-row::-webkit-scrollbar { display: none; }
+
+
+/* Ensure the title text doesn't slide under the X */
+.detail-title-group { 
+  flex: 1; 
+  min-width: 0; 
+  padding-right: 35px; /* Keeps text away from the X */
+  padding-top: 0; /* Remove the old padding you had here */
+}
+
+
+
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  min-width: 60px;
+}
+.action-item:active .action-icon { background: #d1d1d6; transform: scale(0.95); }
+
+.action-icon {
+  width: 42px; 
+  height: 42px;
+  border-radius: 50%;
+  background: #e3e3e8;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  font-size: 18px; 
+  color: #007aff;
+  transition: transform 0.1s, background 0.1s;
+}
+
+.action-label { 
+  font-size: 11px; 
+  font-weight: 600; 
+  color: #555; 
+  white-space: nowrap;
+}
 
 
 
@@ -556,6 +613,12 @@
     .detail-nav-btn { border-bottom-color: #333; }
 
       
+      
+        .absolute-close-btn { background: rgba(255,255,255,0.15); color: #ccc; }
+  .absolute-close-btn:active { background: rgba(255,255,255,0.25); }
+  .action-icon { background: #2c2c2e; color: #0a84ff; }
+  .action-item:active .action-icon { background: #3a3a3c; }
+  .action-label { color: #aaa; }
 
       
       
@@ -575,14 +638,13 @@
           #editFieldSelect { background: #1c1c1e; color: #ffffff; border-color: #38383a; }
       .format-toolbar button { background: #3a3a3c; color: white; border-color: #555; }
       .format-toolbar button:active { background: #2c2c2e; }
+}
 
-    
-    
-    
-    
-    
-    
-    }
+
+
+
+
+
   </style>
 </head>
 <body>
@@ -632,7 +694,7 @@
         <button onclick="execFormat('bold')" title="Bold"><b>B</b></button>
         <button onclick="execFormat('italic')" title="Italicize"><i>I</i></button>
         <button onclick="execFormat('underline')" title="Underline"><u>U</u></button>
-        <input type="color" id="colorPicker" value="#CC5500" onchange="execFormat('foreColor', this.value)" title="Text Color">
+        <input type="color" id="colorPicker" value="#000000" onclick="syncColorPicker()" oninput="execFormat('foreColor', this.value)" onchange="execFormat('foreColor', this.value)" title="Text Color">
         <button onclick="execFormat('removeFormat')" class="clear-format-btn" title="Remove formatting">Tx</button>
       </div>
 
@@ -717,7 +779,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "04.01.26.v1";
+const APP_VERSION = "04.05.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1401,12 +1463,13 @@ bootApp(); // Start the engine
     if (!text) return ""; 
     let escaped = escapeHTML(text); 
     
-    // Parse BBCode into standard HTML
+    // Parse BBCode into standard HTML (Fixed for multiline)
     let withBB = escaped
-      .replace(/\[b\](.*?)\[\/b\]/gi, "<strong>$1</strong>")
-      .replace(/\[i\](.*?)\[\/i\]/gi, "<em>$1</em>")
-      .replace(/\[u\](.*?)\[\/u\]/gi, "<u>$1</u>")
-      .replace(/\[color=([^\]]+)\](.*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>");
+      .replace(/\[b\]([\s\S]*?)\[\/b\]/gi, "<strong>$1</strong>")
+      .replace(/\[i\]([\s\S]*?)\[\/i\]/gi, "<em>$1</em>")
+      .replace(/\[u\]([\s\S]*?)\[\/u\]/gi, "<u>$1</u>")
+      .replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>");
+
       
     if (!activeHighlightRegex) return withBB;
     
@@ -1557,6 +1620,9 @@ bootApp(); // Start the engine
 
     buildQuickPeekDOM(targetPoint);
     document.getElementById("quickPeekModal").style.display = "flex";
+    
+    document.getElementById("quickPeekContainer").scrollTop = 0; 
+    
 
     // NEW: Dynamically measure the header height so the sections stick perfectly
     setTimeout(() => {
@@ -1568,10 +1634,20 @@ bootApp(); // Start the engine
   }
 
 
-  function closeQuickPeek() {
-    document.getElementById("quickPeekModal").style.display = "none";
-    document.getElementById("quickPeekContainer").innerHTML = ""; 
+    function closeQuickPeek() {
+    const modal = document.getElementById("quickPeekModal");
+    
+    // 1. Trigger the slide-out animation
+    modal.classList.add("closing"); 
+    
+    // 2. Wait exactly 0.2s for the animation to finish, then hide it
+    setTimeout(() => {
+      modal.style.display = "none";
+      modal.classList.remove("closing"); // Reset it for next time
+      document.getElementById("quickPeekContainer").innerHTML = ""; 
+    }, 200);
   }
+
 
     function buildQuickPeekDOM(point) {
     const container = document.getElementById("quickPeekContainer");
@@ -1644,7 +1720,7 @@ bootApp(); // Start the engine
   searchInput.addEventListener("input", debounce(() => handleSearch(false), 300));
   searchInput.addEventListener("keydown", e => { if (e.key === "Escape") clearSearchText(); });
 
-    function buildPointDetailsDOM(point, index, channelPoints, scroller, panel, card, rowDiv) {
+        function buildPointDetailsDOM(point, index, channelPoints, scroller, panel, card, rowDiv) {
     const details = document.createElement("div"); details.className = "point-details";
     const headerInfo = document.createElement("div"); headerInfo.className = "detail-header-info";
     
@@ -1652,7 +1728,7 @@ bootApp(); // Start the engine
     imgInfo.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
     imgInfo.onclick = (e) => { e.stopPropagation(); openLightbox(index, channelPoints, scroller); };
     
-        const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
+    const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
     
     const imp = point.Important ? String(point.Important).trim() : "";
     const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
@@ -1673,24 +1749,9 @@ bootApp(); // Start the engine
     headerInfo.appendChild(imgInfo); 
     headerInfo.appendChild(titleGroup);
 
-    // NEW: Horizontal Top-Right Button Group
-    const navGroup = document.createElement("div"); 
-    navGroup.className = "detail-nav-group";
-    
-    const impBtn = document.createElement("button"); 
-    impBtn.className = "detail-nav-btn"; 
-    impBtn.innerHTML = "❗";
-    impBtn.onclick = (e) => { e.stopPropagation(); cycleImportance(point["Short Name"]); };
-    navGroup.appendChild(impBtn);
-
-    const compareBtn = document.createElement("button"); 
-    compareBtn.className = "detail-nav-btn"; 
-    compareBtn.innerHTML = "⚖️";
-    compareBtn.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
-    navGroup.appendChild(compareBtn);
-
-        const closeBtn = document.createElement("button"); 
-    closeBtn.className = "detail-nav-btn"; 
+    // --- ABSOLUTE X BUTTON ---
+    const closeBtn = document.createElement("button"); 
+    closeBtn.className = "absolute-close-btn"; 
     closeBtn.innerHTML = "✕";
     closeBtn.onclick = (e) => {
       e.stopPropagation(); 
@@ -1703,16 +1764,52 @@ bootApp(); // Start the engine
       scroller.scrollTo({ left: cardCenter - scrollerCenter, behavior: 'smooth' });
       
       const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
-      const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop; // NEW: Get the wrapper's distance
+      const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop; 
       appContainer.scrollTo({ top: wrapperOffset + rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
     };
+    headerInfo.appendChild(closeBtn); 
 
-    navGroup.appendChild(closeBtn);
+    // --- DOUBLE TAP TO TOP (Adjusted to scroll perfectly to the detail header) ---
+    let lastTapTime = 0;
+    headerInfo.addEventListener('click', (e) => {
+      // Don't trigger if they clicked the image or the X button
+      if (e.target.closest('button') || e.target.closest('img')) return;
+      
+      const now = Date.now();
+      if (now - lastTapTime < 300) { // 300ms window for a double tap
+        const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+        const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop;
+        appContainer.scrollTo({ top: wrapperOffset + panel.offsetTop - mainHeaderH, behavior: 'smooth' });
+      }
+      lastTapTime = now;
+    });
 
-    headerInfo.appendChild(navGroup); 
     details.appendChild(headerInfo);
 
+    // --- PRIME-STYLE ACTION ROW ---
+    const actionRow = document.createElement("div");
+    actionRow.className = "point-action-row";
 
+    // PREVENT SWIPE BUBBLING (So scrolling tools doesn't swipe the card)
+    actionRow.addEventListener('touchstart', e => e.stopPropagation());
+    actionRow.addEventListener('touchend', e => e.stopPropagation());
+
+    // Action 1: Importance
+    const impAction = document.createElement("button");
+    impAction.className = "action-item";
+    impAction.innerHTML = `<div class="action-icon">❗️</div><div class="action-label">Important</div>`;
+    impAction.onclick = (e) => { e.stopPropagation(); cycleImportance(point["Short Name"]); };
+    actionRow.appendChild(impAction);
+
+    // Action 2: Compare
+    const compareAction = document.createElement("button");
+    compareAction.className = "action-item";
+    compareAction.innerHTML = `<div class="action-icon">⚖️</div><div class="action-label">Compare</div>`;
+    compareAction.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
+    actionRow.appendChild(compareAction);
+
+    // Append the row to the details panel right beneath the header
+    details.appendChild(actionRow);
 
     let hasFilteredContent = false;
     
@@ -1781,15 +1878,16 @@ bootApp(); // Start the engine
     addFieldBtn.innerHTML = "➕ Add / Edit Field";
     addFieldBtn.onclick = (e) => { 
       e.stopPropagation(); 
-      window.triggerEdit(point["Short Name"], "Notes"); // Defaults to Notes, but they can pick anything from the dropdown
+      window.triggerEdit(point["Short Name"], "Notes"); 
     };
     details.appendChild(addFieldBtn);
 
     let touchStartX = 0; let touchStartY = 0; let lastSwipeTime = 0;
     details.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }, {passive: true});
     details.addEventListener('touchend', e => {
-      // Prevent swiping when tapping links or buttons inside the card
-      if (e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button')) return; 
+      
+      // NEW FIX: Prevent swiping when tapping links, tables, buttons, OR interacting with the new action row!
+      if (e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button') || e.target.closest('.point-action-row')) return; 
 
       if (Date.now() - lastSwipeTime < 400) return; 
       let touchEndX = e.changedTouches[0].screenX; let touchEndY = e.changedTouches[0].screenY;
@@ -1805,6 +1903,7 @@ bootApp(); // Start the engine
 
     return { detailsDOM: details, hasFilteredContent: hasFilteredContent, headerEl: headerInfo };
   }
+
 
 
     cardContainer.addEventListener('click', (e) => {
@@ -1857,19 +1956,43 @@ bootApp(); // Start the engine
       const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
       const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
       toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
-      toggleBtn.onclick = (ev) => {
+                                        toggleBtn.onclick = (ev) => {
         ev.stopPropagation();
-        if (panel.classList.contains("show-all-text")) { 
-          // SHRINKING TEXT: Snap back to the Detail Header
-          panel.classList.remove("show-all-text"); 
-          toggleBtn.textContent = "Show full text"; 
-          appContainer.scrollTo({ top: wrapperOffset + panel.offsetTop - document.getElementById("mainStickyHeader").offsetHeight, behavior: 'auto' });
-        } else { 
-          // EXPANDING TEXT
-          panel.classList.add("show-all-text"); 
-          toggleBtn.textContent = "Show filtered text only"; 
+
+        const mainHeaderH = document.getElementById("mainStickyHeader") ? document.getElementById("mainStickyHeader").offsetHeight : 0;
+        const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop;
+        
+        // This calculates the exact top of the point detail panel
+        const targetScroll = wrapperOffset + panel.offsetTop - mainHeaderH;
+
+        if (panel.classList.contains("show-all-text")) {
+          // === COLLAPSE FLOW (Instant Snap) ===
+          
+          // 1. Instantly shrink the panel
+          panel.classList.remove("show-all-text");
+          toggleBtn.textContent = "Show full text";
+          
+          // 2. Instantly snap the scroll position so no visual jumping occurs
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'auto' });
+
+        } else {
+          // === EXPAND FLOW (Smoothly Anchor) ===
+          
+          panel.classList.add("show-all-text");
+          toggleBtn.textContent = "Show filtered text only";
+          
+          // Smooth scroll is great here because the page is getting longer, 
+          // so there is no risk of the browser freaking out.
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
         }
       };
+
+
+
+
+
+
+
       stickyBtnContainer.appendChild(toggleBtn); result.detailsDOM.appendChild(stickyBtnContainer); 
     }
 
@@ -1904,19 +2027,43 @@ bootApp(); // Start the engine
           const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
           const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
           toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
-          toggleBtn.onclick = (ev) => {
-            ev.stopPropagation();
-            if (panel.classList.contains("show-all-text")) { 
-              // SHRINKING TEXT: Snap back to the Detail Header
-              panel.classList.remove("show-all-text"); 
-              toggleBtn.textContent = "Show full text"; 
-              appContainer.scrollTo({ top: wrapperOffset + panel.offsetTop - document.getElementById("mainStickyHeader").offsetHeight, behavior: 'auto' });
-            } else { 
-              // EXPANDING TEXT
-              panel.classList.add("show-all-text"); 
-              toggleBtn.textContent = "Show filtered text only"; 
-            }
-          };
+                                            toggleBtn.onclick = (ev) => {
+        ev.stopPropagation();
+
+        const mainHeaderH = document.getElementById("mainStickyHeader") ? document.getElementById("mainStickyHeader").offsetHeight : 0;
+        const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop;
+        
+        // This calculates the exact top of the point detail panel
+        const targetScroll = wrapperOffset + panel.offsetTop - mainHeaderH;
+
+        if (panel.classList.contains("show-all-text")) {
+          // === COLLAPSE FLOW (Instant Snap) ===
+          
+          // 1. Instantly shrink the panel
+          panel.classList.remove("show-all-text");
+          toggleBtn.textContent = "Show full text";
+          
+          // 2. Instantly snap the scroll position so no visual jumping occurs
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'auto' });
+
+        } else {
+          // === EXPAND FLOW (Smoothly Anchor) ===
+          
+          panel.classList.add("show-all-text");
+          toggleBtn.textContent = "Show filtered text only";
+          
+          // Smooth scroll is great here because the page is getting longer, 
+          // so there is no risk of the browser freaking out.
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+        }
+      };
+
+
+
+
+
+
+
           stickyBtnContainer.appendChild(toggleBtn); refreshedResult.detailsDOM.appendChild(stickyBtnContainer); 
        }
        appContainer.scrollTop = scrollPos; 
@@ -2132,15 +2279,16 @@ bootApp(); // Start the engine
   }
 
   // --- 2. Translators: BBCode <-> HTML ---
-  function bbcodeToHtml(text) {
+    function bbcodeToHtml(text) {
     if (!text) return "";
     return escapeHTML(text)
-      .replace(/\[b\](.*?)\[\/b\]/gi, "<b>$1</b>")
-      .replace(/\[i\](.*?)\[\/i\]/gi, "<i>$1</i>")
-      .replace(/\[u\](.*?)\[\/u\]/gi, "<u>$1</u>")
-      .replace(/\[color=([^\]]+)\](.*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>")
+      .replace(/\[b\]([\s\S]*?)\[\/b\]/gi, "<b>$1</b>")
+      .replace(/\[i\]([\s\S]*?)\[\/i\]/gi, "<i>$1</i>")
+      .replace(/\[u\]([\s\S]*?)\[\/u\]/gi, "<u>$1</u>")
+      .replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>")
       .replace(/\n/g, "<br>"); // Convert newlines for the editable div
   }
+ 
 
   function htmlToBbcode(node) {
     let out = "";
@@ -2441,6 +2589,33 @@ bootApp(); // Start the engine
   }
 
   function resetModalButtons() { document.getElementById("saveBtn").textContent = "Save"; document.getElementById("saveBtn").disabled = false; document.getElementById("cancelBtnEdit").disabled = false; }
+  
+  
+    // --- Syncs the color picker to the highlighted text ---
+  window.syncColorPicker = function() {
+    // 1. Get the color of the currently highlighted text
+    let color = document.queryCommandValue("foreColor");
+    let picker = document.getElementById("colorPicker");
+
+    if (!color || color === "transparent") return;
+
+    // 2. If it's already a hex code, apply it directly
+    if (color.startsWith("#")) {
+      picker.value = color;
+      return;
+    }
+
+    // 3. Browsers usually return "rgb(r,g,b)", so we convert it to hex for the input
+    let match = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (match) {
+      let hex = "#" +
+        ("0" + parseInt(match[1], 10).toString(16)).slice(-2) +
+        ("0" + parseInt(match[2], 10).toString(16)).slice(-2) +
+        ("0" + parseInt(match[3], 10).toString(16)).slice(-2);
+      picker.value = hex;
+    }
+  };
+
 
   
 </script>
