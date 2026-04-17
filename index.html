@@ -779,7 +779,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "04.04.26.v1";
+const APP_VERSION = "04.05.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1797,7 +1797,7 @@ bootApp(); // Start the engine
     // Action 1: Importance
     const impAction = document.createElement("button");
     impAction.className = "action-item";
-    impAction.innerHTML = `<div class="action-icon">❗</div><div class="action-label">Important</div>`;
+    impAction.innerHTML = `<div class="action-icon">❗️</div><div class="action-label">Important</div>`;
     impAction.onclick = (e) => { e.stopPropagation(); cycleImportance(point["Short Name"]); };
     actionRow.appendChild(impAction);
 
@@ -1956,7 +1956,7 @@ bootApp(); // Start the engine
       const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
       const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
       toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
-                                  toggleBtn.onclick = (ev) => {
+                                        toggleBtn.onclick = (ev) => {
         ev.stopPropagation();
 
         const mainHeaderH = document.getElementById("mainStickyHeader") ? document.getElementById("mainStickyHeader").offsetHeight : 0;
@@ -1966,29 +1966,27 @@ bootApp(); // Start the engine
         const targetScroll = wrapperOffset + panel.offsetTop - mainHeaderH;
 
         if (panel.classList.contains("show-all-text")) {
-          // === COLLAPSE FLOW (Scroll first, then hide) ===
-          toggleBtn.textContent = "Scrolling to top...";
+          // === COLLAPSE FLOW (Instant Snap) ===
           
-          // 1. Smooth scroll back to the panel header
-          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+          // 1. Instantly shrink the panel
+          panel.classList.remove("show-all-text");
+          toggleBtn.textContent = "Show full text";
           
-          // 2. Wait 350ms for the smooth scroll to finish, THEN hide the text
-          setTimeout(() => {
-            panel.classList.remove("show-all-text");
-            toggleBtn.textContent = "Show full text";
-          }, 350);
+          // 2. Instantly snap the scroll position so no visual jumping occurs
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'auto' });
 
         } else {
-          // === EXPAND FLOW (Show first, then anchor) ===
+          // === EXPAND FLOW (Smoothly Anchor) ===
           
-          // 1. Expand the text so the document height increases
           panel.classList.add("show-all-text");
           toggleBtn.textContent = "Show filtered text only";
           
-          // 2. Smoothly anchor them to the header so they don't lose their place
+          // Smooth scroll is great here because the page is getting longer, 
+          // so there is no risk of the browser freaking out.
           appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
         }
       };
+
 
 
 
@@ -2029,7 +2027,7 @@ bootApp(); // Start the engine
           const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
           const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
           toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
-                                      toggleBtn.onclick = (ev) => {
+                                            toggleBtn.onclick = (ev) => {
         ev.stopPropagation();
 
         const mainHeaderH = document.getElementById("mainStickyHeader") ? document.getElementById("mainStickyHeader").offsetHeight : 0;
@@ -2039,29 +2037,27 @@ bootApp(); // Start the engine
         const targetScroll = wrapperOffset + panel.offsetTop - mainHeaderH;
 
         if (panel.classList.contains("show-all-text")) {
-          // === COLLAPSE FLOW (Scroll first, then hide) ===
-          toggleBtn.textContent = "Scrolling to top...";
+          // === COLLAPSE FLOW (Instant Snap) ===
           
-          // 1. Smooth scroll back to the panel header
-          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+          // 1. Instantly shrink the panel
+          panel.classList.remove("show-all-text");
+          toggleBtn.textContent = "Show full text";
           
-          // 2. Wait 350ms for the smooth scroll to finish, THEN hide the text
-          setTimeout(() => {
-            panel.classList.remove("show-all-text");
-            toggleBtn.textContent = "Show full text";
-          }, 350);
+          // 2. Instantly snap the scroll position so no visual jumping occurs
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'auto' });
 
         } else {
-          // === EXPAND FLOW (Show first, then anchor) ===
+          // === EXPAND FLOW (Smoothly Anchor) ===
           
-          // 1. Expand the text so the document height increases
           panel.classList.add("show-all-text");
           toggleBtn.textContent = "Show filtered text only";
           
-          // 2. Smoothly anchor them to the header so they don't lose their place
+          // Smooth scroll is great here because the page is getting longer, 
+          // so there is no risk of the browser freaking out.
           appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
         }
       };
+
 
 
 
