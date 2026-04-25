@@ -261,7 +261,7 @@
     /* Table Styles */
     .tcm-table {
       width: 100%; border-collapse: collapse; margin: 12px 0;
-      font-size: 14px; border-radius: 6px; overflow: hidden;
+      font-size: 14px; border-radius: 6px; 
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     .tcm-table th, .tcm-table td {
@@ -296,12 +296,12 @@
       border-radius: 20px 0 0 20px; box-shadow: -5px 0 25px rgba(0,0,0,0.15); 
       
       /* Slowed down slightly for a smoother feel */
-      animation: slideInRight 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      animation: slideInRight 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
     }
     
     /* The new slide-out class */
     #quickPeekModal.closing .quick-peek-content {
-      animation: slideOutRight 0.2s cubic-bezier(0.4, 0.0, 1, 1) forwards;
+      animation: slideOutRight 0.5s cubic-bezier(0.4, 0.0, 1, 1) forwards;
     }
 
     @keyframes slideInRight {
@@ -398,42 +398,67 @@
     
     /* Compare Modal Header Controls */
     .compare-actions { display: flex; align-items: center; gap: 15px; }
-    .zoom-controls { display: flex; background: #e3e3e8; border-radius: 8px; overflow: hidden; }
-    .zoom-controls button { background: transparent; border: none; padding: 6px 12px; font-weight: bold; font-size: 15px; color: #333; cursor: pointer; border-right: 1px solid #d1d1d6; transition: background 0.1s; }
-    .zoom-controls button:last-child { border-right: none; }
-    .zoom-controls button:active { background: #c7c7cc; }
-
-    /* Responsive Matrix Table (With Dynamic Zoom Math) */
-    .compare-table { 
-      --comp-zoom: 1; /* Default Zoom Level */
-      width: max-content; min-width: 100%; background: white; margin: 0; border: none; 
-      box-shadow: none; border-collapse: separate; border-spacing: 0; 
-      font-size: calc(14px * var(--comp-zoom)); 
-      transition: font-size 0.2s;
-    }
-    .compare-table th, .compare-table td { 
-      min-width: calc(280px * var(--comp-zoom)); 
-      max-width: calc(400px * var(--comp-zoom)); 
-      vertical-align: top; border: none; border-bottom: 1px solid #e0e0e0; border-right: 1px solid #e0e0e0; 
-      padding: calc(15px * var(--comp-zoom)); 
-      transition: min-width 0.2s, max-width 0.2s, padding 0.2s;
-    }
     
-    /* Sticky Row & Column Headers for Mobile Scrolling */
-    .compare-table th:first-child, .compare-table td:first-child { 
-      position: sticky; left: 0; background: #f8f8f8; z-index: 2; font-weight: 800; 
-      min-width: calc(110px * var(--comp-zoom)); 
-      max-width: calc(110px * var(--comp-zoom)); 
-      text-transform: uppercase; 
-      font-size: calc(12px * var(--comp-zoom)); 
-      color: #cc5500; border-right: 2px solid #ccc; box-shadow: 2px 0 5px rgba(0,0,0,0.03);
-    }
-    .compare-table thead th { 
-      position: sticky; top: 0; background: #e3e3e8; z-index: 3; 
-      font-size: calc(18px * var(--comp-zoom)); 
-      color: #333; border-bottom: 2px solid #ccc; 
-    }
-    .compare-table thead th:first-child { z-index: 4; border-right: 2px solid #ccc; } 
+
+ /* Responsive Matrix Table */
+.compare-table {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  border-collapse: separate; /* CRITICAL: Sticky cells fail if this is 'collapse' */
+  border-spacing: 0;
+  font-size: 14px;
+}
+
+/* 1. Base Cells (Need a solid background so scrolling text doesn't bleed through) */
+.compare-table th, .compare-table td {
+  min-width: 280px;
+  max-width: 400px;
+  vertical-align: top;
+  padding: 15px;
+  background: white; 
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  border-right: 1px solid #e0e0e0;
+}
+
+/* 2. Frozen Top Header Row (Point Names like LU-5) */
+.compare-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10; /* Keep above scrolling data */
+  background: #e3e3e8;
+  font-size: 18px;
+  color: #333;
+  border-bottom: 2px solid #ccc;
+}
+
+/* 3. Frozen Left Column (Labels like Location, Actions) */
+.compare-table td:first-child, .compare-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5; /* Keep above normal cells, but below top header */
+  background: #f8f8f8;
+  font-weight: 800;
+  min-width: 75px;
+  max-width: 75px;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #cc5500;
+  border-right: 2px solid #ccc;
+}
+
+/* 4. The Top-Left Corner "Data" Cell (Must be pinned in both directions) */
+.compare-table thead th:first-child {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 15; /* Absolute highest layer so it stays in the corner */
+  background: #e3e3e8;
+  border-right: 2px solid #ccc;
+  border-bottom: 2px solid #ccc;
+}
+
 
 
 
@@ -720,10 +745,7 @@
       <div class="compare-header">
         <h2>Compare Points</h2>
         <div class="compare-actions">
-          <div class="zoom-controls">
-            <button onclick="adjustCompareZoom(-0.15)" title="Zoom Out">A-</button>
-            <button onclick="adjustCompareZoom(0.15)" title="Zoom In">A+</button>
-          </div>
+          
           <button class="detail-nav-btn" onclick="closeCompareModal()" style="font-size:24px; color:#555;">✕</button>
         </div>
       </div>
@@ -1645,7 +1667,7 @@ bootApp(); // Start the engine
       modal.style.display = "none";
       modal.classList.remove("closing"); // Reset it for next time
       document.getElementById("quickPeekContainer").innerHTML = ""; 
-    }, 200);
+    }, 350);
   }
 
 
@@ -1679,7 +1701,7 @@ bootApp(); // Start the engine
     headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
 
     const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
-    const closeBtn = document.createElement("button"); closeBtn.className = "detail-nav-btn"; closeBtn.innerHTML = "✕";
+    const closeBtn = document.createElement("button"); closeBtn.className = "absolute-close-btn"; closeBtn.innerHTML = "✕";
     closeBtn.onclick = closeQuickPeek;
     navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); container.appendChild(headerInfo);
 
@@ -2451,19 +2473,16 @@ bootApp(); // Start the engine
   let compareList = [];
 
   function toggleCompare(pointId) {
-    if (compareList.includes(pointId)) {
-      compareList = compareList.filter(id => id !== pointId);
-      showToast("Removed from Compare");
-    } else {
-      if (compareList.length >= 3) {
-        showToast("You can only compare up to 3 points.");
-        return;
-      }
-      compareList.push(pointId);
-      showToast("Added to Compare");
-    }
-    updateCompareBasketUI();
+  if (compareList.includes(pointId)) {
+    // Remove if already in list
+    compareList = compareList.filter(id => id !== pointId);
+  } else {
+    // Add without limits
+    compareList.push(pointId);
   }
+  updateCompareBasketUI();
+}
+
 
   function clearCompare() {
     compareList = [];
@@ -2485,6 +2504,9 @@ bootApp(); // Start the engine
   function openCompareModal() {
     if (compareList.length === 0) return;
     const table = document.getElementById("compareTable");
+    
+      // Enable Native Pinch-to-Zoom
+  viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0");
     
     // The fields to display in the matrix rows
     const fields = [
@@ -2523,8 +2545,10 @@ bootApp(); // Start the engine
   }
 
   function closeCompareModal() {
-    document.getElementById("compareModal").style.display = "none";
-  }
+  // Lock the viewport back down to protect the main app UI
+  viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
+  document.getElementById("compareModal").style.display = "none";
+}
 
   // --- COMPARE ZOOM LOGIC ---
   let compareZoomLevel = 1.0;
