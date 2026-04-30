@@ -128,7 +128,7 @@
     .card-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .card-label { padding: 6px 4px; text-align: center; font-weight: 800; font-size: 14px; background: white; border-top: 1px solid #eee; }
 
-    .detail-panel { display: none; width: 100%; max-width: 900px; margin: 0 auto 20px auto; padding: 0 15px; box-sizing: border-box; content-visibility: auto;}
+    .detail-panel { display: none; width: 100%; max-width: 900px; margin: 0 auto 20px auto; padding: 0 15px 25px 15px; box-sizing: border-box; content-visibility: auto;}
     .detail-panel.open { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -359,7 +359,7 @@
         .add-field-btn {
       background: transparent; color: #007aff; border: 1px dashed #007aff;
       border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600;
-      cursor: pointer; width: 100%; transition: background 0.2s; margin-top: 5px;
+      cursor: pointer; width: 100%; transition: background 0.2s; margin-top: 5px; margin-bottom: 5px;
     }
     .add-field-btn:active { background: rgba(0, 122, 255, 0.1); }
 
@@ -802,7 +802,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "04.30.26.v1";
+const APP_VERSION = "04.30.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
