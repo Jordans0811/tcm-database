@@ -950,28 +950,81 @@ async function saveVaultData(dataArray) {
 
 const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
 
-// Fetch the database
+// --- NEW: Optimized Fetching Engine ---
 async function loadTCMData() {
   try {
-    let response = await fetch(dataUrl);
-    let textData = await response.text(); 
-    let newArray = JSON.parse(textData);
-    
-    let oldArray = await getVaultData();
-    let newClean = JSON.stringify(newArray);
-    let oldClean = JSON.stringify(oldArray);
+    let localVersion = localStorage.getItem("tcmpoints_version");
+    let isColdBoot = points.length === 0;
 
-    if (newClean !== oldClean && newClean.length > 50) {
-      console.log("New data found! Updating local cache and UI...");
-      await saveVaultData(newArray); 
-      receiveBackgroundUpdate(newClean); 
-    } else {
-      console.log("Data is identical. No update needed.");
+    // 1. COLD BOOT BYPASS: If we have no data, skip the version check to save time
+    if (isColdBoot || !localVersion) {
+       console.log("Cold boot detected. Fetching full payload immediately...");
+       const fullDataUrl = dataUrl + "?t=" + Date.now();
+       let response = await fetch(fullDataUrl);
+       let payload = await response.json();
+       let newArray = payload.points || payload;
+       await processAndSaveData(newArray, payload.version || Date.now().toString());
+       return;
     }
+
+    console.log("Checking for updates in the background...");
+    
+    // 2. Fast Version Check (Bypassing cache with &t=...)
+    const versionUrl = dataUrl + "?checkVersion=true&t=" + Date.now();
+    let versionResponse = await fetch(versionUrl);
+    let versionData = await versionResponse.json();
+    
+    // Safety net in case of legacy array format
+    if (Array.isArray(versionData)) {
+      await processAndSaveData(versionData, null); 
+      return;
+    }
+
+    let serverVersion = versionData.version;
+    
+    if (serverVersion && serverVersion === localVersion) {
+      console.log("Data is identical. No update needed.");
+      return; 
+    }
+
+    // 3. Versions didn't match. Download the new data!
+    console.log("New version detected! Downloading full payload...");
+    const fullDataUrl = dataUrl + "?t=" + Date.now();
+    let response = await fetch(fullDataUrl);
+    let payload = await response.json();
+    let newArray = payload.points || payload; 
+    
+    await processAndSaveData(newArray, serverVersion);
+    
   } catch (e) {
-    console.log("Offline or failed to fetch. Relying on IndexedDB cache.");
+    console.error("Critical Fetch Error: ", e);
+    if (points.length === 0) {
+       document.getElementById("cardContainer").innerHTML = 
+         "<div style='text-align:center; padding:40px; color:#ff3b30; font-weight:bold;'>Offline. Could not load database.</div>";
+    }
   }
 }
+
+// --- NEW: Dual-Vault Save System ---
+async function processAndSaveData(newArray, versionStr) {
+  if (!Array.isArray(newArray) || newArray.length === 0) {
+     console.error("Fetch failed: Received empty or invalid data.", newArray);
+     return;
+  }
+  
+  // 1. Save to primary IndexedDB vault
+  try { await saveVaultData(newArray); } catch(e) { console.log("IDB save bypassed."); }
+  
+  // 2. Save to secondary LocalStorage vault (Protects against iOS wiping data)
+  try { localStorage.setItem("tcmpoints_vault", JSON.stringify(newArray)); } catch(e) { console.log("LS save bypassed."); }
+  
+  // 3. Update version string
+  if (versionStr) localStorage.setItem("tcmpoints_version", versionStr);
+  
+  // 4. Send to background updater as a string
+  receiveBackgroundUpdate(JSON.stringify(newArray)); 
+}
+
 
 // The Visibility Tripwire
 document.addEventListener("visibilitychange", () => {
@@ -997,20 +1050,49 @@ const resultsCounter = document.getElementById("resultsCounter");
 const viewportMeta = document.querySelector('meta[name="viewport"]');
 
 // NEW: Instant Offline Boot (Async)
+// --- NEW: Bulletproof Boot Sequence ---
 async function bootApp() {
-  let rawPoints = await getVaultData();
-  
-  if (rawPoints.length === 0 && localStorage.getItem("tcmpoints_vault")) {
-    console.log("Migrating database...");
-    rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault"));
-    await saveVaultData(rawPoints);
+
+// 1. REQUEST PERSISTENCE: Ask iOS not to delete our IndexedDB
+  if (navigator.storage && navigator.storage.persist) {
+    try {
+      const isPersistent = await navigator.storage.persist();
+      if (isPersistent) {
+        console.log("Storage is protected. iOS will not clear this database.");
+      } else {
+        console.log("Storage is standard. Subject to iOS cleanup.");
+      }
+    } catch (e) { console.log("Persistence API not supported."); }
   }
 
-  points = processPoints(rawPoints);
-  initDropdown();
-  handleSearch(); // Renders the initial UI
+
+
+  let rawPoints = await getVaultData();
   
-  loadTCMData(); // Background sync
+  // iOS SURVIVAL: If IndexedDB was wiped, restore it from our LocalStorage backup
+  if ((!rawPoints || rawPoints.length === 0) && localStorage.getItem("tcmpoints_vault")) {
+    console.log("IndexedDB empty. Restoring from LocalStorage backup...");
+    try {
+        rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault"));
+        // Silently rebuild the IndexedDB vault in the background
+        if (Array.isArray(rawPoints)) saveVaultData(rawPoints).catch(e=>{});
+    } catch(e) { console.error("Could not parse LocalStorage vault."); }
+  }
+
+  if (!Array.isArray(rawPoints)) rawPoints = [];
+
+  if (rawPoints.length > 0) {
+    // We have data! Render instantly.
+    points = processPoints(rawPoints);
+    initDropdown();
+    handleSearch(); 
+  } else {
+    // True first-time load. Show a friendly message instead of a blank screen.
+    document.getElementById("cardContainer").innerHTML = 
+      "<div style='text-align:center; padding:40px; color:#888; font-weight:bold;'>Downloading Database...<br><span style='font-size:12px; font-weight:normal;'>This will only take a few seconds.</span></div>";
+  }
+  
+  loadTCMData(); // Trigger background sync
 }
 
 bootApp(); // Start the engine
