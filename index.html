@@ -128,7 +128,7 @@
     .card-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .card-label { padding: 6px 4px; text-align: center; font-weight: 800; font-size: 14px; background: white; border-top: 1px solid #eee; }
 
-    .detail-panel { display: none; width: 100%; max-width: 900px; margin: 0 auto 20px auto; padding: 0 15px; box-sizing: border-box; }
+    .detail-panel { display: none; width: 100%; max-width: 900px; margin: 0 auto 20px auto; padding: 0 15px; box-sizing: border-box; content-visibility: auto;}
     .detail-panel.open { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -261,7 +261,7 @@
     /* Table Styles */
     .tcm-table {
       width: 100%; border-collapse: collapse; margin: 12px 0;
-      font-size: 14px; border-radius: 6px; overflow: hidden;
+      font-size: 14px; border-radius: 6px; 
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     .tcm-table th, .tcm-table td {
@@ -288,20 +288,21 @@
       justify-content: flex-end; /* Pushes the panel to the right side */
       align-items: stretch; /* Stretches it to the very top and bottom */
       padding: 0;
+      background: transparent; /* This removes the dark grey overlay */
     }
     
        #quickPeekModal .quick-peek-content {
       height: 100%; max-height: 100%; width: 88%; max-width: 420px; 
       margin: 0; padding: 0; overflow-y: auto; background: #f0f0f5;
       border-radius: 20px 0 0 20px; box-shadow: -5px 0 25px rgba(0,0,0,0.15); 
-      
+      will-change: transform;
       /* Slowed down slightly for a smoother feel */
-      animation: slideInRight 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      animation: slideInRight 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
     }
     
     /* The new slide-out class */
     #quickPeekModal.closing .quick-peek-content {
-      animation: slideOutRight 0.2s cubic-bezier(0.4, 0.0, 1, 1) forwards;
+      animation: slideOutRight 0.5s cubic-bezier(0.4, 0.0, 1, 1) forwards;
     }
 
     @keyframes slideInRight {
@@ -398,42 +399,67 @@
     
     /* Compare Modal Header Controls */
     .compare-actions { display: flex; align-items: center; gap: 15px; }
-    .zoom-controls { display: flex; background: #e3e3e8; border-radius: 8px; overflow: hidden; }
-    .zoom-controls button { background: transparent; border: none; padding: 6px 12px; font-weight: bold; font-size: 15px; color: #333; cursor: pointer; border-right: 1px solid #d1d1d6; transition: background 0.1s; }
-    .zoom-controls button:last-child { border-right: none; }
-    .zoom-controls button:active { background: #c7c7cc; }
-
-    /* Responsive Matrix Table (With Dynamic Zoom Math) */
-    .compare-table { 
-      --comp-zoom: 1; /* Default Zoom Level */
-      width: max-content; min-width: 100%; background: white; margin: 0; border: none; 
-      box-shadow: none; border-collapse: separate; border-spacing: 0; 
-      font-size: calc(14px * var(--comp-zoom)); 
-      transition: font-size 0.2s;
-    }
-    .compare-table th, .compare-table td { 
-      min-width: calc(280px * var(--comp-zoom)); 
-      max-width: calc(400px * var(--comp-zoom)); 
-      vertical-align: top; border: none; border-bottom: 1px solid #e0e0e0; border-right: 1px solid #e0e0e0; 
-      padding: calc(15px * var(--comp-zoom)); 
-      transition: min-width 0.2s, max-width 0.2s, padding 0.2s;
-    }
     
-    /* Sticky Row & Column Headers for Mobile Scrolling */
-    .compare-table th:first-child, .compare-table td:first-child { 
-      position: sticky; left: 0; background: #f8f8f8; z-index: 2; font-weight: 800; 
-      min-width: calc(110px * var(--comp-zoom)); 
-      max-width: calc(110px * var(--comp-zoom)); 
-      text-transform: uppercase; 
-      font-size: calc(12px * var(--comp-zoom)); 
-      color: #cc5500; border-right: 2px solid #ccc; box-shadow: 2px 0 5px rgba(0,0,0,0.03);
-    }
-    .compare-table thead th { 
-      position: sticky; top: 0; background: #e3e3e8; z-index: 3; 
-      font-size: calc(18px * var(--comp-zoom)); 
-      color: #333; border-bottom: 2px solid #ccc; 
-    }
-    .compare-table thead th:first-child { z-index: 4; border-right: 2px solid #ccc; } 
+
+ /* Responsive Matrix Table */
+.compare-table {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  border-collapse: separate; /* CRITICAL: Sticky cells fail if this is 'collapse' */
+  border-spacing: 0;
+  font-size: 14px;
+}
+
+/* 1. Base Cells (Need a solid background so scrolling text doesn't bleed through) */
+.compare-table th, .compare-table td {
+  min-width: 280px;
+  max-width: 400px;
+  vertical-align: top;
+  padding: 15px;
+  background: white; 
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  border-right: 1px solid #e0e0e0;
+}
+
+/* 2. Frozen Top Header Row (Point Names like LU-5) */
+.compare-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10; /* Keep above scrolling data */
+  background: #e3e3e8;
+  font-size: 18px;
+  color: #333;
+  border-bottom: 2px solid #ccc;
+}
+
+/* 3. Frozen Left Column (Labels like Location, Actions) */
+.compare-table td:first-child, .compare-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5; /* Keep above normal cells, but below top header */
+  background: #f8f8f8;
+  font-weight: 800;
+  min-width: 75px;
+  max-width: 75px;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #cc5500;
+  border-right: 2px solid #ccc;
+}
+
+/* 4. The Top-Left Corner "Data" Cell (Must be pinned in both directions) */
+.compare-table thead th:first-child {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 15; /* Absolute highest layer so it stays in the corner */
+  background: #e3e3e8;
+  border-right: 2px solid #ccc;
+  border-bottom: 2px solid #ccc;
+}
+
 
 
 
@@ -720,10 +746,7 @@
       <div class="compare-header">
         <h2>Compare Points</h2>
         <div class="compare-actions">
-          <div class="zoom-controls">
-            <button onclick="adjustCompareZoom(-0.15)" title="Zoom Out">A-</button>
-            <button onclick="adjustCompareZoom(0.15)" title="Zoom In">A+</button>
-          </div>
+          
           <button class="detail-nav-btn" onclick="closeCompareModal()" style="font-size:24px; color:#555;">✕</button>
         </div>
       </div>
@@ -927,28 +950,81 @@ async function saveVaultData(dataArray) {
 
 const dataUrl = "https://script.google.com/macros/s/AKfycbwHK3226WzOLyfR8N-e1XNkBdyOPLkmZKlWunGsdqR4m64dP_iizcrbZyig8c2H0opcaA/exec";
 
-// Fetch the database
+// --- NEW: Optimized Fetching Engine ---
 async function loadTCMData() {
   try {
-    let response = await fetch(dataUrl);
-    let textData = await response.text(); 
-    let newArray = JSON.parse(textData);
-    
-    let oldArray = await getVaultData();
-    let newClean = JSON.stringify(newArray);
-    let oldClean = JSON.stringify(oldArray);
+    let localVersion = localStorage.getItem("tcmpoints_version");
+    let isColdBoot = points.length === 0;
 
-    if (newClean !== oldClean && newClean.length > 50) {
-      console.log("New data found! Updating local cache and UI...");
-      await saveVaultData(newArray); 
-      receiveBackgroundUpdate(newClean); 
-    } else {
-      console.log("Data is identical. No update needed.");
+    // 1. COLD BOOT BYPASS: If we have no data, skip the version check to save time
+    if (isColdBoot || !localVersion) {
+       console.log("Cold boot detected. Fetching full payload immediately...");
+       const fullDataUrl = dataUrl + "?t=" + Date.now();
+       let response = await fetch(fullDataUrl);
+       let payload = await response.json();
+       let newArray = payload.points || payload;
+       await processAndSaveData(newArray, payload.version || Date.now().toString());
+       return;
     }
+
+    console.log("Checking for updates in the background...");
+    
+    // 2. Fast Version Check (Bypassing cache with &t=...)
+    const versionUrl = dataUrl + "?checkVersion=true&t=" + Date.now();
+    let versionResponse = await fetch(versionUrl);
+    let versionData = await versionResponse.json();
+    
+    // Safety net in case of legacy array format
+    if (Array.isArray(versionData)) {
+      await processAndSaveData(versionData, null); 
+      return;
+    }
+
+    let serverVersion = versionData.version;
+    
+    if (serverVersion && serverVersion === localVersion) {
+      console.log("Data is identical. No update needed.");
+      return; 
+    }
+
+    // 3. Versions didn't match. Download the new data!
+    console.log("New version detected! Downloading full payload...");
+    const fullDataUrl = dataUrl + "?t=" + Date.now();
+    let response = await fetch(fullDataUrl);
+    let payload = await response.json();
+    let newArray = payload.points || payload; 
+    
+    await processAndSaveData(newArray, serverVersion);
+    
   } catch (e) {
-    console.log("Offline or failed to fetch. Relying on IndexedDB cache.");
+    console.error("Critical Fetch Error: ", e);
+    if (points.length === 0) {
+       document.getElementById("cardContainer").innerHTML = 
+         "<div style='text-align:center; padding:40px; color:#ff3b30; font-weight:bold;'>Offline. Could not load database.</div>";
+    }
   }
 }
+
+// --- NEW: Dual-Vault Save System ---
+async function processAndSaveData(newArray, versionStr) {
+  if (!Array.isArray(newArray) || newArray.length === 0) {
+     console.error("Fetch failed: Received empty or invalid data.", newArray);
+     return;
+  }
+  
+  // 1. Save to primary IndexedDB vault
+  try { await saveVaultData(newArray); } catch(e) { console.log("IDB save bypassed."); }
+  
+  // 2. Save to secondary LocalStorage vault (Protects against iOS wiping data)
+  try { localStorage.setItem("tcmpoints_vault", JSON.stringify(newArray)); } catch(e) { console.log("LS save bypassed."); }
+  
+  // 3. Update version string
+  if (versionStr) localStorage.setItem("tcmpoints_version", versionStr);
+  
+  // 4. Send to background updater as a string
+  receiveBackgroundUpdate(JSON.stringify(newArray)); 
+}
+
 
 // The Visibility Tripwire
 document.addEventListener("visibilitychange", () => {
@@ -974,20 +1050,49 @@ const resultsCounter = document.getElementById("resultsCounter");
 const viewportMeta = document.querySelector('meta[name="viewport"]');
 
 // NEW: Instant Offline Boot (Async)
+// --- NEW: Bulletproof Boot Sequence ---
 async function bootApp() {
-  let rawPoints = await getVaultData();
-  
-  if (rawPoints.length === 0 && localStorage.getItem("tcmpoints_vault")) {
-    console.log("Migrating database...");
-    rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault"));
-    await saveVaultData(rawPoints);
+
+// 1. REQUEST PERSISTENCE: Ask iOS not to delete our IndexedDB
+  if (navigator.storage && navigator.storage.persist) {
+    try {
+      const isPersistent = await navigator.storage.persist();
+      if (isPersistent) {
+        console.log("Storage is protected. iOS will not clear this database.");
+      } else {
+        console.log("Storage is standard. Subject to iOS cleanup.");
+      }
+    } catch (e) { console.log("Persistence API not supported."); }
   }
 
-  points = processPoints(rawPoints);
-  initDropdown();
-  handleSearch(); // Renders the initial UI
+
+
+  let rawPoints = await getVaultData();
   
-  loadTCMData(); // Background sync
+  // iOS SURVIVAL: If IndexedDB was wiped, restore it from our LocalStorage backup
+  if ((!rawPoints || rawPoints.length === 0) && localStorage.getItem("tcmpoints_vault")) {
+    console.log("IndexedDB empty. Restoring from LocalStorage backup...");
+    try {
+        rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault"));
+        // Silently rebuild the IndexedDB vault in the background
+        if (Array.isArray(rawPoints)) saveVaultData(rawPoints).catch(e=>{});
+    } catch(e) { console.error("Could not parse LocalStorage vault."); }
+  }
+
+  if (!Array.isArray(rawPoints)) rawPoints = [];
+
+  if (rawPoints.length > 0) {
+    // We have data! Render instantly.
+    points = processPoints(rawPoints);
+    initDropdown();
+    handleSearch(); 
+  } else {
+    // True first-time load. Show a friendly message instead of a blank screen.
+    document.getElementById("cardContainer").innerHTML = 
+      "<div style='text-align:center; padding:40px; color:#888; font-weight:bold;'>Downloading Database...<br><span style='font-size:12px; font-weight:normal;'>This will only take a few seconds.</span></div>";
+  }
+  
+  loadTCMData(); // Trigger background sync
 }
 
 bootApp(); // Start the engine
@@ -1232,7 +1337,7 @@ bootApp(); // Start the engine
     const mainHeader = document.getElementById("mainStickyHeader");
     if (mainHeader) document.documentElement.style.setProperty('--header-height', mainHeader.getBoundingClientRect().height + 'px');
   }
-  window.addEventListener('resize', updateStickyHeaderHeights);
+  window.addEventListener('resize', debounce(updateStickyHeaderHeights, 150));
 
   function toggleSearchDropdown() {
     const dropdown = document.getElementById("searchDropdown");
@@ -1385,7 +1490,7 @@ bootApp(); // Start the engine
     headers.forEach(h => { regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(h); });
     fullNames.forEach(f => { regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(f); });
 
-    const validRegexParts = regexParts.filter(t => t.trim().length > 0).sort((a, b) => b.length - a.length);
+    const validRegexParts = regexParts.filter(t => t.trim().length > 2).sort((a, b) => b.length - a.length);
     if (validRegexParts.length > 0) activeHighlightRegex = new RegExp("(" + validRegexParts.join("|") + ")", "gi");
     else activeHighlightRegex = null;
 
@@ -1645,7 +1750,7 @@ bootApp(); // Start the engine
       modal.style.display = "none";
       modal.classList.remove("closing"); // Reset it for next time
       document.getElementById("quickPeekContainer").innerHTML = ""; 
-    }, 200);
+    }, 350);
   }
 
 
@@ -1679,7 +1784,7 @@ bootApp(); // Start the engine
     headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
 
     const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
-    const closeBtn = document.createElement("button"); closeBtn.className = "detail-nav-btn"; closeBtn.innerHTML = "✕";
+    const closeBtn = document.createElement("button"); closeBtn.className = "absolute-close-btn"; closeBtn.innerHTML = "✕";
     closeBtn.onclick = closeQuickPeek;
     navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); container.appendChild(headerInfo);
 
@@ -2100,6 +2205,7 @@ bootApp(); // Start the engine
       
       const imgContainer = document.createElement("div"); imgContainer.className = "card-img-container";
       const img = document.createElement("img"); img.dataset.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+      img.decoding = "async";
       
       const label = document.createElement("div"); label.className = "card-label";
       label.innerHTML = highlightText(point["Short Name"]); 
@@ -2451,19 +2557,16 @@ bootApp(); // Start the engine
   let compareList = [];
 
   function toggleCompare(pointId) {
-    if (compareList.includes(pointId)) {
-      compareList = compareList.filter(id => id !== pointId);
-      showToast("Removed from Compare");
-    } else {
-      if (compareList.length >= 3) {
-        showToast("You can only compare up to 3 points.");
-        return;
-      }
-      compareList.push(pointId);
-      showToast("Added to Compare");
-    }
-    updateCompareBasketUI();
+  if (compareList.includes(pointId)) {
+    // Remove if already in list
+    compareList = compareList.filter(id => id !== pointId);
+  } else {
+    // Add without limits
+    compareList.push(pointId);
   }
+  updateCompareBasketUI();
+}
+
 
   function clearCompare() {
     compareList = [];
@@ -2485,6 +2588,9 @@ bootApp(); // Start the engine
   function openCompareModal() {
     if (compareList.length === 0) return;
     const table = document.getElementById("compareTable");
+    
+      // Enable Native Pinch-to-Zoom
+  viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0");
     
     // The fields to display in the matrix rows
     const fields = [
@@ -2523,8 +2629,10 @@ bootApp(); // Start the engine
   }
 
   function closeCompareModal() {
-    document.getElementById("compareModal").style.display = "none";
-  }
+  // Lock the viewport back down to protect the main app UI
+  viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
+  document.getElementById("compareModal").style.display = "none";
+}
 
   // --- COMPARE ZOOM LOGIC ---
   let compareZoomLevel = 1.0;
