@@ -128,7 +128,7 @@
     .card-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .card-label { padding: 6px 4px; text-align: center; font-weight: 800; font-size: 14px; background: white; border-top: 1px solid #eee; }
 
-    .detail-panel { display: none; width: 100%; max-width: 900px; margin: 0 auto 20px auto; padding: 0 15px; box-sizing: border-box; }
+    .detail-panel { display: none; width: 100%; max-width: 900px; margin: 0 auto 20px auto; padding: 0 15px; box-sizing: border-box; content-visibility: auto;}
     .detail-panel.open { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -295,7 +295,7 @@
       height: 100%; max-height: 100%; width: 88%; max-width: 420px; 
       margin: 0; padding: 0; overflow-y: auto; background: #f0f0f5;
       border-radius: 20px 0 0 20px; box-shadow: -5px 0 25px rgba(0,0,0,0.15); 
-      
+      will-change: transform;
       /* Slowed down slightly for a smoother feel */
       animation: slideInRight 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
     }
@@ -1255,7 +1255,7 @@ bootApp(); // Start the engine
     const mainHeader = document.getElementById("mainStickyHeader");
     if (mainHeader) document.documentElement.style.setProperty('--header-height', mainHeader.getBoundingClientRect().height + 'px');
   }
-  window.addEventListener('resize', updateStickyHeaderHeights);
+  window.addEventListener('resize', debounce(updateStickyHeaderHeights, 150));
 
   function toggleSearchDropdown() {
     const dropdown = document.getElementById("searchDropdown");
@@ -1408,7 +1408,7 @@ bootApp(); // Start the engine
     headers.forEach(h => { regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(h); });
     fullNames.forEach(f => { regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(f); });
 
-    const validRegexParts = regexParts.filter(t => t.trim().length > 0).sort((a, b) => b.length - a.length);
+    const validRegexParts = regexParts.filter(t => t.trim().length > 2).sort((a, b) => b.length - a.length);
     if (validRegexParts.length > 0) activeHighlightRegex = new RegExp("(" + validRegexParts.join("|") + ")", "gi");
     else activeHighlightRegex = null;
 
@@ -2123,6 +2123,7 @@ bootApp(); // Start the engine
       
       const imgContainer = document.createElement("div"); imgContainer.className = "card-img-container";
       const img = document.createElement("img"); img.dataset.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+      img.decoding = "async";
       
       const label = document.createElement("div"); label.className = "card-label";
       label.innerHTML = highlightText(point["Short Name"]); 
