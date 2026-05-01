@@ -802,7 +802,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.01.26.v1";
+const APP_VERSION = "05.01.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1564,7 +1564,7 @@ bootApp(); // Start the engine
 
   function escapeHTML(str) { return !str ? "" : String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   
-    function highlightText(text) {
+      function highlightText(text) {
     if (!text) return ""; 
     let escaped = escapeHTML(text); 
     
@@ -1575,7 +1575,9 @@ bootApp(); // Start the engine
       .replace(/\[u\]([\s\S]*?)\[\/u\]/gi, "<u>$1</u>")
       .replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>");
 
-      
+    // NEW FIX: Sweep up any orphaned/broken BBCode tags that were severed during paragraph filtering
+    withBB = withBB.replace(/\[\/?(b|i|u|color(?:=[^\]]+)?)\]/gi, "");
+
     if (!activeHighlightRegex) return withBB;
     
     // Highlight text while ignoring anything inside HTML brackets
@@ -1587,6 +1589,7 @@ bootApp(); // Start the engine
     }
     return parts.join("");
   }
+
 
 
   function formatTextWithTables(text) {
