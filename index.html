@@ -1107,12 +1107,16 @@ bootApp(); // Start the engine
   }
 
   function generateSearchIndex(point) {
-    const visibleData = [
+        const visibleData = [
       point.Important, point["Short Name"], point["Full Name"], point["Channel Full Name"],
       point["Channel Short Name"], point["Location"], point.Location,
       point["Location Notes"], point.Needling, point.Actions, point.Indications, point.Commentary,
-      point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
+      point["Summary of clinical application"], point.Combinations, point.Description, 
+      point.Patterns, point["Diagnosis & Differentiation"], point.Analysis, point["Treatment Principle"], 
+      point["Point Prescription"], point["Supplementary Points"], point.Explanation, point.Remarks, point["Flashcard View"],
+      point.Notes, point["CAM Notes"]
     ];
+
     // Strip BBCode and lowercase once during boot
     return stripBBCode(visibleData.filter(Boolean).map(v => String(v)).join(" ")).toLowerCase(); 
   }
@@ -1134,12 +1138,16 @@ bootApp(); // Start the engine
       point._shortNameLower = (point["Short Name"] || "").toString().toLowerCase();
       point._fullNameLower = (point["Full Name"] || point[" Full Name"] || "").toString().toLowerCase();
       
-      const fields = [
+            const fields = [
         point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"],
         point["Location "] || point.Location, point["Location Notes"], point.Needling,
         point.Actions, point.Indications, point.Commentary,
-        point["Summary of clinical application"], point.Combinations, point.Description, point.Notes, point["CAM Notes"]
+        point["Summary of clinical application"], point.Combinations, point.Description, 
+        point.Patterns, point["Diagnosis & Differentiation"], point.Analysis, point["Treatment Principle"], 
+        point["Point Prescription"], point["Supplementary Points"], point.Explanation, point.Remarks, point["Flashcard View"],
+        point.Notes, point["CAM Notes"]
       ];
+
       
       let paras = [];
       fields.forEach(f => {
@@ -1811,8 +1819,18 @@ bootApp(); // Start the engine
     addDetail("Summary of Clinical Application", point["Summary of clinical application"]);
     addDetail("Combinations", point.Combinations);
     addDetail("Description", point.Description);
+    addDetail("Patterns", point.Patterns);
+    addDetail("Diagnosis & Differentiation", point["Diagnosis & Differentiation"]);
+    addDetail("Analysis", point.Analysis);
+    addDetail("Treatment Principle", point["Treatment Principle"]);
+    addDetail("Point Prescription", point["Point Prescription"]);
+    addDetail("Supplementary Points", point["Supplementary Points"]);
+    addDetail("Explanation", point.Explanation);
+    addDetail("Remarks", point.Remarks);
+    addDetail("Flashcard View", point["Flashcard View"]);
     addDetail("Notes", point.Notes);
     addDetail("CAM Notes", point["CAM Notes"]);
+
   }
 
 
@@ -1977,8 +1995,18 @@ bootApp(); // Start the engine
     addDetail("Summary of Clinical Application", point["Summary of clinical application"], "Summary of clinical application");
     addDetail("Combinations", point.Combinations, "Combinations");
     addDetail("Description", point.Description, "Description");
+    addDetail("Patterns", point.Patterns, "Patterns");
+    addDetail("Diagnosis & Differentiation", point["Diagnosis & Differentiation"], "Diagnosis & Differentiation");
+    addDetail("Analysis", point.Analysis, "Analysis");
+    addDetail("Treatment Principle", point["Treatment Principle"], "Treatment Principle");
+    addDetail("Point Prescription", point["Point Prescription"], "Point Prescription");
+    addDetail("Supplementary Points", point["Supplementary Points"], "Supplementary Points");
+    addDetail("Explanation", point.Explanation, "Explanation");
+    addDetail("Remarks", point.Remarks, "Remarks");
+    addDetail("Flashcard View", point["Flashcard View"], "Flashcard View");
     addDetail("Notes", point.Notes, "Notes");
     addDetail("CAM Notes", point["CAM Notes"], "CAM Notes");
+
 
     // --- The "Add / Edit Field" Shortcut Button ---
     const addFieldBtn = document.createElement("button");
@@ -2345,13 +2373,16 @@ bootApp(); // Start the engine
     currentEditingPoint = point; 
     
     // Safely fetch field names (handling your data's "Location " trailing space quirk)
-    const fields = [
+        const fields = [
       "Important", "Notes", "CAM Notes", 
       point.hasOwnProperty("Location ") ? "Location " : "Location", 
       "Location Notes", "Needling", "Actions", "Indications", 
       "Commentary", "Summary of clinical application", 
-      "Combinations", "Description"
+      "Combinations", "Description",
+      "Patterns", "Diagnosis & Differentiation", "Analysis", "Treatment Principle", 
+      "Point Prescription", "Supplementary Points", "Explanation", "Remarks", "Flashcard View"
     ];
+
     
     const select = document.getElementById("editFieldSelect");
     select.innerHTML = "";
@@ -2596,7 +2627,7 @@ bootApp(); // Start the engine
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0");
     
     // The fields to display in the matrix rows
-    const fields = [
+        const fields = [
       { key: "Location ", altKey: "Location", label: "Location" },
       { key: "Needling", label: "Needling" },
       { key: "Actions", label: "Actions" },
@@ -2605,10 +2636,19 @@ bootApp(); // Start the engine
       { key: "Commentary", label: "Commentary" },
       { key: "Summary of clinical application", label: "Summary of Clinical Application" },
       { key: "Description", label: "Description" },
+      { key: "Patterns", label: "Patterns" },
+      { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
+      { key: "Analysis", label: "Analysis" },
+      { key: "Treatment Principle", label: "Treatment Principle" },
+      { key: "Point Prescription", label: "Point Prescription" },
+      { key: "Supplementary Points", label: "Supplementary Points" },
+      { key: "Explanation", label: "Explanation" },
+      { key: "Remarks", label: "Remarks" },
+      { key: "Flashcard View", label: "Flashcard View" },
       { key: "Notes", label: "Notes" },
       { key: "CAM Notes", label: "CAM Notes" }
-      
     ];
+
 
     let pts = compareList.map(id => points.find(p => p["Short Name"] === id)).filter(Boolean);
 
@@ -2668,12 +2708,15 @@ bootApp(); // Start the engine
     }
 
     // 3. Rebuild the Paragraph Array for the Search Engine
-    const fields = [
+        const fields = [
       currentEditingPoint.Important, currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
       currentEditingPoint.Actions, currentEditingPoint.Indications, currentEditingPoint.Commentary,
       currentEditingPoint["Summary of clinical application"], currentEditingPoint.Combinations, currentEditingPoint.Description, 
+      currentEditingPoint.Patterns, currentEditingPoint["Diagnosis & Differentiation"], currentEditingPoint.Analysis, currentEditingPoint["Treatment Principle"], 
+      currentEditingPoint["Point Prescription"], currentEditingPoint["Supplementary Points"], currentEditingPoint.Explanation, currentEditingPoint.Remarks, currentEditingPoint["Flashcard View"],
       currentEditingPoint.Notes, currentEditingPoint["CAM Notes"]
     ];
+
     
     let paras = [];
     fields.forEach(f => {
