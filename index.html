@@ -1376,14 +1376,9 @@ bootApp(); // Start the engine
     }
   });
 
-  function expandTCMPoint(term) {
+    function expandTCMPoint(term) {
     term = term.trim();
-    const match = term.match(/^([a-z\.]+)(?:[\s\-\.]*)(\d+)$/i);
-    if (!match) return [term];
-
-    let rawLetters = match[1].toLowerCase().replace(/\./g, ""); 
-    let numbers = match[2];
-
+    
     const aliases = {
       'li': ['li', 'l.i.'], 'ht': ['ht', 'he'], 'he': ['ht', 'he'],
       'sj': ['sj', 'te', 'tb', 't.b.', 'th'], 'te': ['sj', 'te', 'tb', 't.b.', 'th'],
@@ -1393,6 +1388,19 @@ bootApp(); // Start the engine
       'cv': ['cv', 'rn', 'ren'], 'rn': ['cv', 'rn', 'ren'], 'ren':['cv', 'rn', 'ren'],
       'gv': ['gv', 'du'], 'du': ['gv', 'du']
     };
+
+    // Fix: Allow pure letter searches (like "@cv") to trigger alias expansion
+    const lettersOnlyMatch = term.match(/^([a-z\.]+)$/i);
+    if (lettersOnlyMatch) {
+       let rawLetters = lettersOnlyMatch[1].toLowerCase().replace(/\./g, "");
+       return aliases[rawLetters] || [term];
+    }
+
+    const match = term.match(/^([a-z\.]+)(?:[\s\-\.]*)(\d+)$/i);
+    if (!match) return [term];
+
+    let rawLetters = match[1].toLowerCase().replace(/\./g, ""); 
+    let numbers = match[2];
 
     let baseLetters = aliases[rawLetters] || [rawLetters];
     let variations = new Set();
@@ -1409,6 +1417,7 @@ bootApp(); // Start the engine
     });
     return Array.from(variations);
   }
+
   
        const editArea = document.getElementById('editArea');
 
@@ -1711,26 +1720,41 @@ bootApp(); // Start the engine
     return parts.join("");
   }
 
-    function openQuickPeek(chan, num) {
+      function openQuickPeek(chan, num) {
     chan = chan.toUpperCase().replace(/\./g, "");
-    const aliases = {
-      'HE': 'HT', 'TB': 'SJ', 'TE': 'SJ', 'TH': 'SJ', 'P': 'PC',
-      'LIV': 'LV', 'LV': 'LV', 'KID': 'KD', 'UB': 'BL', 'REN': 'REN', 'RN': 'CV', 'DU': 'DU'
-    };
-    let stdChan = aliases[chan] || chan;
     
-    let targetId1 = stdChan + "-" + num;
-    let targetId2 = stdChan + " " + num;
-    let targetId3 = stdChan + num;
+    // Symmetrical aliases so it doesn't matter what your DB uses
+    const aliases = {
+      'HE': ['HT', 'HE'], 'HT': ['HT', 'HE'],
+      'TB': ['SJ', 'TE', 'TB', 'TH'], 'TE': ['SJ', 'TE', 'TB', 'TH'], 'TH': ['SJ', 'TE', 'TB', 'TH'], 'SJ': ['SJ', 'TE', 'TB', 'TH'],
+      'P': ['PC', 'P'], 'PC': ['PC', 'P'],
+      'LIV': ['LV', 'LIV', 'LR'], 'LR': ['LV', 'LIV', 'LR'], 'LV': ['LV', 'LIV', 'LR'],
+      'KID': ['KD', 'KI', 'KID'], 'KI': ['KD', 'KI', 'KID'], 'KD': ['KD', 'KI', 'KID'],
+      'UB': ['BL', 'UB'], 'BL': ['BL', 'UB'],
+      'REN': ['REN', 'RN', 'CV'], 'RN': ['REN', 'RN', 'CV'], 'CV': ['REN', 'RN', 'CV'],
+      'DU': ['DU', 'GV'], 'GV': ['DU', 'GV']
+    };
+    
+    let stdChans = aliases[chan] || [chan];
+    let targetPoint = null;
 
-    let targetPoint = points.find(p => 
-      p["Short Name"].toUpperCase() === targetId1 ||
-      p["Short Name"].toUpperCase() === targetId2 ||
-      p["Short Name"].toUpperCase() === targetId3
-    );
+    // Check all possible aliases against the database
+    for (let stdChan of stdChans) {
+      let targetId1 = stdChan + "-" + num;
+      let targetId2 = stdChan + " " + num;
+      let targetId3 = stdChan + num;
+
+      targetPoint = points.find(p => 
+        p["Short Name"].toUpperCase() === targetId1 ||
+        p["Short Name"].toUpperCase() === targetId2 ||
+        p["Short Name"].toUpperCase() === targetId3
+      );
+      
+      if (targetPoint) break;
+    }
 
     if (!targetPoint) {
-      showToast("Point " + stdChan + "-" + num + " not found.");
+      showToast("Point " + chan + "-" + num + " not found.");
       return;
     }
 
@@ -1739,8 +1763,7 @@ bootApp(); // Start the engine
     
     document.getElementById("quickPeekContainer").scrollTop = 0; 
     
-
-    // NEW: Dynamically measure the header height so the sections stick perfectly
+    // Dynamically measure the header height so the sections stick perfectly
     setTimeout(() => {
       const qpHeader = document.querySelector('#quickPeekModal .detail-header-info');
       if (qpHeader) {
@@ -1748,6 +1771,7 @@ bootApp(); // Start the engine
       }
     }, 10);
   }
+
 
 
     function closeQuickPeek() {
