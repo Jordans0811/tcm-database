@@ -72,6 +72,47 @@
     #searchDropdown.expanded {
       display: block; 
     }
+    
+    
+    /* Search History Floating Menu Styles */
+    #searchHistoryContainer {
+      display: none; 
+      flex-direction: column;
+      position: absolute;
+      top: calc(100% + 8px); /* Anchors it 8px below the search bar */
+      left: 0;
+      width: 100%;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.2); /* Deep shadow for floating effect */
+      border: 1px solid #d1d1d6;
+      z-index: 200; /* Forces it over the cards */
+      overflow: hidden; /* Keeps the bottom corners rounded */
+    }
+    .history-item {
+      padding: 12px 15px;
+      border-bottom: 1px solid #e3e3e8;
+      color: #007aff;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .history-item:active { background: rgba(0,0,0,0.05); }
+    
+    .history-clear-row { 
+      display: flex; 
+      justify-content: center; /* Centered looks better in a floating card */
+      padding: 12px;
+      background: #f8f8f8;
+    }
+    .history-clear-btn {
+      background: transparent; border: none;
+      color: #ff3b30; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+
+
 
     .search-sort-row { display: flex; gap: 10px; align-items: center; width: 100%; max-width: 800px; margin: 0 auto; }
     
@@ -251,7 +292,7 @@
       display: none; position: absolute; top: calc(100% - 5px); left: 50%; transform: translateX(-50%);
       width: calc(100% - 30px); max-width: 400px; background: rgba(240, 240, 245, 0.95); backdrop-filter: blur(10px);
       padding: 12px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid #d1d1d6; 
-      z-index: 101; font-size: 13px; color: #333;
+      z-index: 201; font-size: 13px; color: #333;
     }
     #searchHelpTooltip.show { display: block; animation: fadeIn 0.2s ease; }
     .help-row { display: flex; margin-bottom: 6px; align-items: baseline; }
@@ -647,6 +688,11 @@
   .action-icon { background: #2c2c2e; color: #0a84ff; }
   .action-item:active .action-icon { background: #3a3a3c; }
   .action-label { color: #aaa; }
+  
+  #searchHistoryContainer { background: #1c1c1e; border-color: #38383a; box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
+      .history-item { border-bottom-color: #38383a; color: #64b5f6; }
+      .history-clear-row { background: #2c2c2e; }
+
 
       
       
@@ -685,6 +731,8 @@
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: #f0f0f5; z-index: 10004; flex-direction: column;
     }
+    
+      
 
         @media print {
       /* Hide the app UI and the modal header completely */
@@ -867,6 +915,7 @@
           <div class="search-container">
             <input id="searchInput" class="search-box" type="text" placeholder='Search exact match, @short, #full...' />
             <div class="clear-btn-hitbox" onclick="clearSearchText()"><span class="clear-btn-icon">✕</span></div>
+              <div id="searchHistoryContainer"></div>
           </div>
           <div class="help-icon" onclick="toggleHelp()">?</div>
         </div>
@@ -1436,6 +1485,7 @@ bootApp(); // Start the engine
     dropdown.classList.toggle("expanded");
     if (dropdown.classList.contains("expanded")) {
       searchInput.focus();
+      renderSearchHistory();
     }
     updateStickyHeaderHeights(); 
   }
@@ -1449,7 +1499,7 @@ bootApp(); // Start the engine
     }
   });
 
-  function clearSearchText() { searchInput.value = ""; handleSearch(); searchInput.focus(); }
+  function clearSearchText() { searchInput.value = ""; handleSearch(); searchInput.focus(); renderSearchHistory(); }
   function clearAndCloseSearch() { searchInput.value = ""; handleSearch(); document.getElementById("searchDropdown").classList.remove("expanded"); updateStickyHeaderHeights(); }
 
   function toggleHelp() { document.getElementById("searchHelpTooltip").classList.toggle("show"); }
@@ -1525,6 +1575,54 @@ bootApp(); // Start the engine
   });
 
 
+  function saveSearchHistory(query) {
+    if (!query || query.trim().length < 2) return;
+    let cleanQuery = query.trim();
+    let history = JSON.parse(localStorage.getItem('tcm_search_history')) || [];
+    
+    // Remove if it exists, then put it at the very top
+    history = history.filter(item => item !== cleanQuery);
+    history.unshift(cleanQuery);
+    history = history.slice(0, 10); // Keep only the last 10
+    
+    localStorage.setItem('tcm_search_history', JSON.stringify(history));
+  }
+
+  function renderSearchHistory() {
+    const container = document.getElementById("searchHistoryContainer");
+    let history = JSON.parse(localStorage.getItem('tcm_search_history')) || [];
+    
+    // Only show if the input is empty AND we have history
+    if (history.length === 0 || searchInput.value.trim().length > 0) {
+      container.style.display = "none";
+      return;
+    }
+
+    let html = "";
+    history.forEach(term => {
+      // Escape single quotes so points with apostrophes don't break the click handler
+      const safeTerm = term.replace(/'/g, "\\'"); 
+      html += `<div class="history-item" onclick="applyHistorySearch('${safeTerm}')"><span class="history-icon">🕒</span> ${term}</div>`;
+    });
+    html += `<div class="history-clear-row"><button class="history-clear-btn" onclick="clearSearchHistory()">Clear History</button></div>`;
+    
+    container.innerHTML = html;
+    container.style.display = "flex";
+
+  }
+
+  function applyHistorySearch(term) {
+    searchInput.value = term;
+    saveSearchHistory(term); // Bumps this term back to the top of the list!
+    handleSearch();
+  }
+
+  function clearSearchHistory() {
+    localStorage.removeItem('tcm_search_history');
+    renderSearchHistory(); // Instantly hides the menu
+  }
+
+
 
 
   
@@ -1540,7 +1638,13 @@ bootApp(); // Start the engine
 
     let query = searchInput.value.trim();
     const headerClearBtn = document.getElementById("headerClearBtn");
-    if (query.length > 0) headerClearBtn.style.display = "flex"; else headerClearBtn.style.display = "none";
+    const historyContainer = document.getElementById("searchHistoryContainer");
+        if (query.length > 0) {
+      headerClearBtn.style.display = "flex"; 
+      if (historyContainer) historyContainer.style.display = "none"; // ADD THIS
+    } else {
+      headerClearBtn.style.display = "none";
+    }
 
     query = query.replace(/\s*\|\s*/g, "|");
     const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
@@ -1969,7 +2073,14 @@ bootApp(); // Start the engine
 
   function debounce(fn, delay = 300) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn.apply(this, args), delay); }; }
   searchInput.addEventListener("input", debounce(() => handleSearch(false), 300));
-  searchInput.addEventListener("keydown", e => { if (e.key === "Escape") clearSearchText(); });
+    searchInput.addEventListener("keydown", e => { 
+    if (e.key === "Escape") clearSearchText(); 
+    if (e.key === "Enter") {
+      saveSearchHistory(searchInput.value);
+      searchInput.blur(); // Drops the mobile keyboard so they can see results
+    }
+  });
+
 
         function buildPointDetailsDOM(point, index, channelPoints, scroller, panel, card, rowDiv) {
     const details = document.createElement("div"); details.className = "point-details";
@@ -2176,6 +2287,11 @@ bootApp(); // Start the engine
 
 
     cardContainer.addEventListener('click', (e) => {
+        // ADD THIS BLOCK: Save the search query if they tapped a result
+    if (searchInput.value.trim().length > 1) {
+      saveSearchHistory(searchInput.value);
+    }
+
     const card = e.target.closest('.point-card');
     if (!card) return; 
     
