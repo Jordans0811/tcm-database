@@ -624,7 +624,9 @@
       
       
       
-          #compareModal { background: #000000; }
+    #compareModal, #printModal { background: #000000; }
+    #printModalBody { background: #1c1c1e; }
+
     .compare-header, .compare-table { background: #1c1c1e; border-color: #38383a; }
     .compare-header h2, .compare-table thead th { color: white; background: #2c2c2e; border-color: #555; }
     .compare-table th:first-child, .compare-table td:first-child { background: #2c2c2e; border-color: #555; }
@@ -665,6 +667,62 @@
       .format-toolbar button { background: #3a3a3c; color: white; border-color: #555; }
       .format-toolbar button:active { background: #2c2c2e; }
 }
+
+    /* Floating Print Basket */
+    #printBasket {
+      position: fixed; bottom: -80px; left: 50%; transform: translateX(-50%);
+      background: #007aff; color: white; padding: 12px 24px; border-radius: 30px;
+      display: flex; align-items: center; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10002;
+      cursor: pointer; font-weight: 800; font-size: 14px; white-space: nowrap;
+    }
+    #printBasket.visible { bottom: 100px; } /* Stacks nicely above the Compare basket */
+    #printBasket button { background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 15px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: bold; transition: background 0.2s; }
+    #printBasket button:active { background: rgba(255,255,255,0.4); }
+
+    /* Print Queue Modal Base Layout */
+    #printModal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #f0f0f5; z-index: 10004; flex-direction: column;
+    }
+
+        @media print {
+      /* Hide the app UI and the modal header completely */
+      #appContainer, #mainStickyHeader, #compareBasket, #printBasket, #lightbox, #devModal, #channelModal, #quickPeekModal, #editModal, #toast, .compare-header { 
+        display: none !important; 
+      }
+      
+      html, body, #printModal, #printModalBody, .compare-content { 
+        height: auto !important; 
+        overflow: visible !important; 
+        background: white !important; 
+        position: static !important;
+        display: block !important;
+        padding: 0 !important;
+      }
+
+      /* Force iOS/Safari to print the grey card backgrounds and orange text */
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      /* Tweak the original UI cards perfectly for paper */
+      .point-details { 
+        page-break-inside: avoid; /* Prevent card from splitting across pages */
+        margin-bottom: 25px !important; 
+        border: 1px solid #d1d1d6; 
+      }
+      .point-notes { page-break-inside: avoid; }
+      
+      /* Disable sticky elements on paper so they don't overlap text */
+      .detail-header-info, .section-label { position: static !important; }
+
+      /* Ensure tables don't get cut in half */
+      .tcm-table { width: 100%; border-collapse: collapse; page-break-inside: avoid; margin-bottom: 15px;}
+      .tcm-table th, .tcm-table td { border: 1px solid #000; padding: 6px; text-align: left; }
+    }
+
 
 
 
@@ -739,6 +797,32 @@
     <span id="compareText">0 Points Selected</span>
     <button onclick="event.stopPropagation(); clearCompare()">Clear</button>
   </div>
+  
+  <div id="printBasket" onclick="openPrintQueue()">
+    <span id="printText">0 Points to Print</span>
+    <button onclick="event.stopPropagation(); clearPrint()">Clear</button>
+  </div>
+
+      <div id="printModal">
+    <div class="compare-content">
+      <div class="compare-header">
+        <h2>Print Queue</h2>
+                <div class="compare-actions">
+          <button class="save-btn" onclick="executeNativePrint()" style="padding: 8px 16px; font-size: 14px;">📤 Export</button>
+          <button class="detail-nav-btn" onclick="closePrintQueue()" style="font-size:24px; color:#555; margin-left: 5px;">✕</button>
+        </div>
+
+      </div>
+      <div id="printModalBody" style="flex: 1; overflow-y: auto; padding: 20px; background: white; -webkit-overflow-scrolling: touch;">
+        </div>
+    </div>
+  </div>
+
+
+
+
+
+  
 
       <div id="compareModal">
     <div class="compare-content">
@@ -1957,6 +2041,14 @@ bootApp(); // Start the engine
     compareAction.innerHTML = `<div class="action-icon">⚖️</div><div class="action-label">Compare</div>`;
     compareAction.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
     actionRow.appendChild(compareAction);
+    
+    // Action 3: Print
+    const printAction = document.createElement("button");
+    printAction.className = "action-item";
+    printAction.innerHTML = `<div class="action-icon">📂</div><div class="action-label">Export</div>`;
+    printAction.onclick = (e) => { e.stopPropagation(); togglePrint(point["Short Name"]); };
+    actionRow.appendChild(printAction);
+
 
     // Append the row to the details panel right beneath the header
     details.appendChild(actionRow);
@@ -2714,7 +2806,283 @@ bootApp(); // Start the engine
     // Apply the math to the CSS variables
     document.getElementById("compareTable").style.setProperty('--comp-zoom', compareZoomLevel);
   }
+  
+    // --- PRINT FEATURE LOGIC ---
+  let printList = [];
 
+    function togglePrint(pointId) {
+    if (printList.includes(pointId)) {
+      printList = printList.filter(id => id !== pointId);
+    } else {
+      printList.push(pointId);
+    }
+    updatePrintBasketUI();
+  }
+
+
+  function clearPrint() {
+    printList = [];
+    updatePrintBasketUI();
+  }
+
+  function updatePrintBasketUI() {
+    const basket = document.getElementById("printBasket");
+    const text = document.getElementById("printText");
+    if (printList.length > 0) {
+      text.innerHTML = `<strong>${printList.length} Point${printList.length > 1 ? "s" : ""}</strong> in Print Queue`;
+      basket.classList.add("visible");
+    } else {
+      basket.classList.remove("visible");
+    }
+  }
+
+    function openPrintQueue() {
+    if (printList.length === 0) return;
+    
+    const container = document.getElementById("printModalBody");
+    container.innerHTML = ""; 
+
+    const fieldsToPrint = [
+      { key: "Location ", altKey: "Location", label: "Location" },
+      { key: "Location Notes", label: "Location Notes" },
+      { key: "Needling", label: "Needling" },
+      { key: "Actions", label: "Actions" },
+      { key: "Indications", label: "Indications" },
+      { key: "Commentary", label: "Commentary" },
+      { key: "Summary of clinical application", label: "Summary of Clinical Application" },
+      { key: "Combinations", label: "Combinations" },
+      { key: "Description", label: "Description" },
+      { key: "Patterns", label: "Patterns" },
+      { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
+      { key: "Analysis", label: "Analysis" },
+      { key: "Treatment Principle", label: "Treatment Principle" },
+      { key: "Point Prescription", label: "Point Prescription" },
+      { key: "Supplementary Points", label: "Supplementary Points" },
+      { key: "Explanation", label: "Explanation" },
+      { key: "Remarks", label: "Remarks" },
+      { key: "Flashcard View", label: "Flashcard View" },
+      { key: "Notes", label: "Notes" },
+      { key: "CAM Notes", label: "CAM Notes" }
+    ];
+
+    printList.forEach(id => {
+      const p = points.find(x => x["Short Name"] === id);
+      if (!p) return;
+
+      // 1. Build the main card (reusing your exact app classes)
+      const details = document.createElement("div");
+      details.className = "point-details";
+      details.style.marginBottom = "25px"; // Extra spacing for the queue view
+
+      // 2. Build the Header with small photo
+      const headerInfo = document.createElement("div");
+      headerInfo.className = "detail-header-info";
+      headerInfo.style.position = "static"; 
+      
+      const imgInfo = document.createElement("img");
+      imgInfo.src = "DeadmanPhotos/" + p["Image ID"] + ".jpg";
+      imgInfo.style.width = "50px"; 
+      imgInfo.style.height = "70px";
+      
+      const titleGroup = document.createElement("div");
+      titleGroup.className = "detail-title-group";
+      titleGroup.style.paddingTop = "0"; // Reset padding for print
+      
+      const imp = p.Important ? String(p.Important).trim() : "";
+      const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
+      
+      const titleEl = document.createElement("div");
+      titleEl.className = "detail-title";
+      titleEl.innerHTML = highlightText(p["Short Name"]) + impHtml;
+      
+      const meta = document.createElement("div");
+      meta.className = "detail-meta";
+      meta.innerHTML = `<span>${p["Full Name"] || p[" Full Name"] || ""}</span><span>${p["Channel Full Name"] || p[" Channel Full Name"] || ""}</span>`;
+      
+      titleGroup.appendChild(titleEl); titleGroup.appendChild(meta);
+      headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
+      details.appendChild(headerInfo);
+
+      // 3. Build the content sections
+      fieldsToPrint.forEach(f => {
+        let val = p[f.key] || p[f.altKey] || "";
+        if (val && String(val).trim() !== "") {
+          const section = document.createElement("div");
+          section.className = "point-notes";
+          
+          const label = document.createElement("div");
+          label.className = "section-label";
+          label.textContent = f.label;
+          label.style.position = "static";
+          
+          const content = document.createElement("div");
+          content.className = "section-content";
+          content.innerHTML = linkifyPoints(formatTextWithTables(bbcodeToHtml(val)));
+          
+          section.appendChild(label); section.appendChild(content);
+          details.appendChild(section);
+        }
+      });
+
+      container.appendChild(details);
+    });
+
+    viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0");
+    document.getElementById("printModal").style.display = "flex";
+  }
+
+  function closePrintQueue() {
+    viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
+    document.getElementById("printModal").style.display = "none";
+  }
+
+                    async function executeNativePrint() {
+    const btn = document.querySelector('.save-btn');
+    const origBtnText = btn.innerHTML;
+    btn.innerHTML = "⏳ Generating Document...";
+    btn.disabled = true;
+
+    try {
+      // 1. Build the raw Document structure with your beautiful styling
+      let htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>TCM Points Reference</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: black; background: white; padding: 20px; max-width: 800px; margin: 0 auto; }
+          .point-details { page-break-inside: avoid; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #d1d1d6; }
+          .detail-header-info { display: flex; align-items: flex-end; margin-bottom: 20px; border-bottom: 4px solid #cc5500; padding-bottom: 10px; }
+          .detail-header-info img { width: 80px; height: auto; margin-right: 20px; border: 1px solid #ccc; object-fit: contain; }
+          .detail-title { font-size: 24pt; font-weight: 900; margin: 0; line-height: 1; }
+          .detail-meta { font-size: 14pt; color: #555; margin-top: 8px; }
+          .point-notes { margin-bottom: 15px; page-break-inside: avoid; }
+          .section-label { font-weight: 800; color: #cc5500; font-size: 12pt; text-transform: uppercase; margin-bottom: 4px; }
+          .section-content { font-size: 11pt; line-height: 1.4; color: #2c2c2e; }
+          .tcm-table { width: 100%; border-collapse: collapse; margin: 10px 0; page-break-inside: avoid; }
+          .tcm-table th, .tcm-table td { border: 1px solid #d1d1d6; padding: 8px; text-align: left; }
+          .tcm-table th { background-color: #e3e3e8; font-weight: 800; color: #333; }
+          .importance-badge { color: #ff3b30; font-weight: 900; font-size: 20px; margin-left: 8px; }
+          .point-link { color: #007aff; font-weight: 600; text-decoration: underline; text-decoration-color: rgba(0, 122, 255, 0.4); text-underline-offset: 2px; }
+        </style>
+      </head>
+      <body>
+      `;
+
+      // 2. Helper to convert images to Base64 so they work completely offline in the shared file
+      const getBase64 = async (url) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          };
+          img.onerror = () => resolve('');
+          img.src = url;
+        });
+      };
+
+      const fieldsToPrint = [
+        { key: "Location ", altKey: "Location", label: "Location" },
+        { key: "Location Notes", label: "Location Notes" },
+        { key: "Needling", label: "Needling" },
+        { key: "Actions", label: "Actions" },
+        { key: "Indications", label: "Indications" },
+        { key: "Commentary", label: "Commentary" },
+        { key: "Summary of clinical application", label: "Summary of Clinical Application" },
+        { key: "Combinations", label: "Combinations" },
+        { key: "Description", label: "Description" },
+        { key: "Patterns", label: "Patterns" },
+        { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
+        { key: "Analysis", label: "Analysis" },
+        { key: "Treatment Principle", label: "Treatment Principle" },
+        { key: "Point Prescription", label: "Point Prescription" },
+        { key: "Supplementary Points", label: "Supplementary Points" },
+        { key: "Explanation", label: "Explanation" },
+        { key: "Remarks", label: "Remarks" },
+        { key: "Flashcard View", label: "Flashcard View" },
+        { key: "Notes", label: "Notes" },
+        { key: "CAM Notes", label: "CAM Notes" }
+      ];
+
+      for (let id of printList) {
+        const p = points.find(x => x["Short Name"] === id);
+        if (!p) continue;
+
+        let b64Img = await getBase64("DeadmanPhotos/" + p["Image ID"] + ".jpg");
+        let imgTag = b64Img ? `<img src="${b64Img}">` : '';
+
+        const imp = p.Important ? String(p.Important).trim() : "";
+        const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
+
+        htmlContent += `
+        <div class="point-details">
+          <div class="detail-header-info">
+            ${imgTag}
+            <div>
+              <div class="detail-title">${p["Short Name"]}${impHtml}</div>
+              <div class="detail-meta">${p["Full Name"] || p[" Full Name"] || ""} &bull; ${p["Channel Full Name"] || p[" Channel Full Name"] || ""}</div>
+            </div>
+          </div>
+        `;
+
+        fieldsToPrint.forEach(f => {
+          let val = p[f.key] || p[f.altKey] || "";
+          if (val && String(val).trim() !== "") {
+            // Apply the links, but strip the javascript click events so it's safe for a static document
+            let formatted = linkifyPoints(formatTextWithTables(bbcodeToHtml(val)));
+            formatted = formatted.replace(/ onclick="[^"]*"/g, "");
+
+            htmlContent += `
+            <div class="point-notes">
+              <div class="section-label">${f.label}</div>
+              <div class="section-content">${formatted}</div>
+            </div>
+            `;
+          }
+        });
+
+        htmlContent += `</div>`;
+      }
+
+      htmlContent += `</body></html>`;
+
+      // 3. Create the Physical File Object
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const file = new File([blob], "TCM_Points.html", { type: 'text/html' });
+
+      // 4. Trigger the Native iOS Share Sheet (Bypassing Working Copy restrictions!)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'TCM Points Reference'
+        });
+      } else {
+        // Fallback for Mac/PC Desktop testing
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "TCM_Points.html";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+    } catch (err) {
+      console.error("Document generation failed", err);
+      showToast("Failed to generate document.");
+    } finally {
+      btn.innerHTML = origBtnText;
+      btn.disabled = false;
+    }
+  }
 
 
   // --- STANDARD SAVE LOGIC ---
