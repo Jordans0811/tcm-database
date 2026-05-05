@@ -1788,23 +1788,34 @@ bootApp(); // Start the engine
     return output;
   }
 
-  function linkifyPoints(htmlText) {
+    function linkifyPoints(htmlText) {
     if (!htmlText) return "";
     
+    // 1. The standard Channel + Number links
     const regex = /\b(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*(\d+)\b/gi;
+    
+    // 2. The custom Named Points links (Handles optional spaces automatically!)
+    const namedPointsRegex = /\b(Shi\s*Xuan|Si\s*Feng|Ba\s*Xie|Luo\s*Zhen|Yao\s*Tong\s*Xue|Er\s*Bai|Zhou\s*Jian|Jian\s*Qian|Bai\s*Chong\s*Wo|He\s*Ding|Xi\s*Yan|Lan\s*Wei\s*Xue|Dan\s*Nang\s*Xue|Ba\s*Feng|Si\s*Shen\s*Cong|Yin\s*Tang|Yu\s*Yao|Qiu\s*Hou|Tai\s*Yang|Er\s*Jian|Bi\s*Tong|Bai\s*Lao|An\s*Mian|Jia\s*Cheng\s*Jiang|Jin\s*Jin\s*Yu\s*Ye|Hai\s*Quan|Ding\s*Chuan|Huan\s*Men|Wei\s*Guan\s*Xia\s*Shu|Yao\s*Yan|Shi\s*Qi\s*Zhui\s*Xia|San\s*Jiao\s*Jiu|Zi\s*Gong|Ti\s*Tuo|Hua\s*Tuo\s*Jia\s*Ji|Pi\s*Gen)\b/gi;
     
     const parts = htmlText.split(/(<[^>]*>)/g);
     for (let i = 0; i < parts.length; i++) {
       if (!parts[i].startsWith("<")) {
+        // Apply standard links
         parts[i] = parts[i].replace(regex, (match, chan, num) => {
           return `<span class="point-link" onclick="event.stopPropagation(); openQuickPeek('${chan}', '${num}')">${match}</span>`;
+        });
+        
+        // Apply named point links (passes the name as 'chan' and leaves 'num' blank)
+        parts[i] = parts[i].replace(namedPointsRegex, (match) => {
+          return `<span class="point-link" onclick="event.stopPropagation(); openQuickPeek('${match}', '')">${match}</span>`;
         });
       }
     }
     return parts.join("");
   }
 
-      function openQuickPeek(chan, num) {
+
+        function openQuickPeek(chan, num) {
     chan = chan.toUpperCase().replace(/\./g, "");
     
     // Symmetrical aliases so it doesn't matter what your DB uses
@@ -1827,18 +1838,23 @@ bootApp(); // Start the engine
       let targetId1 = stdChan + "-" + num;
       let targetId2 = stdChan + " " + num;
       let targetId3 = stdChan + num;
+      
+      // FIX: Check a spaceless version so "Yintang" matches "Yin Tang" infallibly
+      let spacelessTarget = (stdChan + num).replace(/\s+/g, "");
 
       targetPoint = points.find(p => 
         p["Short Name"].toUpperCase() === targetId1 ||
         p["Short Name"].toUpperCase() === targetId2 ||
-        p["Short Name"].toUpperCase() === targetId3
+        p["Short Name"].toUpperCase() === targetId3 ||
+        p["Short Name"].toUpperCase().replace(/\s+/g, "") === spacelessTarget
       );
       
       if (targetPoint) break;
     }
 
     if (!targetPoint) {
-      showToast("Point " + chan + "-" + num + " not found.");
+      let pointLabel = num ? chan + "-" + num : chan;
+      showToast("Point " + pointLabel + " not found.");
       return;
     }
 
@@ -1855,6 +1871,7 @@ bootApp(); // Start the engine
       }
     }, 10);
   }
+
 
 
 
