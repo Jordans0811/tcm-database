@@ -886,7 +886,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.04.26.v1";
+const APP_VERSION = "05.05.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2836,7 +2836,7 @@ bootApp(); // Start the engine
     }
   }
 
-    function openPrintQueue() {
+      function openPrintQueue() {
     if (printList.length === 0) return;
     
     const container = document.getElementById("printModalBody");
@@ -2869,12 +2869,10 @@ bootApp(); // Start the engine
       const p = points.find(x => x["Short Name"] === id);
       if (!p) return;
 
-      // 1. Build the main card (reusing your exact app classes)
       const details = document.createElement("div");
       details.className = "point-details";
-      details.style.marginBottom = "25px"; // Extra spacing for the queue view
+      details.style.marginBottom = "25px";
 
-      // 2. Build the Header with small photo
       const headerInfo = document.createElement("div");
       headerInfo.className = "detail-header-info";
       headerInfo.style.position = "static"; 
@@ -2886,7 +2884,7 @@ bootApp(); // Start the engine
       
       const titleGroup = document.createElement("div");
       titleGroup.className = "detail-title-group";
-      titleGroup.style.paddingTop = "0"; // Reset padding for print
+      titleGroup.style.paddingTop = "0"; 
       
       const imp = p.Important ? String(p.Important).trim() : "";
       const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
@@ -2903,7 +2901,6 @@ bootApp(); // Start the engine
       headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
       details.appendChild(headerInfo);
 
-      // 3. Build the content sections
       fieldsToPrint.forEach(f => {
         let val = p[f.key] || p[f.altKey] || "";
         if (val && String(val).trim() !== "") {
@@ -2917,7 +2914,8 @@ bootApp(); // Start the engine
           
           const content = document.createElement("div");
           content.className = "section-content";
-          content.innerHTML = linkifyPoints(formatTextWithTables(bbcodeToHtml(val)));
+          // FIX: Swapped bbcodeToHtml for highlightText to preserve the table rows visually!
+          content.innerHTML = linkifyPoints(formatTextWithTables(highlightText(val)));
           
           section.appendChild(label); section.appendChild(content);
           details.appendChild(section);
@@ -2931,12 +2929,13 @@ bootApp(); // Start the engine
     document.getElementById("printModal").style.display = "flex";
   }
 
+
   function closePrintQueue() {
     viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
     document.getElementById("printModal").style.display = "none";
   }
 
-                    async function executeNativePrint() {
+                      async function executeNativePrint() {
     const btn = document.querySelector('.save-btn');
     const origBtnText = btn.innerHTML;
     btn.innerHTML = "⏳ Generating Document...";
@@ -2963,7 +2962,8 @@ bootApp(); // Start the engine
           .section-content { font-size: 11pt; line-height: 1.4; color: #2c2c2e; }
           .tcm-table { width: 100%; border-collapse: collapse; margin: 10px 0; page-break-inside: avoid; }
           .tcm-table th, .tcm-table td { border: 1px solid #d1d1d6; padding: 8px; text-align: left; }
-          .tcm-table th { background-color: #e3e3e8; font-weight: 800; color: #333; }
+          /* FIX: Added print-color-adjust so the grey table headers actually export/print! */
+          .tcm-table th { background-color: #e3e3e8; font-weight: 800; color: #333; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .importance-badge { color: #ff3b30; font-weight: 900; font-size: 20px; margin-left: 8px; }
           .point-link { color: #007aff; font-weight: 600; text-decoration: underline; text-decoration-color: rgba(0, 122, 255, 0.4); text-underline-offset: 2px; }
         </style>
@@ -3035,8 +3035,8 @@ bootApp(); // Start the engine
         fieldsToPrint.forEach(f => {
           let val = p[f.key] || p[f.altKey] || "";
           if (val && String(val).trim() !== "") {
-            // Apply the links, but strip the javascript click events so it's safe for a static document
-            let formatted = linkifyPoints(formatTextWithTables(bbcodeToHtml(val)));
+            // FIX: Using highlightText instead of bbcodeToHtml ensures the newlines stay intact for your table engine!
+            let formatted = linkifyPoints(formatTextWithTables(highlightText(val)));
             formatted = formatted.replace(/ onclick="[^"]*"/g, "");
 
             htmlContent += `
@@ -3083,6 +3083,7 @@ bootApp(); // Start the engine
       btn.disabled = false;
     }
   }
+
 
 
   // --- STANDARD SAVE LOGIC ---
