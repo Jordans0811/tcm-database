@@ -169,7 +169,7 @@
     .card-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .card-label { padding: 6px 4px; text-align: center; font-weight: 800; font-size: 14px; background: white; border-top: 1px solid #eee; }
 
-    .detail-panel { display: none; width: 100%; max-width: 900px; margin: 0 auto 20px auto; padding: 0 15px 25px 15px; box-sizing: border-box; content-visibility: auto;}
+    .detail-panel { display: none; width: 100%; max-width: 900px; margin: 0 auto 20px auto; padding: 0 15px 25px 15px; box-sizing: border-box; }
     .detail-panel.open { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -214,10 +214,15 @@
 
 
     .sticky-toggle-container {
-      position: sticky; bottom: 20px; z-index: 89; 
-      display: flex; justify-content: center; width: 100%;
-      pointer-events: none; margin-top: 15px; padding-bottom: 5px;
-    }
+  position: sticky; bottom: 20px; z-index: 89; 
+  display: flex; justify-content: center; width: 100%;
+  pointer-events: none; margin-top: 15px; padding-bottom: 5px;
+  
+
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
     .card-toggle-btn {
       background: rgba(227, 242, 253, 0.95); color: #007aff; border: 1px solid #bbdefb;
       border-radius: 25px; padding: 12px 24px; font-size: 14px; font-weight: 700;
@@ -523,7 +528,7 @@
 
 
     .channel-wrapper {
-      contain: content;
+      contain: layout style;
       width: 100%;
     }
 
@@ -935,7 +940,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.05.26.v1";
+const APP_VERSION = "05.07.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1164,8 +1169,16 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     console.log("App resumed. Silently checking for updates...");
     loadTCMData();
+    
+    // --- THE IOS STICKY JOLT ---
+    // Force WebKit to recalculate sticky positioning after backgrounding
+    if (appContainer && appContainer.scrollTop > 0) {
+      appContainer.scrollTop += 1;
+      appContainer.scrollTop -= 1;
+    }
   }
 });
+
 
 // Define Globals
 let points = [];
