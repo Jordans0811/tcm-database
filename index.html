@@ -2691,8 +2691,29 @@ bootApp(); // Start the engine
       .replace(/\n/g, "<br>"); // Convert newlines for the editable div
   }
  
+ 
+   // --- Helper: Convert RGB to Hex ---
+  function rgbToHex(color) {
+    if (!color) return "";
+    // If it's already Hex, leave it alone
+    if (color.startsWith("#")) return color; 
+    
+    // Extract rgb/rgba values and convert to Hex
+    let match = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (match) {
+      return "#" +
+        ("0" + parseInt(match[1], 10).toString(16)).slice(-2) +
+        ("0" + parseInt(match[2], 10).toString(16)).slice(-2) +
+        ("0" + parseInt(match[3], 10).toString(16)).slice(-2);
+    }
+    // Fallback if it's a color word like "red"
+    return color;
+  }
 
-  function htmlToBbcode(node) {
+ 
+ 
+
+    function htmlToBbcode(node) {
     let out = "";
     for (let child of node.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
@@ -2705,8 +2726,9 @@ bootApp(); // Start the engine
         if (tag === 'b' || tag === 'strong') out += `[b]${inner}[/b]`;
         else if (tag === 'i' || tag === 'em') out += `[i]${inner}[/i]`;
         else if (tag === 'u') out += `[u]${inner}[/u]`;
-        else if (tag === 'span' && child.style.color) out += `[color=${child.style.color}]${inner}[/color]`;
-        else if (tag === 'font' && child.color) out += `[color=${child.color}]${inner}[/color]`;
+        // NEW: Force the extracted color back into Hex format
+        else if (tag === 'span' && child.style.color) out += `[color=${rgbToHex(child.style.color)}]${inner}[/color]`;
+        else if (tag === 'font' && child.color) out += `[color=${rgbToHex(child.color)}]${inner}[/color]`;
         else if (tag === 'br') out += `\n`;
         else if (tag === 'div' || tag === 'p') out += (out.length > 0 ? `\n` : ``) + inner; // Handle Enter key
         else out += inner;
@@ -2714,6 +2736,7 @@ bootApp(); // Start the engine
     }
     return out;
   }
+
 
   // --- 3. Update the Modal Load logic ---
   function changeEditField() {
@@ -3284,30 +3307,18 @@ bootApp(); // Start the engine
   function resetModalButtons() { document.getElementById("saveBtn").textContent = "Save"; document.getElementById("saveBtn").disabled = false; document.getElementById("cancelBtnEdit").disabled = false; }
   
   
+
     // --- Syncs the color picker to the highlighted text ---
   window.syncColorPicker = function() {
-    // 1. Get the color of the currently highlighted text
     let color = document.queryCommandValue("foreColor");
     let picker = document.getElementById("colorPicker");
 
     if (!color || color === "transparent") return;
 
-    // 2. If it's already a hex code, apply it directly
-    if (color.startsWith("#")) {
-      picker.value = color;
-      return;
-    }
-
-    // 3. Browsers usually return "rgb(r,g,b)", so we convert it to hex for the input
-    let match = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    if (match) {
-      let hex = "#" +
-        ("0" + parseInt(match[1], 10).toString(16)).slice(-2) +
-        ("0" + parseInt(match[2], 10).toString(16)).slice(-2) +
-        ("0" + parseInt(match[3], 10).toString(16)).slice(-2);
-      picker.value = hex;
-    }
+    // Utilize the helper function to set the picker value safely
+    picker.value = rgbToHex(color);
   };
+
 
 
   
