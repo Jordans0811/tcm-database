@@ -1474,7 +1474,7 @@ bootApp(); // Start the engine
 
       const sameStructure = processed.length === points.length && processed.every((p, i) => points[i] && p["Short Name"] === points[i]["Short Name"]);
 
-            if (sameStructure) {
+                  if (sameStructure) {
         points = processed;
         changedIds.forEach(id => {
           const card = document.querySelector('.point-card[data-id="' + id + '"]');
@@ -1504,20 +1504,23 @@ bootApp(); // Start the engine
             }
             badge.textContent = imp;
           }
-          // -----------------------------------------------
-          
         });
-                const openSheet = document.getElementById('bottomSheet');
-        if (openSheet && openSheet.classList.contains('open') && typeof window.refreshActivePanel === 'function') {
-          window.refreshActivePanel();
+        
+        if (typeof window.refreshActivePanel === 'function') {
+          window.refreshActivePanel(false); // Background was already manually updated above
         }
 
-      }
- else {
+      } else {
         points = processed;
         initDropdown();
-        handleSearch(true);
+        
+        if (typeof window.refreshActivePanel === 'function') {
+          window.refreshActivePanel(true); // Forces BOTH the sheet and background to rebuild
+        } else {
+          handleSearch(true);
+        }
       }
+
       showToast("🔄 Data synced");
     } catch(e) { console.log("Failed to process background data."); }
   }
@@ -2528,9 +2531,13 @@ bootApp(); // Start the engine
     }
 
 
-    // 2. Refresh the Panels Instantly
-    if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
-    else handleSearch(true);
+        // 2. Refresh the Panels Instantly
+    if (typeof window.refreshActivePanel === 'function') {
+       window.refreshActivePanel(true); // True forces background to rebuild the search index
+    } else {
+       handleSearch(true);
+    }
+
     
     // Instantly update the red bubble on the main scrolling card behind the modal
     const card = document.querySelector(`.point-card[data-id="${pointId}"]`);
@@ -3037,9 +3044,12 @@ bootApp(); // Start the engine
     });
     currentEditingPoint._paragraphs = paras;
 
-    // 4. Update the UI
-    if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
-    else handleSearch(true); 
+        // 4. Update the UI
+    if (typeof window.refreshActivePanel === 'function') {
+       window.refreshActivePanel(true); // True forces background to rebuild the search index
+    } else {
+       handleSearch(true); 
+    }
     
     closeEditModal(); 
     resetModalButtons();
@@ -3391,8 +3401,8 @@ bootApp(); // Start the engine
   }
 
 
-    // Bind the global refresh so edits update the sheet instantly while freezing the scroll position
-  window.refreshActivePanel = () => {
+      // Bind the global refresh so edits update the sheet instantly while freezing the scroll position
+  window.refreshActivePanel = (forceBackgroundRebuild = false) => {
     // 1. Sync the bottom sheet's memory with the freshly downloaded global database
     if (sheetContextPoints && sheetContextPoints.length > 0) {
       sheetContextPoints = sheetContextPoints.map(oldPoint => {
@@ -3400,9 +3410,18 @@ bootApp(); // Start the engine
       });
     }
     
-    // 2. Redraw the UI
-    updateSheetUI(false, true); // true = preserveScroll
+    // 2. Redraw the Bottom Sheet UI (only if it is currently open)
+    const sheet = document.getElementById('bottomSheet');
+    if (sheet && sheet.classList.contains('open')) {
+      updateSheetUI(false, true); // true = preserveScroll
+    }
+    
+    // 3. Keep the background search index and feed perfectly in sync!
+    if (forceBackgroundRebuild) {
+      handleSearch(true); 
+    }
   };
+
 
 
 
