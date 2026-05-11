@@ -1507,8 +1507,11 @@ bootApp(); // Start the engine
           // -----------------------------------------------
           
         });
-        const openPanel = document.querySelector('.detail-panel.open');
-        if (openPanel && typeof window.refreshActivePanel === 'function') window.refreshActivePanel();
+                const openSheet = document.getElementById('bottomSheet');
+        if (openSheet && openSheet.classList.contains('open') && typeof window.refreshActivePanel === 'function') {
+          window.refreshActivePanel();
+        }
+
       }
  else {
         points = processed;
@@ -1773,14 +1776,13 @@ bootApp(); // Start the engine
 
   
 
-  function handleSearch(preserveState = false) {
-    let currentScroll = 0; let activePointId = null; let activeCardIsShowingAllText = false;
+    function handleSearch(preserveState = false) {
+    let currentScroll = 0;
     
     if (preserveState) {
         currentScroll = appContainer.scrollTop;
-        const openPanel = document.querySelector('.detail-panel.open');
-        if (openPanel) { activePointId = openPanel.dataset.activeId; activeCardIsShowingAllText = openPanel.classList.contains("show-all-text"); }
     }
+
 
     let query = searchInput.value.trim();
     const headerClearBtn = document.getElementById("headerClearBtn");
@@ -1910,7 +1912,8 @@ bootApp(); // Start the engine
 
 
     setTimeout(updateStickyHeaderHeights, 10);
-    renderRows(preserveState, currentScroll, activePointId, activeCardIsShowingAllText);
+    renderRows(preserveState, currentScroll);
+
   }
 
   function escapeHTML(str) { return !str ? "" : String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -2311,14 +2314,11 @@ bootApp(); // Start the engine
   }
 
   // --- NEW VIRTUALIZED RENDER FUNCTION ---
-  function renderRows(preserveState = false, currentScroll = 0, activePointId = null, activeCardIsShowingAllText = false) {
+  function renderRows(preserveState = false, currentScroll = 0) {
     const fragment = document.createDocumentFragment();
 
-    // 1. Reset Observer to prevent memory leaks during rapid searching
     if (windowingObserver) windowingObserver.disconnect();
 
-    // 2. Initialize the Virtual Windowing Observer
-    // rootMargin '1500px' ensures we build the DOM roughly 1.5 screens before the user sees it
     windowingObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         const wrapper = entry.target;
@@ -2326,32 +2326,18 @@ bootApp(); // Start the engine
         const channelName = wrapper.dataset.channel;
         const hasContent = wrapper.hasChildNodes();
 
-        // Do not cull (delete) the wrapper if it contains the user's currently open detail panel
-        const hasActivePanel = activePointId && wrapper.querySelector(`.detail-panel.open`);
-
         if (isVisible && !hasContent) {
           // RENDER: Element is approaching viewport
-          wrapper.style.height = ''; // Remove hardcoded height to allow natural expansion
+          wrapper.style.height = ''; 
           const pts = wrapper._pointsData;
           wrapper.appendChild(buildRow(channelName, pts));
-
-          // Restore active state if it happens to fall inside this newly rendered chunk
-          if (activePointId && pts.some(p => p["Short Name"] === activePointId)) {
-             const cardToOpen = wrapper.querySelector(".point-card[data-id='" + activePointId + "']");
-             if (cardToOpen) {
-                 cardToOpen.dataset.isSilentOpen = "true";
-                 if (activeCardIsShowingAllText) cardToOpen.dataset.restoreShowAllText = "true";
-                 cardToOpen.click();
-             }
-          }
-        } else if (!isVisible && hasContent && !hasActivePanel) {
-          // CULL: Element left viewport safely. Freeze its height to prevent the scrollbar from violently jumping
+        } else if (!isVisible && hasContent) {
+          // CULL: Element left viewport safely. Freeze its height to prevent the scrollbar from jumping
           wrapper.style.height = wrapper.getBoundingClientRect().height + "px";
-          wrapper.innerHTML = ""; // Wipe DOM nodes from memory entirely
+          wrapper.innerHTML = ""; 
         }
       });
     }, { root: appContainer, rootMargin: '150% 0px 150% 0px' });
-
 
     if (filteredPoints.length === 0) {
       const noResults = document.createElement("div");
@@ -2366,27 +2352,12 @@ bootApp(); // Start the engine
         grouped[channel].push(p);
       });
 
-      const entries = Object.entries(grouped);
-
-      entries.forEach(([name, pts]) => {
+      Object.entries(grouped).forEach(([name, pts]) => {
         const wrapper = document.createElement("div");
         wrapper.className = "channel-wrapper";
         wrapper.dataset.channel = name;
-        wrapper._pointsData = pts; // Attach data for the observer to use later
-
-        // FORCE RENDER synchronously if this chunk contains the active panel
-        // This prevents scroll restoration bugs when panels stay open during search
-        let shouldForceRender = false;
-        if (preserveState && activePointId && pts.some(p => p["Short Name"] === activePointId)) {
-            shouldForceRender = true;
-        }
-
-        if (shouldForceRender) {
-            wrapper.appendChild(buildRow(name, pts));
-        } else {
-            wrapper.style.minHeight = "180px"; // Default estimated row height 
-        }
-
+        wrapper._pointsData = pts; 
+        wrapper.style.minHeight = "180px"; 
         fragment.appendChild(wrapper);
       });
     }
@@ -2394,24 +2365,13 @@ bootApp(); // Start the engine
     cardContainer.innerHTML = "";
     cardContainer.appendChild(fragment);
 
-    // 3. Attach observer to all wrappers AFTER they are in the DOM
     const wrappers = cardContainer.querySelectorAll(".channel-wrapper");
     wrappers.forEach(w => windowingObserver.observe(w));
-
-    // 4. State restoration fallbacks
-    if (preserveState && activePointId) {
-        const cardToOpen = document.querySelector(".point-card[data-id='" + activePointId + "']");
-        if (cardToOpen && !cardToOpen.closest('.channel-wrapper').dataset.hasRestored) {
-            cardToOpen.dataset.isSilentOpen = "true";
-            if (activeCardIsShowingAllText) cardToOpen.dataset.restoreShowAllText = "true";
-            cardToOpen.click();
-            cardToOpen.closest('.channel-wrapper').dataset.hasRestored = "true";
-        }
-    }
 
     if (preserveState) appContainer.scrollTop = currentScroll; 
     else appContainer.scrollTo({ top: 0, behavior: "auto" }); 
   }
+
 
 
 
@@ -3431,10 +3391,19 @@ bootApp(); // Start the engine
   }
 
 
-  // Bind the global refresh so edits update the sheet instantly while freezing the scroll position
+    // Bind the global refresh so edits update the sheet instantly while freezing the scroll position
   window.refreshActivePanel = () => {
+    // 1. Sync the bottom sheet's memory with the freshly downloaded global database
+    if (sheetContextPoints && sheetContextPoints.length > 0) {
+      sheetContextPoints = sheetContextPoints.map(oldPoint => {
+        return points.find(p => p["Short Name"] === oldPoint["Short Name"]) || oldPoint;
+      });
+    }
+    
+    // 2. Redraw the UI
     updateSheetUI(false, true); // true = preserveScroll
   };
+
 
 
 
