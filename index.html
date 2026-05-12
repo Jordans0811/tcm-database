@@ -31,7 +31,7 @@
 
 
    #mainStickyHeader {
-      position: sticky; top: 0; background: #f0f0f0; z-index: 100;
+      position: sticky; top: 0; background: #f0f0f0; z-index: 10005;
       padding: calc(12px + env(safe-area-inset-top)) 0 0 0; 
       border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
     }
@@ -646,7 +646,7 @@
       background: #f0f0f5;
       border-radius: 20px 20px 0 0;
       box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
-      z-index: 10002; 
+      z-index: 10006; 
       display: flex; flex-direction: column;
       transform: translateY(100%);
       transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -705,7 +705,7 @@
       position: fixed; 
       top: 0; left: 0; 
       width: 100%; height: 100%; 
-      z-index: 10001; 
+      z-index: 10004; 
       background: transparent; 
       cursor: pointer; /* CRITICAL FOR IOS CLICK DELEGATION */
       -webkit-tap-highlight-color: transparent;
@@ -1499,7 +1499,9 @@ bootApp(); // Start the engine
     if (!anyChecked) checkboxes[0].checked = true;
   }
 
-  function openChannelModal() { document.getElementById("channelModal").style.display = "flex"; }
+  function openChannelModal() { 
+      closeBottomSheet();
+  document.getElementById("channelModal").style.display = "flex"; }
   
   function applyChannels() {
     const checkboxes = document.getElementById("channelCheckboxes").querySelectorAll("input");
@@ -1675,6 +1677,7 @@ bootApp(); // Start the engine
   window.addEventListener('resize', debounce(updateStickyHeaderHeights, 150));
 
         function toggleSearchDropdown() {
+        closeBottomSheet();    
     const dropdown = document.getElementById("searchDropdown");
     const isExpanded = dropdown.classList.toggle("expanded");
     
@@ -1709,7 +1712,14 @@ bootApp(); // Start the engine
   });
 
   function clearSearchText() { searchInput.value = ""; handleSearch(); searchInput.focus(); renderSearchHistory(); }
-  function clearAndCloseSearch() { searchInput.value = ""; handleSearch(); document.getElementById("searchDropdown").classList.remove("expanded"); updateStickyHeaderHeights(); }
+    function clearAndCloseSearch() { 
+    closeBottomSheet(); // <-- Added this!
+    searchInput.value = ""; 
+    handleSearch(); 
+    document.getElementById("searchDropdown").classList.remove("expanded"); 
+    updateStickyHeaderHeights(); 
+  }
+
 
   function toggleHelp() { document.getElementById("searchHelpTooltip").classList.toggle("show"); }
   document.addEventListener("click", (e) => {
@@ -3517,6 +3527,16 @@ sel.addRange(range);
 
 
 
+  // Safety net: Close bottom sheet if user taps empty space in the header
+  document.getElementById("mainStickyHeader").addEventListener("click", (e) => {
+    const sheet = document.getElementById("bottomSheet");
+    if (sheet && sheet.classList.contains("open")) {
+      // If they didn't specifically tap a button or input, drop the sheet
+      if (!e.target.closest("button") && !e.target.closest("label") && !e.target.closest("input")) {
+        closeBottomSheet();
+      }
+    }
+  });
 
 
 
