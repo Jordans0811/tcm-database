@@ -59,24 +59,17 @@
     .clear-active-btn { background: rgba(255, 59, 48, 0.1); color: #ff3b30; font-weight: 800; }
     .clear-active-btn:active { background: rgba(255, 59, 48, 0.2); }
 
-        /* The Dropdown Search Area (Made INSTANT to fix scroll jumping) */
+            /* The Dropdown Search Area */
     #searchDropdown {
-      height: 0; 
-      overflow: hidden; 
-      padding: 0 15px; 
+      display: none; 
       background: #f0f0f0; 
-      border-bottom: none;
-      opacity: 0; 
-      pointer-events: none;
-    }
-        #searchDropdown.expanded {
-      height: auto; 
-      overflow: visible; /* NEW: Lets the history menu drop out of the header bounds */
       padding: 4px 15px 15px 15px; 
       border-bottom: 1px solid #d1d1d6;
-      opacity: 1; 
-      pointer-events: auto;
     }
+    #searchDropdown.expanded {
+      display: block; 
+    }
+
 
 
     
@@ -150,9 +143,7 @@
       background-color: #e3e3e8; border: none; border-radius: 10px; color: #000; box-sizing: border-box;
       -webkit-appearance: none;
       
-      /* NEW: Forces iOS PWA to allow keyboard interaction */
-      -webkit-user-select: text !important;
-      user-select: text !important;
+      
     }
 
     .search-box:focus { outline: none; box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3); }
@@ -448,9 +439,7 @@
       padding: 10px; border: 1px solid #ccc; border-radius: 6px; overflow-y: auto; 
       background: white; color: black; outline: none; line-height: 1.4;
       
-      /* NEW: Forces iOS PWA to allow keyboard interaction inside the edit modal */
-      -webkit-user-select: text !important;
-      user-select: text !important;
+      
     }
 
 
@@ -1104,7 +1093,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.12.26.v6";
+const APP_VERSION = "05.12.26.v7";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1681,20 +1670,18 @@ bootApp(); // Start the engine
   }
   window.addEventListener('resize', debounce(updateStickyHeaderHeights, 150));
 
-    function toggleSearchDropdown() {
-  const dropdown = document.getElementById("searchDropdown");
-  dropdown.classList.toggle("expanded");
-  
-  if (dropdown.classList.contains("expanded")) {
-  renderSearchHistory();
-  searchInput.focus(); // Must be synchronous!
+      function toggleSearchDropdown() {
+    const dropdown = document.getElementById("searchDropdown");
+    dropdown.classList.toggle("expanded");
+    if (dropdown.classList.contains("expanded")) {
+      searchInput.focus(); // Synchronous focus!
+      renderSearchHistory();
+    } else {
+      searchInput.blur();
+    }
+    updateStickyHeaderHeights(); 
   }
-   else {
-    searchInput.blur();
-  }
-  
-  updateStickyHeaderHeights();
-}
+
 
 
   
