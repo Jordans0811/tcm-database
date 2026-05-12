@@ -62,16 +62,26 @@
     .clear-active-btn { background: rgba(255, 59, 48, 0.1); color: #ff3b30; font-weight: 800; }
     .clear-active-btn:active { background: rgba(255, 59, 48, 0.2); }
 
-    /* The Dropdown Search Area (Made INSTANT to fix scroll jumping) */
+        /* The Dropdown Search Area (Made INSTANT to fix scroll jumping) */
     #searchDropdown {
-      display: none; 
+      height: 0; 
+      overflow: hidden; 
+      padding: 0 15px; 
       background: #f0f0f0; 
+      border-bottom: none;
+      opacity: 0; 
+      pointer-events: none;
+    }
+        #searchDropdown.expanded {
+      height: auto; 
+      overflow: visible; /* NEW: Lets the history menu drop out of the header bounds */
       padding: 4px 15px 15px 15px; 
       border-bottom: 1px solid #d1d1d6;
+      opacity: 1; 
+      pointer-events: auto;
     }
-    #searchDropdown.expanded {
-      display: block; 
-    }
+
+
     
     
         /* Search History Floating Menu Styles */
@@ -828,7 +838,10 @@
 
     /* iPad / Desktop Adaptive Layout */
     @media (min-width: 1900px) {
-      #searchDropdown { display: block !important; padding: 4px 15px 15px 15px; border-bottom: 1px solid #d1d1d6; }
+      #searchDropdown { height: auto !important; overflow: visible !important; opacity: 1 !important; pointer-events: auto !important; padding: 4px 15px 15px 15px; border-bottom: 1px solid #d1d1d6; }
+
+
+
       .search-toggle-btn { display: none !important; } 
     
           #editFieldSelect { background: #1c1c1e; color: #ffffff; border-color: #38383a; }
@@ -1094,7 +1107,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.12.26.v3";
+const APP_VERSION = "05.12.26.v4";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2300,6 +2313,12 @@ bootApp(); // Start the engine
       searchInput.blur(); // Drops the mobile keyboard so they can see results
     }
   });
+  
+    // iOS PWA bulletproof touch-to-focus bypass
+  searchInput.addEventListener("touchend", function(e) {
+    this.focus();
+  });
+
 
 
   // --- CARD CLICK GESTURE (TRIGGERS BOTTOM SHEET) ---
