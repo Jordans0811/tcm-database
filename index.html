@@ -694,6 +694,24 @@
       background: #f0f0f5;
     }
 
+     /* Bottom Sheet Click-Catcher */
+    #sheetBackdrop {
+      display: none; 
+      position: fixed; 
+      top: 0; left: 0; 
+      width: 100%; height: 100%; 
+      z-index: 10001; /* Places it exactly 1 layer beneath the Bottom Sheet */
+      background: transparent; /* Change to rgba(0,0,0,0.4) if you want the background to dim! */
+    }
+    
+    #sheetBackdrop.show {
+      display: block;
+    }
+
+
+
+
+
 
     /* Dark Mode */
     @media (prefers-color-scheme: dark) {
@@ -783,6 +801,9 @@
       .sheet-header { background: rgba(0,0,0,0.98); border-color: #38383a; }
       .pill { background: #1c1c1e; border-color: #38383a; color: #8e8e93; }
       .pill.active { background: #0a84ff; color: white; border-color: #0a84ff; }
+    
+    
+    
     
 
 
@@ -1046,8 +1067,13 @@
     <div id="cardContainer"></div>
   </div>
   
-    <div id="bottomSheet" class="bottom-sheet">
+  
+  
+      <div id="sheetBackdrop" onclick="closeBottomSheet()"></div>
+  
+  <div id="bottomSheet" class="bottom-sheet">
     <div class="sheet-header">
+
       <div id="pillContainer" class="pill-nav">
         </div>
       <button class="absolute-close-btn" style="top: 15px;" onclick="closeBottomSheet()">✕</button>
@@ -1059,7 +1085,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.12.26.v1";
+const APP_VERSION = "05.12.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3156,6 +3182,7 @@ bootApp(); // Start the engine
 
     // 1. Start the curtain-drop animation
     sheet.classList.remove('open');
+    document.getElementById('sheetBackdrop').classList.remove('show'); // NEW: Hide Backdrop
 
     // 2. Smart Background Sync
     if (sheetContextPoints.length > 0 && currentSheetIndex >= 0) {
@@ -3200,7 +3227,7 @@ bootApp(); // Start the engine
 
 
 
-    function openBottomSheet(pointId, contextArray) {
+        function openBottomSheet(pointId, contextArray) {
     document.getElementById('bottomSheet').classList.remove('show-all-text');
     
     sheetContextPoints = contextArray;
@@ -3209,8 +3236,10 @@ bootApp(); // Start the engine
     if (currentSheetIndex === -1) return; 
     
     document.getElementById('bottomSheet').classList.add('open');
-    updateSheetUI(true); // <-- Added 'true' here to flag the initial open
+    document.getElementById('sheetBackdrop').classList.add('show'); // NEW: Show Backdrop
+    updateSheetUI(true); 
   }
+
 
 
 
