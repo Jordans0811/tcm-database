@@ -700,14 +700,17 @@
     }
 
      /* Bottom Sheet Click-Catcher */
-    #sheetBackdrop {
+        #sheetBackdrop {
       display: none; 
       position: fixed; 
       top: 0; left: 0; 
       width: 100%; height: 100%; 
-      z-index: 10001; /* Places it exactly 1 layer beneath the Bottom Sheet */
-      background: transparent; /* Change to rgba(0,0,0,0.4) if you want the background to dim! */
+      z-index: 10001; 
+      background: transparent; 
+      cursor: pointer; /* CRITICAL FOR IOS CLICK DELEGATION */
+      -webkit-tap-highlight-color: transparent;
     }
+
     
     #sheetBackdrop.show {
       display: block;
@@ -1046,10 +1049,11 @@
           <p id="searchQueryDisplay"></p>
         </div>
         <div class="header-actions">
-          <button id="headerClearBtn" class="icon-btn clear-active-btn" onclick="clearAndCloseSearch()" style="display: none;">✕</button>
-          <button class="icon-btn search-toggle-btn" onclick="toggleSearchDropdown()">🔍</button>
-          <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
-        </div>
+  <button id="headerClearBtn" class="icon-btn clear-active-btn" onclick="clearAndCloseSearch()" style="display: none;">✕</button>
+  <label class="icon-btn search-toggle-btn" for="searchInput" onclick="toggleSearchDropdown()" style="margin: 0; display: flex;">🔍</label>
+  <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
+</div>
+
       </div>
       
       <div id="searchDropdown">
@@ -1093,7 +1097,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.12.26.v7";
+const APP_VERSION = "05.12.26.v8";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1670,17 +1674,19 @@ bootApp(); // Start the engine
   }
   window.addEventListener('resize', debounce(updateStickyHeaderHeights, 150));
 
-      function toggleSearchDropdown() {
+        function toggleSearchDropdown() {
     const dropdown = document.getElementById("searchDropdown");
-    dropdown.classList.toggle("expanded");
-    if (dropdown.classList.contains("expanded")) {
-      searchInput.focus(); // Synchronous focus!
+    const isExpanded = dropdown.classList.toggle("expanded");
+    
+    if (isExpanded) {
+      // The <label> tag natively handles the focus now!
       renderSearchHistory();
     } else {
       searchInput.blur();
     }
     updateStickyHeaderHeights(); 
   }
+
 
 
 
@@ -2475,13 +2481,17 @@ bootApp(); // Start the engine
     
     changeEditField();
     
-    document.getElementById("editTitle").textContent = "Edit Data (" + point["Short Name"] + ")";
+        document.getElementById("editTitle").textContent = "Edit Data (" + point["Short Name"] + ")";
     document.getElementById("editError").style.display = "none";
-    document.getElementById("editModal").style.display = "flex";
+    
+    const modal = document.getElementById("editModal");
+    modal.style.display = "flex";
+    void modal.offsetHeight; // FORCES IOS TO CALCULATE VISIBILITY
 
-// Execute immediately in the same click context
-const editor = document.getElementById("editArea");
-editor.focus();
+    // Execute immediately in the same click context
+    const editor = document.getElementById("editArea");
+    editor.focus();
+
 const range = document.createRange();
 const sel = window.getSelection();
 range.selectNodeContents(editor);
