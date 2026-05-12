@@ -74,29 +74,22 @@
     }
     
     
-        /* Search History Floating Menu Styles */
+    /* Search History Floating Menu Styles */
     #searchHistoryContainer {
       display: none; 
       flex-direction: column;
       position: absolute;
-      top: calc(100% + 8px); 
+      top: calc(100% + 8px); /* Anchors it 8px below the search bar */
       left: 0;
       width: 100%;
       background: #ffffff;
       border-radius: 12px;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.3); 
+      box-shadow: 0 8px 25px rgba(0,0,0,0.2); /* Deep shadow for floating effect */
       border: 1px solid #d1d1d6;
-      z-index: 200; 
-      
-      /* The iOS Scroll & Bounce Upgrades */
-      max-height: 30vh; /* Constrains it so it doesn't hide under the mobile keyboard */
-      overflow-y: auto; /* Enables vertical scrolling */
-      overflow-x: hidden; 
-      -webkit-overflow-scrolling: touch; /* Adds the fluid, native iOS bounce */
-      overscroll-behavior-y: contain; /* Prevents the main app background from moving when you hit the top/bottom of this menu */
+      z-index: 200; /* Forces it over the cards */
+      overflow: hidden; /* Keeps the bottom corners rounded */
     }
-
-        .history-item {
+    .history-item {
       padding: 12px 15px;
       border-bottom: 1px solid #e3e3e8;
       color: #007aff;
@@ -105,16 +98,7 @@
       align-items: center;
       gap: 12px;
       cursor: pointer;
-      
-      /* NEW BUTTON RESETS */
-      width: 100%;
-      text-align: left;
-      background: transparent;
-      border-top: none; border-left: none; border-right: none;
-      font-family: inherit;
-      box-sizing: border-box;
     }
-
     .history-item:active { background: rgba(0,0,0,0.05); }
     
     .history-clear-row { 
@@ -247,11 +231,10 @@
     }
     .card-toggle-btn:active { background: #bbdefb; transform: scale(0.97); }
 
-       .bottom-sheet:not(.show-all-text) .full-view { display: none; }
-    .bottom-sheet.show-all-text .filtered-view { display: none; }
-    .bottom-sheet.show-all-text .full-view { display: block; }
-    .bottom-sheet:not(.show-all-text) .hidden-section { display: none !important; }
-
+    .detail-panel:not(.show-all-text) .full-view { display: none; }
+    .detail-panel.show-all-text .filtered-view { display: none; }
+    .detail-panel.show-all-text .full-view { display: block; }
+    .detail-panel:not(.show-all-text) .hidden-section { display: none !important; }
 
     .point-notes { 
       background: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px;
@@ -276,8 +259,8 @@
     
     mark { background-color: #ffd54f; color: black; padding: 0; border-radius: 2px; }
     
-  #lightbox, #editModal, #channelModal, #quickPeekModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10010; justify-content: center; align-items: center; }
-#lightbox { background: rgba(0,0,0,0.9); z-index: 10015; flex-direction: column; }
+    #lightbox, #editModal, #channelModal, #quickPeekModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center; }
+    #lightbox { background: rgba(0,0,0,0.9); z-index: 10002; flex-direction: column; }
     #lightbox-title { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 16px; letter-spacing: 0.5px; }
     #lightbox img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 8px; }
     
@@ -297,7 +280,7 @@
     #toast {
       visibility: hidden; min-width: 200px; background-color: #333; color: #fff;
       text-align: center; border-radius: 20px; padding: 10px 20px;
-      position: fixed; z-index: 10020; left: 50%; bottom: 30px;
+      position: fixed; z-index: 10003; left: 50%; bottom: 30px;
       transform: translateX(-50%); font-size: 14px;
       opacity: 0; transition: opacity 0.5s, bottom 0.5s;
     }
@@ -354,20 +337,19 @@
       background: transparent; /* This removes the dark grey overlay */
     }
     
-          #quickPeekModal .quick-peek-content {
+       #quickPeekModal .quick-peek-content {
       height: 100%; max-height: 100%; width: 88%; max-width: 420px; 
       margin: 0; padding: 0; overflow-y: auto; background: #f0f0f5;
       border-radius: 20px 0 0 20px; box-shadow: -5px 0 25px rgba(0,0,0,0.15); 
       will-change: transform;
-      /* Snappy entrance synced perfectly to the Bottom Sheet */
-      animation: slideInRight 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      /* Slowed down slightly for a smoother feel */
+      animation: slideInRight 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
     }
     
+    /* The new slide-out class */
     #quickPeekModal.closing .quick-peek-content {
-      /* Snappy exit synced perfectly to the Bottom Sheet */
-      animation: slideOutRight 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      animation: slideOutRight 0.5s cubic-bezier(0.4, 0.0, 1, 1) forwards;
     }
-
 
     @keyframes slideInRight {
       from { transform: translateX(100%); }
@@ -394,7 +376,7 @@
  
 
     /* Dev Menu Styles */
-    #devModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10012; justify-content: center; align-items: center; }
+    #devModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10005; justify-content: center; align-items: center; }
     .dev-content { background: white; padding: 25px; border-radius: 12px; width: 85%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
     .dev-title { margin: 0 0 15px 0; font-size: 20px; font-weight: 800; color: #333; }
     .dev-stat { font-size: 15px; margin: 8px 0; color: #555; font-weight: 600; display: flex; justify-content: space-between; }
@@ -447,7 +429,7 @@
       position: fixed; bottom: -80px; left: 50%; transform: translateX(-50%);
       background: #2c2c2e; color: white; padding: 12px 24px; border-radius: 30px;
       display: flex; align-items: center; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-      transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10008;
+      transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10001;
       cursor: pointer; font-weight: 800; font-size: 14px; white-space: nowrap;
     }
     #compareBasket.visible { bottom: 40px; }
@@ -455,7 +437,7 @@
     #compareBasket button:active { background: rgba(255,255,255,0.4); }
 
         /* Compare Matrix Modal Base Layout */
-    #compareModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f0f5; z-index: 10012; flex-direction: column; }
+    #compareModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f0f5; z-index: 10004; flex-direction: column; }
     .compare-content { display: flex; flex-direction: column; height: 100%; width: 100%; }
     .compare-header { display: flex; justify-content: space-between; align-items: center; padding: calc(15px + env(safe-area-inset-top)) 20px 15px 20px; background: white; border-bottom: 1px solid #d1d1d6; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
     .compare-header h2 { margin: 0; font-size: 22px; color: #333; font-weight: 800; }
@@ -631,69 +613,6 @@
 }
 
 
-    /* --- NEW BOTTOM SHEET STYLES --- */
-    .bottom-sheet {
-      position: fixed;
-      top: 60px; /* Locks the top slightly below the status bar */
-      bottom: 0; /* Locks the bottom to the screen */
-      left: 0; width: 100%;
-      height: auto; /* Removes the buggy vh calculation */
-      background: #f0f0f5;
-      border-radius: 20px 20px 0 0;
-      box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
-      z-index: 10002; 
-      display: flex; flex-direction: column;
-      transform: translateY(100%);
-      transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-      pointer-events: none; 
-    }
-
-    
-    .bottom-sheet.open {
-      transform: translateY(0);
-      pointer-events: auto;
-    }
-    
-    /* Sheet Header & Pill Navigation */
-    .sheet-header {
-      position: relative;
-      display: flex; align-items: center;
-      padding: 12px 55px 12px 15px; /* Extra right padding to clear the absolute X button */
-      background: rgba(240, 240, 245, 0.98);
-      backdrop-filter: blur(8px);
-      border-radius: 20px 20px 0 0;
-      border-bottom: 1px solid #d1d1d6;
-      z-index: 10;
-    }
-    
-    .pill-nav {
-      display: flex; gap: 8px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      width: 100%;
-      /* scroll-behavior: smooth; Makes auto-centering look nice */
-    }
-    .pill-nav::-webkit-scrollbar { display: none; }
-    
-    .pill {
-      padding: 6px 18px;
-      background: #ffffff; border: 1px solid #d1d1d6;
-      border-radius: 20px; font-size: 14px; font-weight: 700; color: #555;
-      white-space: nowrap; cursor: pointer; transition: all 0.2s;
-    }
-    .pill.active { background: #007aff; color: white; border-color: #007aff; }
-    
-    /* Content Area */
-    .sheet-content {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      -webkit-overflow-scrolling: touch;
-      padding: 15px; 
-      background: #f0f0f5;
-    }
-
 
     /* Dark Mode */
     @media (prefers-color-scheme: dark) {
@@ -779,12 +698,6 @@
       .history-item { border-bottom-color: #38383a; color: #64b5f6; }
       .history-clear-row { background: #2c2c2e; }
 
-  .bottom-sheet, .sheet-content { background: #000000; }
-      .sheet-header { background: rgba(0,0,0,0.98); border-color: #38383a; }
-      .pill { background: #1c1c1e; border-color: #38383a; color: #8e8e93; }
-      .pill.active { background: #0a84ff; color: white; border-color: #0a84ff; }
-    
-
 
       
       
@@ -811,7 +724,7 @@
       position: fixed; bottom: -80px; left: 50%; transform: translateX(-50%);
       background: #007aff; color: white; padding: 12px 24px; border-radius: 30px;
       display: flex; align-items: center; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-      transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10008;
+      transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10002;
       cursor: pointer; font-weight: 800; font-size: 14px; white-space: nowrap;
     }
     #printBasket.visible { bottom: 100px; } /* Stacks nicely above the Compare basket */
@@ -821,7 +734,7 @@
     /* Print Queue Modal Base Layout */
     #printModal {
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: #f0f0f5; z-index: 10012; flex-direction: column;
+      background: #f0f0f5; z-index: 10004; flex-direction: column;
     }
     
       
@@ -863,27 +776,6 @@
       .tcm-table th, .tcm-table td { border: 1px solid #000; padding: 6px; text-align: left; }
     }
 
-
-
-    /* iPad Bottom Sheet Restraint */
-    @media (min-width: 850px) {
-      .bottom-sheet {
-        left: 0; 
-        right: 0; 
-        margin: 0 auto; 
-        max-width: 800px; /* Matches your channel-row width perfectly */
-        border-left: 1px solid #d1d1d6;
-        border-right: 1px solid #d1d1d6;
-        box-shadow: 0 -10px 40px rgba(0,0,0,0.3); /* Slightly deeper shadow for the floating effect */
-      }
-      
-      @media (prefers-color-scheme: dark) {
-        .bottom-sheet {
-           border-color: #38383a;
-           box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
-        }
-      }
-    }
 
 
 
@@ -1045,21 +937,10 @@
     </div> 
     <div id="cardContainer"></div>
   </div>
-  
-    <div id="bottomSheet" class="bottom-sheet">
-    <div class="sheet-header">
-      <div id="pillContainer" class="pill-nav">
-        </div>
-      <button class="absolute-close-btn" style="top: 15px;" onclick="closeBottomSheet()">✕</button>
-    </div>
-    <div id="sheetContent" class="sheet-content">
-      </div>
-  </div>
-  
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.12.26.v1";
+const APP_VERSION = "05.09.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1490,7 +1371,7 @@ bootApp(); // Start the engine
 
       const sameStructure = processed.length === points.length && processed.every((p, i) => points[i] && p["Short Name"] === points[i]["Short Name"]);
 
-                  if (sameStructure) {
+            if (sameStructure) {
         points = processed;
         changedIds.forEach(id => {
           const card = document.querySelector('.point-card[data-id="' + id + '"]');
@@ -1520,23 +1401,17 @@ bootApp(); // Start the engine
             }
             badge.textContent = imp;
           }
+          // -----------------------------------------------
+          
         });
-        
-        if (typeof window.refreshActivePanel === 'function') {
-          window.refreshActivePanel(false); // Background was already manually updated above
-        }
-
-      } else {
+        const openPanel = document.querySelector('.detail-panel.open');
+        if (openPanel && typeof window.refreshActivePanel === 'function') window.refreshActivePanel();
+      }
+ else {
         points = processed;
         initDropdown();
-        
-        if (typeof window.refreshActivePanel === 'function') {
-          window.refreshActivePanel(true); // Forces BOTH the sheet and background to rebuild
-        } else {
-          handleSearch(true);
-        }
+        handleSearch(true);
       }
-
       showToast("🔄 Data synced");
     } catch(e) { console.log("Failed to process background data."); }
   }
@@ -1589,17 +1464,8 @@ bootApp(); // Start the engine
     if (e.touches.length > 1 || (window.visualViewport && window.visualViewport.scale > 1.01)) { lbTouchStartX = null; return; }
     lbTouchStartX = e.changedTouches[0].screenX; lbTouchStartY = e.changedTouches[0].screenY; lbWasSwiped = false;
   }, {passive: true});
-  
-   // --- KILLS NATIVE BOUNCE, BUT ALLOWS PINCH-TO-ZOOM ---
-  lightboxEl.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 1) {
-      e.preventDefault(); 
-    }
-  }, { passive: false });
 
-
-
-    lightboxEl.addEventListener('touchend', (e) => {
+  lightboxEl.addEventListener('touchend', (e) => {
     if (lbTouchStartX === null) return;
     let touchEndX = e.changedTouches[0].screenX; let touchEndY = e.changedTouches[0].screenY;
     let deltaX = touchEndX - lbTouchStartX; let deltaY = touchEndY - lbTouchStartY;
@@ -1613,22 +1479,13 @@ bootApp(); // Start the engine
         currentLightboxIndex = newIndex; const point = currentLightboxPoints[currentLightboxIndex];
         document.getElementById("lightbox-title").textContent = point["Short Name"]; 
         document.getElementById("lightbox-img").src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
-        
-        // --- NEW BACKGROUND SYNC LOGIC ---
-        // 1. Legacy fallback just in case
         if (currentLightboxScroller) {
           const targetCard = currentLightboxScroller.children[currentLightboxIndex];
           if (targetCard) { targetCard.dataset.isSilentOpen = "true"; targetCard.click(); }
         }
-        // 2. Sync the Bottom Sheet perfectly behind the scenes!
-        if (document.getElementById('bottomSheet').classList.contains('open')) {
-          currentSheetIndex = currentLightboxIndex;
-          updateSheetUI();
-        }
       }
     }
   }, {passive: true});
-
 
   function updateStickyHeaderHeights() {
     const mainHeader = document.getElementById("mainStickyHeader");
@@ -1645,18 +1502,6 @@ bootApp(); // Start the engine
     }
     updateStickyHeaderHeights(); 
   }
-  
-    // --- HEADER INTERACTION LISTENER ---
-  // If the user clicks anywhere in the top header (Search, Clear, Settings, etc.), close the bottom sheet!
-  document.getElementById("mainStickyHeader").addEventListener("click", () => {
-    closeBottomSheet();
-  }, { passive: true });
-
-  // Bulletproof fallback: If they somehow focus the search input directly, close the sheet.
-  document.getElementById("searchInput").addEventListener("focus", () => {
-    closeBottomSheet();
-  });
-
 
   document.addEventListener("click", (e) => {
     const dropdown = document.getElementById("searchDropdown");
@@ -1766,20 +1611,15 @@ bootApp(); // Start the engine
       return;
     }
 
-        let html = "";
+    let html = "";
     history.forEach(term => {
       // Escape single quotes so points with apostrophes don't break the click handler
       const safeTerm = term.replace(/'/g, "\\'"); 
-      
-      // UPGRADE: Converted to a <button> and added onmousedown
-      html += `<button type="button" class="history-item" onmousedown="event.preventDefault()" onclick="applyHistorySearch('${safeTerm}')"><span class="history-icon">🕒</span> ${term}</button>`;
+      html += `<div class="history-item" onclick="applyHistorySearch('${safeTerm}')"><span class="history-icon">🕒</span> ${term}</div>`;
     });
-    
-    // UPGRADE: Converted Clear button container wrapper as well
-    html += `<div class="history-clear-row"><button type="button" class="history-clear-btn" onmousedown="event.preventDefault()" onclick="clearSearchHistory()">Clear History</button></div>`;
+    html += `<div class="history-clear-row"><button class="history-clear-btn" onclick="clearSearchHistory()">Clear History</button></div>`;
     
     container.innerHTML = html;
-
     container.style.display = "flex";
 
   }
@@ -1800,13 +1640,14 @@ bootApp(); // Start the engine
 
   
 
-    function handleSearch(preserveState = false) {
-    let currentScroll = 0;
+  function handleSearch(preserveState = false) {
+    let currentScroll = 0; let activePointId = null; let activeCardIsShowingAllText = false;
     
     if (preserveState) {
         currentScroll = appContainer.scrollTop;
+        const openPanel = document.querySelector('.detail-panel.open');
+        if (openPanel) { activePointId = openPanel.dataset.activeId; activeCardIsShowingAllText = openPanel.classList.contains("show-all-text"); }
     }
-
 
     let query = searchInput.value.trim();
     const headerClearBtn = document.getElementById("headerClearBtn");
@@ -1837,12 +1678,9 @@ bootApp(); // Start the engine
         const terms = token.slice(1).toLowerCase().split(",");
         terms.forEach(t => headers.push(...expandTCMPoint(t)));
       } else if (token.startsWith("#")) {
-        // Strip the # AND any quotation marks so multi-word phrases parse cleanly
-        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
-        const terms = cleanToken.split(",");
+        const terms = token.slice(1).toLowerCase().split(",");
         terms.forEach(t => fullNames.push(...expandTCMPoint(t)));
-      }
-        else {
+      } else {
         const parts = token.split("|").filter(Boolean);
         const orGroup = [];
         parts.forEach(part => {
@@ -1891,13 +1729,8 @@ bootApp(); // Start the engine
       // 4. SHORT NAMES @ (Fast Check)
       if (headers.length > 0 && !headers.some(h => point._shortNameLower.includes(h))) return false;
 
-            // 5. FULL NAMES & CHANNELS # (Fast Check)
-      if (fullNames.length > 0 && !fullNames.every(f => {
-        // Combine the fields so the # searches both at the same time
-        const hashTarget = (point["Full Name"] || point[" Full Name"] || "") + " " + 
-                           (point["Channel Short Name"] || point[" Channel Short Name"] || "");
-        return hashTarget.toLowerCase().includes(f);
-      })) return false;
+      // 5. FULL NAMES # (Fast Check)
+      if (fullNames.length > 0 && !fullNames.every(f => point._fullNameLower.includes(f))) return false;
 
       // 6. GENERAL SEARCH & PARAGRAPH LOGIC (Heavy Lifter)
       if (parsedIncludes.length > 0) {
@@ -1944,8 +1777,7 @@ bootApp(); // Start the engine
 
 
     setTimeout(updateStickyHeaderHeights, 10);
-    renderRows(preserveState, currentScroll);
-
+    renderRows(preserveState, currentScroll, activePointId, activeCardIsShowingAllText);
   }
 
   function escapeHTML(str) { return !str ? "" : String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -2160,20 +1992,19 @@ bootApp(); // Start the engine
 
 
 
-        function closeQuickPeek() {
+    function closeQuickPeek() {
     const modal = document.getElementById("quickPeekModal");
     
     // 1. Trigger the slide-out animation
     modal.classList.add("closing"); 
     
-    // 2. Wait exactly 0.4s for the snappy animation to finish, then hide it
+    // 2. Wait exactly 0.2s for the animation to finish, then hide it
     setTimeout(() => {
       modal.style.display = "none";
       modal.classList.remove("closing"); // Reset it for next time
       document.getElementById("quickPeekContainer").innerHTML = ""; 
-    }, 400); // Synced to the new 0.4s CSS duration
+    }, 350);
   }
-
 
 
     function buildQuickPeekDOM(point) {
@@ -2198,10 +2029,9 @@ bootApp(); // Start the engine
     const fullName = point["Full Name"] || point[" Full Name"] || "";
     const shortChan = point["Channel Short Name"] || point[" Channel Short Name"] || "";
     let metaHtml = "";
-    if (fullName) metaHtml += "<span>" + highlightText(fullName) + "</span>";
-    if (shortChan) metaHtml += "<span>" + highlightText(shortChan) + "</span>";
+    if (fullName) metaHtml += "<span>" + fullName + "</span>";
+    if (shortChan) metaHtml += "<span>" + shortChan + "</span>";
     meta.innerHTML = metaHtml;
-
     
     titleGroup.appendChild(titleEl); titleGroup.appendChild(meta);
     headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
@@ -2265,45 +2095,392 @@ bootApp(); // Start the engine
   });
 
 
-  // --- CARD CLICK GESTURE (TRIGGERS BOTTOM SHEET) ---
-  cardContainer.addEventListener('click', (e) => {
-    if (searchInput.value.trim().length > 1) saveSearchHistory(searchInput.value);
+        function buildPointDetailsDOM(point, index, channelPoints, scroller, panel, card, rowDiv) {
+    const details = document.createElement("div"); details.className = "point-details";
+    const headerInfo = document.createElement("div"); headerInfo.className = "detail-header-info";
+    
+    const imgInfo = document.createElement("img"); 
+    imgInfo.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+    imgInfo.onclick = (e) => { e.stopPropagation(); openLightbox(index, channelPoints, scroller); };
+    
+    const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
+    
+    const imp = point.Important ? String(point.Important).trim() : "";
+    const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
+
+    const titleEl = document.createElement("div"); titleEl.className = "detail-title";
+    titleEl.innerHTML = highlightText(point["Short Name"]) + impHtml;
+
+    const meta = document.createElement("div"); meta.className = "detail-meta";
+    const fullName = point["Full Name"] || point[" Full Name"] || "";
+    const shortChan = point["Channel Short Name"] || point[" Channel Short Name"] || "";
+    let metaHtml = "";
+    if (fullName) metaHtml += "<span>" + highlightText(fullName) + "</span>";
+    if (shortChan) metaHtml += "<span>" + shortChan + "</span>";
+    meta.innerHTML = metaHtml;
+    
+    titleGroup.appendChild(titleEl); 
+    titleGroup.appendChild(meta);
+    headerInfo.appendChild(imgInfo); 
+    headerInfo.appendChild(titleGroup);
+
+    // --- ABSOLUTE X BUTTON ---
+    const closeBtn = document.createElement("button"); 
+    closeBtn.className = "absolute-close-btn"; 
+    closeBtn.innerHTML = "✕";
+    closeBtn.onclick = (e) => {
+      e.stopPropagation(); 
+      if (Date.now() - lastGlobalClickTime < 400) return; 
+      lastGlobalClickTime = Date.now();
+
+      panel.classList.remove("open"); panel.dataset.activeId = ""; card.classList.remove("active");
+      const cardCenter = card.offsetLeft + (card.clientWidth / 2);
+      const scrollerCenter = scroller.clientWidth / 2;
+      scroller.scrollTo({ left: cardCenter - scrollerCenter, behavior: 'smooth' });
+      
+      const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+      const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop; 
+      appContainer.scrollTo({ top: wrapperOffset + rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
+    };
+    headerInfo.appendChild(closeBtn); 
+
+    // --- DOUBLE TAP TO TOP (Adjusted to scroll perfectly to the detail header) ---
+    let lastTapTime = 0;
+    headerInfo.addEventListener('click', (e) => {
+      // Don't trigger if they clicked the image or the X button
+      if (e.target.closest('button') || e.target.closest('img')) return;
+      
+      const now = Date.now();
+      if (now - lastTapTime < 300) { // 300ms window for a double tap
+        const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+        const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop;
+        appContainer.scrollTo({ top: wrapperOffset + panel.offsetTop - mainHeaderH, behavior: 'smooth' });
+      }
+      lastTapTime = now;
+    });
+
+    details.appendChild(headerInfo);
+
+    // --- PRIME-STYLE ACTION ROW ---
+    const actionRow = document.createElement("div");
+    actionRow.className = "point-action-row";
+
+    // PREVENT SWIPE BUBBLING (So scrolling tools doesn't swipe the card)
+    actionRow.addEventListener('touchstart', e => e.stopPropagation());
+    actionRow.addEventListener('touchend', e => e.stopPropagation());
+
+    // Action 1: Importance
+    const impAction = document.createElement("button");
+    impAction.className = "action-item";
+    impAction.innerHTML = `<div class="action-icon">❗️</div><div class="action-label">Important</div>`;
+    impAction.onclick = (e) => { e.stopPropagation(); cycleImportance(point["Short Name"]); };
+    actionRow.appendChild(impAction);
+
+    // Action 2: Compare
+    const compareAction = document.createElement("button");
+    compareAction.className = "action-item";
+    compareAction.innerHTML = `<div class="action-icon">⚖️</div><div class="action-label">Compare</div>`;
+    compareAction.onclick = (e) => { e.stopPropagation(); toggleCompare(point["Short Name"]); };
+    actionRow.appendChild(compareAction);
+    
+    // Action 3: Print
+    const printAction = document.createElement("button");
+    printAction.className = "action-item";
+    printAction.innerHTML = `<div class="action-icon">📂</div><div class="action-label">Export</div>`;
+    printAction.onclick = (e) => { e.stopPropagation(); togglePrint(point["Short Name"]); };
+    actionRow.appendChild(printAction);
+
+
+    // Append the row to the details panel right beneath the header
+    details.appendChild(actionRow);
+
+    let hasFilteredContent = false;
+    
+    const addDetail = (label, value, fieldName) => {
+      // Hide the entire section if it's empty!
+      if (!value || String(value).trim() === "") return; 
+      
+      const editIcon = `<button class="section-edit-btn" onclick="event.stopPropagation(); window.triggerEdit('${point["Short Name"]}', '${fieldName}')">✏️</button>`;
+      
+      const div = document.createElement("div"); 
+      const paras = value.split(/\r?\n/).filter(p => p.trim() !== "");
+      let matchingParas = []; let nonMatchingParas = [];
+
+      if (activeParsedIncludes && activeParsedIncludes.length > 0) {
+        paras.forEach(p => {
+          const passesAll = activeParsedIncludes.every(orGroup => {
+            return orGroup.some(term => {
+              if (term.type === 'exact') {
+                term.regex.lastIndex = 0; return term.regex.test(p);
+              } else {
+                return p.toLowerCase().includes(term.text);
+              }
+            });
+          });
+          if (passesAll) matchingParas.push(p); else nonMatchingParas.push(p); 
+        });
+      } else {
+        paras.forEach(p => matchingParas.push(p));
+      }
+
+      const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
+      const headerHtml = "<div class='section-label'>" + label + editIcon + "</div>";
+
+      if (activeHighlightRegex && nonMatchingParas.length > 0) {
+        hasFilteredContent = true;
+        if (matchingParas.length === 0) {
+          div.className = "point-notes hidden-section";
+          div.innerHTML = headerHtml + "<div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
+        } else {
+          div.className = "point-notes";
+          const filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
+          div.innerHTML = headerHtml + "<div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
+        }
+      } else {
+        div.className = "point-notes";
+        div.innerHTML = headerHtml + "<div class='section-content'>" + fullHtml + "</div>";
+      }
+      details.appendChild(div);
+    };
+
+    addDetail("Location", point["Location "] || point.Location, point.hasOwnProperty("Location ") ? "Location " : "Location");
+    addDetail("Location Notes", point["Location Notes"], "Location Notes");
+    addDetail("Needling", point.Needling, "Needling");
+    addDetail("Actions", point.Actions, "Actions");
+    addDetail("Indications", point.Indications, "Indications");
+    addDetail("Commentary", point.Commentary, "Commentary");
+    addDetail("Summary of Clinical Application", point["Summary of clinical application"], "Summary of clinical application");
+    addDetail("Combinations", point.Combinations, "Combinations");
+    addDetail("Description", point.Description, "Description");
+    addDetail("Patterns", point.Patterns, "Patterns");
+    addDetail("Diagnosis & Differentiation", point["Diagnosis & Differentiation"], "Diagnosis & Differentiation");
+    addDetail("Analysis", point.Analysis, "Analysis");
+    addDetail("Treatment Principle", point["Treatment Principle"], "Treatment Principle");
+    addDetail("Point Prescription", point["Point Prescription"], "Point Prescription");
+    addDetail("Supplementary Points", point["Supplementary Points"], "Supplementary Points");
+    addDetail("Explanation", point.Explanation, "Explanation");
+    addDetail("Remarks", point.Remarks, "Remarks");
+    addDetail("Flashcard View", point["Flashcard View"], "Flashcard View");
+    addDetail("Notes", point.Notes, "Notes");
+    addDetail("CAM Notes", point["CAM Notes"], "CAM Notes");
+
+
+    // --- The "Add / Edit Field" Shortcut Button ---
+    const addFieldBtn = document.createElement("button");
+    addFieldBtn.className = "add-field-btn";
+    addFieldBtn.innerHTML = "➕ Add / Edit Field";
+    addFieldBtn.onclick = (e) => { 
+      e.stopPropagation(); 
+      window.triggerEdit(point["Short Name"], "Notes"); 
+    };
+    details.appendChild(addFieldBtn);
+
+    let touchStartX = 0; let touchStartY = 0; let lastSwipeTime = 0;
+    details.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }, {passive: true});
+    details.addEventListener('touchend', e => {
+      
+      // NEW FIX: Prevent swiping when tapping links, tables, buttons, OR interacting with the new action row!
+      if (e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button') || e.target.closest('.point-action-row')) return; 
+
+      if (Date.now() - lastSwipeTime < 400) return; 
+      let touchEndX = e.changedTouches[0].screenX; let touchEndY = e.changedTouches[0].screenY;
+
+      let deltaX = touchEndX - touchStartX; let deltaY = touchEndY - touchStartY;
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 60) {
+        lastSwipeTime = Date.now(); let targetCard = null;
+        if (deltaX < 0 && index < channelPoints.length - 1) targetCard = scroller.children[index + 1];
+        else if (deltaX > 0 && index > 0) targetCard = scroller.children[index - 1];
+        if (targetCard) { targetCard.dataset.isSwipe = "true"; targetCard.click(); }
+      }
+    }, {passive: true});
+
+    return { detailsDOM: details, hasFilteredContent: hasFilteredContent, headerEl: headerInfo };
+  }
+
+
+
+    cardContainer.addEventListener('click', (e) => {
+        // ADD THIS BLOCK: Save the search query if they tapped a result
+    if (searchInput.value.trim().length > 1) {
+      saveSearchHistory(searchInput.value);
+    }
 
     const card = e.target.closest('.point-card');
     if (!card) return; 
-
-    // Prevent double tapping
-    if (Date.now() - lastGlobalClickTime < 400) return; 
-    lastGlobalClickTime = Date.now();
     
-    // FORCES THE KEYBOARD TO CLOSE INSTANTLY BEFORE ANIMATING
-    if (document.activeElement) document.activeElement.blur();
+    const isSwipe = card.dataset.isSwipe === "true"; const isSilentOpen = card.dataset.isSilentOpen === "true"; 
+    card.dataset.isSwipe = "false"; card.dataset.isSilentOpen = "false";
+
+    if (!isSwipe && !isSilentOpen) { if (Date.now() - lastGlobalClickTime < 400) return; lastGlobalClickTime = Date.now(); }
     
     const pointId = card.dataset.id;
-    let contextArray = [];
+    const rowDiv = card.closest('.channel-row');
+    const scroller = rowDiv.querySelector('.scroller');
+    const panel = rowDiv.querySelector('.detail-panel');
+    const point = points.find(p => p["Short Name"] === pointId);
+    const channelPoints = Array.from(scroller.children).map(c => points.find(p => p["Short Name"] === c.dataset.id));
+    const index = Array.from(scroller.children).indexOf(card);
+    const exactScrollY = appContainer.scrollTop; 
 
-    if (searchInput.value.trim().length > 0) {
-      contextArray = filteredPoints;
-    } else {
-      // BULLETPROOF ARRAY LOGIC: Grabs the data directly from the virtual windowing wrapper
-      // instead of trying to read the physical DOM elements.
-      const wrapper = card.closest('.channel-wrapper');
-      if (wrapper && wrapper._pointsData) {
-        contextArray = wrapper._pointsData;
+    const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
+    
+    // NEW: Calculate the distance of the parent wrapper to fix 'contain: content' zero-math
+    const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop;
+
+    if (panel.dataset.activeId === pointId && !isSilentOpen) {
+      panel.classList.remove("open"); panel.dataset.activeId = ""; card.classList.remove("active");
+      appContainer.scrollTo({ top: wrapperOffset + rowDiv.offsetTop - mainHeaderH - 10, behavior: 'auto' });
+      return;
+    }
+    
+    // Height-Freeze Trick to prevent native browser phantom jumping
+    const currentPanelHeight = panel.getBoundingClientRect().height;
+    if (panel.classList.contains("open")) {
+        panel.style.minHeight = currentPanelHeight + "px";
+    }
+
+    scroller.querySelectorAll('.point-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active'); panel.innerHTML = "";
+    
+    const result = buildPointDetailsDOM(point, index, channelPoints, scroller, panel, card, rowDiv);
+    panel.appendChild(result.detailsDOM);
+
+    if (card.dataset.restoreShowAllText === "true") {
+       panel.classList.add("show-all-text"); card.dataset.restoreShowAllText = "false";
+    }
+
+    // --- TOGGLE BUTTON CREATION ---
+    if (result.hasFilteredContent) {
+      const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
+      const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
+      toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
+                                        toggleBtn.onclick = (ev) => {
+        ev.stopPropagation();
+
+        const mainHeaderH = document.getElementById("mainStickyHeader") ? document.getElementById("mainStickyHeader").offsetHeight : 0;
+        const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop;
+        
+        // This calculates the exact top of the point detail panel
+        const targetScroll = wrapperOffset + panel.offsetTop - mainHeaderH;
+
+        if (panel.classList.contains("show-all-text")) {
+          // === COLLAPSE FLOW (Instant Snap) ===
+          
+          // 1. Instantly shrink the panel
+          panel.classList.remove("show-all-text");
+          toggleBtn.textContent = "Show full text";
+          
+          // 2. Instantly snap the scroll position so no visual jumping occurs
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'auto' });
+
+        } else {
+          // === EXPAND FLOW (Smoothly Anchor) ===
+          
+          panel.classList.add("show-all-text");
+          toggleBtn.textContent = "Show filtered text only";
+          
+          // Smooth scroll is great here because the page is getting longer, 
+          // so there is no risk of the browser freaking out.
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+        }
+      };
+
+
+
+
+
+
+
+      stickyBtnContainer.appendChild(toggleBtn); result.detailsDOM.appendChild(stickyBtnContainer); 
+    }
+
+    panel.dataset.activeId = pointId; panel.classList.add("open");
+    panel.style.minHeight = ""; // Release the height freeze
+
+    const detailHeaderH = result.headerEl.getBoundingClientRect().height;
+    
+    // NEW: Apply wrapper offset math to scrolling anchors
+    const rowScrollTop = wrapperOffset + rowDiv.offsetTop - mainHeaderH - 10;
+    const panelScrollTop = wrapperOffset + panel.offsetTop - mainHeaderH;
+
+    // --- SWIPE SCROLL MATH ---
+    if (isSilentOpen) {
+      appContainer.scrollTop = exactScrollY;
+    } else if (isSwipe) {
+      if (exactScrollY > panelScrollTop) {
+        appContainer.scrollTop = panelScrollTop;
       } else {
-        contextArray = points; // Failsafe
+        appContainer.scrollTop = exactScrollY;
       }
     }
 
-    openBottomSheet(pointId, contextArray);
+    window.refreshActivePanel = () => {
+       const scrollPos = appContainer.scrollTop; panel.innerHTML = "";
+       const updatedPoint = points.find(p => p["Short Name"] === pointId);
+       const updatedChannelPoints = Array.from(scroller.children).map(c => points.find(p => p["Short Name"] === c.dataset.id));
+       const refreshedResult = buildPointDetailsDOM(updatedPoint, index, updatedChannelPoints, scroller, panel, card, rowDiv);
+       panel.appendChild(refreshedResult.detailsDOM);
+       
+       if (refreshedResult.hasFilteredContent) {
+          const stickyBtnContainer = document.createElement("div"); stickyBtnContainer.className = "sticky-toggle-container";
+          const toggleBtn = document.createElement("button"); toggleBtn.className = "card-toggle-btn";
+          toggleBtn.textContent = panel.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
+                                            toggleBtn.onclick = (ev) => {
+        ev.stopPropagation();
+
+        const mainHeaderH = document.getElementById("mainStickyHeader") ? document.getElementById("mainStickyHeader").offsetHeight : 0;
+        const wrapperOffset = rowDiv.closest('.channel-wrapper').offsetTop;
+        
+        // This calculates the exact top of the point detail panel
+        const targetScroll = wrapperOffset + panel.offsetTop - mainHeaderH;
+
+        if (panel.classList.contains("show-all-text")) {
+          // === COLLAPSE FLOW (Instant Snap) ===
+          
+          // 1. Instantly shrink the panel
+          panel.classList.remove("show-all-text");
+          toggleBtn.textContent = "Show full text";
+          
+          // 2. Instantly snap the scroll position so no visual jumping occurs
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'auto' });
+
+        } else {
+          // === EXPAND FLOW (Smoothly Anchor) ===
+          
+          panel.classList.add("show-all-text");
+          toggleBtn.textContent = "Show filtered text only";
+          
+          // Smooth scroll is great here because the page is getting longer, 
+          // so there is no risk of the browser freaking out.
+          appContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+        }
+      };
+
+
+
+
+
+
+
+          stickyBtnContainer.appendChild(toggleBtn); refreshedResult.detailsDOM.appendChild(stickyBtnContainer); 
+       }
+       appContainer.scrollTop = scrollPos; 
+    };
+
+    const cardCenter = card.offsetLeft + (card.clientWidth / 2);
+    const scrollerCenter = scroller.clientWidth / 2;
+    scroller.scrollTo({ left: cardCenter - scrollerCenter, behavior: (isSilentOpen || isSwipe) ? 'auto' : 'smooth' });
+    
+    if (!isSilentOpen && !isSwipe) {
+      setTimeout(() => { 
+        document.documentElement.style.setProperty('--detail-header-height', detailHeaderH + 'px');
+        appContainer.scrollTo({ top: rowScrollTop, behavior: 'smooth' });
+      }, 50); 
+    } else {
+      document.documentElement.style.setProperty('--detail-header-height', detailHeaderH + 'px');
+    }
   });
 
-
-        
-
-
-
-      
 
       // --- ADD THIS GLOBAL VARIABLE ---
   let windowingObserver = null;
@@ -2347,11 +2524,14 @@ bootApp(); // Start the engine
   }
 
   // --- NEW VIRTUALIZED RENDER FUNCTION ---
-  function renderRows(preserveState = false, currentScroll = 0) {
+  function renderRows(preserveState = false, currentScroll = 0, activePointId = null, activeCardIsShowingAllText = false) {
     const fragment = document.createDocumentFragment();
 
+    // 1. Reset Observer to prevent memory leaks during rapid searching
     if (windowingObserver) windowingObserver.disconnect();
 
+    // 2. Initialize the Virtual Windowing Observer
+    // rootMargin '1500px' ensures we build the DOM roughly 1.5 screens before the user sees it
     windowingObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         const wrapper = entry.target;
@@ -2359,18 +2539,32 @@ bootApp(); // Start the engine
         const channelName = wrapper.dataset.channel;
         const hasContent = wrapper.hasChildNodes();
 
+        // Do not cull (delete) the wrapper if it contains the user's currently open detail panel
+        const hasActivePanel = activePointId && wrapper.querySelector(`.detail-panel.open`);
+
         if (isVisible && !hasContent) {
           // RENDER: Element is approaching viewport
-          wrapper.style.height = ''; 
+          wrapper.style.height = ''; // Remove hardcoded height to allow natural expansion
           const pts = wrapper._pointsData;
           wrapper.appendChild(buildRow(channelName, pts));
-        } else if (!isVisible && hasContent) {
-          // CULL: Element left viewport safely. Freeze its height to prevent the scrollbar from jumping
+
+          // Restore active state if it happens to fall inside this newly rendered chunk
+          if (activePointId && pts.some(p => p["Short Name"] === activePointId)) {
+             const cardToOpen = wrapper.querySelector(".point-card[data-id='" + activePointId + "']");
+             if (cardToOpen) {
+                 cardToOpen.dataset.isSilentOpen = "true";
+                 if (activeCardIsShowingAllText) cardToOpen.dataset.restoreShowAllText = "true";
+                 cardToOpen.click();
+             }
+          }
+        } else if (!isVisible && hasContent && !hasActivePanel) {
+          // CULL: Element left viewport safely. Freeze its height to prevent the scrollbar from violently jumping
           wrapper.style.height = wrapper.getBoundingClientRect().height + "px";
-          wrapper.innerHTML = ""; 
+          wrapper.innerHTML = ""; // Wipe DOM nodes from memory entirely
         }
       });
     }, { root: appContainer, rootMargin: '150% 0px 150% 0px' });
+
 
     if (filteredPoints.length === 0) {
       const noResults = document.createElement("div");
@@ -2385,12 +2579,27 @@ bootApp(); // Start the engine
         grouped[channel].push(p);
       });
 
-      Object.entries(grouped).forEach(([name, pts]) => {
+      const entries = Object.entries(grouped);
+
+      entries.forEach(([name, pts]) => {
         const wrapper = document.createElement("div");
         wrapper.className = "channel-wrapper";
         wrapper.dataset.channel = name;
-        wrapper._pointsData = pts; 
-        wrapper.style.minHeight = "180px"; 
+        wrapper._pointsData = pts; // Attach data for the observer to use later
+
+        // FORCE RENDER synchronously if this chunk contains the active panel
+        // This prevents scroll restoration bugs when panels stay open during search
+        let shouldForceRender = false;
+        if (preserveState && activePointId && pts.some(p => p["Short Name"] === activePointId)) {
+            shouldForceRender = true;
+        }
+
+        if (shouldForceRender) {
+            wrapper.appendChild(buildRow(name, pts));
+        } else {
+            wrapper.style.minHeight = "180px"; // Default estimated row height 
+        }
+
         fragment.appendChild(wrapper);
       });
     }
@@ -2398,13 +2607,24 @@ bootApp(); // Start the engine
     cardContainer.innerHTML = "";
     cardContainer.appendChild(fragment);
 
+    // 3. Attach observer to all wrappers AFTER they are in the DOM
     const wrappers = cardContainer.querySelectorAll(".channel-wrapper");
     wrappers.forEach(w => windowingObserver.observe(w));
+
+    // 4. State restoration fallbacks
+    if (preserveState && activePointId) {
+        const cardToOpen = document.querySelector(".point-card[data-id='" + activePointId + "']");
+        if (cardToOpen && !cardToOpen.closest('.channel-wrapper').dataset.hasRestored) {
+            cardToOpen.dataset.isSilentOpen = "true";
+            if (activeCardIsShowingAllText) cardToOpen.dataset.restoreShowAllText = "true";
+            cardToOpen.click();
+            cardToOpen.closest('.channel-wrapper').dataset.hasRestored = "true";
+        }
+    }
 
     if (preserveState) appContainer.scrollTop = currentScroll; 
     else appContainer.scrollTo({ top: 0, behavior: "auto" }); 
   }
-
 
 
 
@@ -2561,13 +2781,9 @@ bootApp(); // Start the engine
     }
 
 
-        // 2. Refresh the Panels Instantly
-    if (typeof window.refreshActivePanel === 'function') {
-       window.refreshActivePanel(true); // True forces background to rebuild the search index
-    } else {
-       handleSearch(true);
-    }
-
+    // 2. Refresh the Panels Instantly
+    if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
+    else handleSearch(true);
     
     // Instantly update the red bubble on the main scrolling card behind the modal
     const card = document.querySelector(`.point-card[data-id="${pointId}"]`);
@@ -3074,12 +3290,9 @@ bootApp(); // Start the engine
     });
     currentEditingPoint._paragraphs = paras;
 
-        // 4. Update the UI
-    if (typeof window.refreshActivePanel === 'function') {
-       window.refreshActivePanel(true); // True forces background to rebuild the search index
-    } else {
-       handleSearch(true); 
-    }
+    // 4. Update the UI
+    if (typeof window.refreshActivePanel === 'function') window.refreshActivePanel(); 
+    else handleSearch(true); 
     
     closeEditModal(); 
     resetModalButtons();
@@ -3106,367 +3319,9 @@ bootApp(); // Start the engine
     picker.value = rgbToHex(color);
   };
 
-  // --- BOTTOM SHEET GLOBAL STATE ---
-  let sheetContextPoints = []; 
-  let currentSheetIndex = 0;   
-  let sheetTouchStartX = null;
-  let sheetTouchStartY = null;
-
-  // --- BOTTOM SHEET GESTURE LISTENER ---
-  const bottomSheetEl = document.getElementById("bottomSheet");
-
-  bottomSheetEl.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 1) return; // Ignore multi-touch/pinch-zoom
-    sheetTouchStartX = e.changedTouches[0].screenX;
-    sheetTouchStartY = e.changedTouches[0].screenY;
-  }, {passive: true});
-
-  bottomSheetEl.addEventListener('touchend', (e) => {
-    if (sheetTouchStartX === null) return;
-    
-    // Prevent swiping if they are scrolling the pill nav, interacting with a table, link, or action button
-    if (e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button') || e.target.closest('.point-action-row') || e.target.closest('.pill-nav')) return;
-
-    let touchEndX = e.changedTouches[0].screenX; 
-    let touchEndY = e.changedTouches[0].screenY;
-    
-    let deltaX = touchEndX - sheetTouchStartX; 
-    let deltaY = touchEndY - sheetTouchStartY;
-
-    // Check if horizontal swipe is dominant and strong enough (>60px)
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 60) {
-      if (deltaX < 0 && currentSheetIndex < sheetContextPoints.length - 1) {
-        // Swipe Left -> Next Point
-        currentSheetIndex++;
-        updateSheetUI();
-      } else if (deltaX > 0 && currentSheetIndex > 0) {
-        // Swipe Right -> Prev Point
-        currentSheetIndex--;
-        updateSheetUI();
-      }
-    }
-    
-    sheetTouchStartX = null;
-    sheetTouchStartY = null;
-  }, {passive: true});
-
-    function closeBottomSheet() {
-    const sheet = document.getElementById('bottomSheet');
-    if (!sheet.classList.contains('open')) return; // Safety check
-
-    // 1. Start the curtain-drop animation
-    sheet.classList.remove('open');
-
-    // 2. Smart Background Sync
-    if (sheetContextPoints.length > 0 && currentSheetIndex >= 0) {
-      const targetId = sheetContextPoints[currentSheetIndex]["Short Name"];
-
-      // Find the specific virtual wrapper that holds the point we swiped to
-      const wrappers = document.querySelectorAll('.channel-wrapper');
-      let targetWrapper = null;
-      for (let w of wrappers) {
-        if (w._pointsData && w._pointsData.some(p => p["Short Name"] === targetId)) {
-          targetWrapper = w;
-          break;
-        }
-      }
-
-      if (targetWrapper) {
-        const mainHeaderH = document.getElementById("mainStickyHeader").offsetHeight;
-
-        // Snap the vertical scroll instantly while the sheet hides the jump!
-        appContainer.scrollTo({ top: targetWrapper.offsetTop - mainHeaderH - 10, behavior: 'auto' });
-
-        // Wait exactly 50ms for your Virtual Observer to build the DOM if it was culled off-screen
-        setTimeout(() => {
-           const card = targetWrapper.querySelector(`.point-card[data-id="${targetId}"]`);
-           const scroller = targetWrapper.querySelector('.scroller');
-
-           if (card && scroller) {
-             // Center the target card horizontally in its row
-             const cardCenter = card.offsetLeft + (card.clientWidth / 2);
-             const scrollerCenter = scroller.clientWidth / 2;
-             scroller.scrollTo({ left: cardCenter - scrollerCenter, behavior: 'auto' });
-
-             // Give it a brief native-feeling "pulse" so the user's eye catches it
-             targetWrapper.querySelectorAll('.point-card').forEach(c => c.classList.remove('active'));
-             card.classList.add('active');
-             setTimeout(() => card.classList.remove('active'), 600);
-           }
-        }, 50); 
-      }
-    }
-  }
-
-
-
-    function openBottomSheet(pointId, contextArray) {
-    document.getElementById('bottomSheet').classList.remove('show-all-text');
-    
-    sheetContextPoints = contextArray;
-    currentSheetIndex = sheetContextPoints.findIndex(p => p["Short Name"] === pointId);
-    
-    if (currentSheetIndex === -1) return; 
-    
-    document.getElementById('bottomSheet').classList.add('open');
-    updateSheetUI(true); // <-- Added 'true' here to flag the initial open
-  }
-
-
-
-      function updateSheetUI(isInitialOpen = false, preserveScroll = false) {
-    const sheetContent = document.getElementById("sheetContent");
-    
-    // Capture the exact pixel position before we wipe the old data
-    const currentScroll = sheetContent.scrollTop; 
-
-    const point = sheetContextPoints[currentSheetIndex];
-    renderPills(isInitialOpen);
-    renderSheetContent(point);
-    
-    // If saving an edit, hold the position. If swiping/tapping a new point, snap to top.
-    if (preserveScroll) {
-      sheetContent.scrollTop = currentScroll; 
-    } else {
-      sheetContent.scrollTop = 0; 
-    }
-  }
-
-
-
-      function renderPills(isInitialOpen = false) {
-    const container = document.getElementById('pillContainer');
-    container.innerHTML = "";
-    
-    sheetContextPoints.forEach((p, index) => {
-      const pill = document.createElement("div");
-      pill.className = "pill";
-      if (index === currentSheetIndex) pill.classList.add("active");
-      pill.innerHTML = highlightText(p["Short Name"]); 
-      pill.onclick = () => {
-        currentSheetIndex = index;
-        updateSheetUI(false); // Clicking a pill should be a smooth transition
-      };
-      container.appendChild(pill);
-    });
-    
-    setTimeout(() => {
-      const activePill = container.querySelector('.pill.active');
-      if (activePill) {
-        if (isInitialOpen) {
-          // Pure math for an instant, invisible snap before the curtain rises
-          const pillCenter = activePill.offsetLeft + (activePill.clientWidth / 2);
-          const containerCenter = container.clientWidth / 2;
-          container.scrollLeft = pillCenter - containerCenter;
-        } else {
-          // Premium smooth glide for swiping or tapping adjacent pills
-          activePill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-        }
-      }
-    }, 10); 
-  }
-
-
-
-    function renderSheetContent(point) {
-    const container = document.getElementById("sheetContent");
-    container.innerHTML = ""; 
-
-    // 1. Header & Image Info
-    const headerInfo = document.createElement("div"); 
-    headerInfo.className = "detail-header-info";
-    headerInfo.style.position = "static"; 
-    headerInfo.style.margin = "0 0 15px 0";
-    
-    const imgInfo = document.createElement("img"); 
-    imgInfo.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
-    imgInfo.onclick = (e) => { e.stopPropagation(); openLightbox(currentSheetIndex, sheetContextPoints, null); };
-    
-    const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
-    const imp = point.Important ? String(point.Important).trim() : "";
-    const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
-
-    const titleEl = document.createElement("div"); titleEl.className = "detail-title";
-    titleEl.innerHTML = highlightText(point["Short Name"]) + impHtml;
-
-    const meta = document.createElement("div"); meta.className = "detail-meta";
-    meta.innerHTML = `<span>${highlightText(point["Full Name"] || point[" Full Name"] || "")}</span><span>${highlightText(point["Channel Short Name"] || point[" Channel Short Name"] || "")}</span>`;
-
-    
-    titleGroup.appendChild(titleEl); titleGroup.appendChild(meta);
-    headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
-    container.appendChild(headerInfo);
-
-    // 2. The Prime Action Row
-    const actionRow = document.createElement("div");
-    actionRow.className = "point-action-row";
-    actionRow.innerHTML = `
-      <button class="action-item" onclick="cycleImportance('${point["Short Name"]}'); setTimeout(updateSheetUI, 50);">
-        <div class="action-icon">❗️</div><div class="action-label">Important</div>
-      </button>
-      <button class="action-item" onclick="toggleCompare('${point["Short Name"]}')">
-        <div class="action-icon">⚖️</div><div class="action-label">Compare</div>
-      </button>
-      <button class="action-item" onclick="togglePrint('${point["Short Name"]}')">
-        <div class="action-icon">📂</div><div class="action-label">Export</div>
-      </button>
-    `;
-    container.appendChild(actionRow);
-
-    // --- NEW: Track if we found filtered paragraphs ---
-    let hasFilteredContent = false;
-
-    // 3. The Data Notes (RESTORED PARAGRAPH FILTERING LOGIC)
-    const addDetail = (label, value, fieldName) => {
-      if (!value || String(value).trim() === "") return; 
-      
-      const editIcon = `<button class="section-edit-btn" onclick="event.stopPropagation(); window.triggerEdit('${point["Short Name"]}', '${fieldName}')">✏️</button>`;
-      const div = document.createElement("div"); 
-      
-      // Split the text into paragraphs and sort them
-      const paras = String(value).split(/\r?\n/).filter(p => p.trim() !== "");
-      let matchingParas = []; let nonMatchingParas = [];
-
-      if (activeParsedIncludes && activeParsedIncludes.length > 0) {
-        paras.forEach(p => {
-          const passesAll = activeParsedIncludes.every(orGroup => {
-            return orGroup.some(term => {
-              if (term.type === 'exact') {
-                term.regex.lastIndex = 0; return term.regex.test(p);
-              } else {
-                return p.toLowerCase().includes(term.text);
-              }
-            });
-          });
-          if (passesAll) matchingParas.push(p); else nonMatchingParas.push(p); 
-        });
-      } else {
-        paras.forEach(p => matchingParas.push(p));
-      }
-
-      const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
-      const headerHtml = "<div class='section-label' style='position:static;'>" + label + editIcon + "</div>";
-
-      // If there is an active search AND we found irrelevant text, format it!
-      if (activeHighlightRegex && nonMatchingParas.length > 0) {
-        hasFilteredContent = true;
-        if (matchingParas.length === 0) {
-          // Hide this entire block in filtered view
-          div.className = "point-notes hidden-section";
-          div.innerHTML = headerHtml + "<div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
-        } else {
-          // Show only the matching lines with a [...] spacer
-          div.className = "point-notes";
-          const filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
-          div.innerHTML = headerHtml + "<div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
-        }
-      } else {
-        // Normal unbroken view
-        div.className = "point-notes";
-        div.innerHTML = headerHtml + "<div class='section-content'>" + fullHtml + "</div>";
-      }
-      container.appendChild(div);
-    };
-
-    // Call addDetail for all fields...
-    addDetail("Location", point["Location "] || point.Location, point.hasOwnProperty("Location ") ? "Location " : "Location");
-    addDetail("Location Notes", point["Location Notes"], "Location Notes");
-    addDetail("Needling", point.Needling, "Needling");
-    addDetail("Actions", point.Actions, "Actions");
-    addDetail("Indications", point.Indications, "Indications");
-    addDetail("Commentary", point.Commentary, "Commentary");
-    addDetail("Summary of Clinical Application", point["Summary of clinical application"], "Summary of clinical application");
-    addDetail("Combinations", point.Combinations, "Combinations");
-    addDetail("Description", point.Description, "Description");
-    addDetail("Patterns", point.Patterns, "Patterns");
-    addDetail("Diagnosis & Differentiation", point["Diagnosis & Differentiation"], "Diagnosis & Differentiation");
-    addDetail("Analysis", point.Analysis, "Analysis");
-    addDetail("Treatment Principle", point["Treatment Principle"], "Treatment Principle");
-    addDetail("Point Prescription", point["Point Prescription"], "Point Prescription");
-    addDetail("Supplementary Points", point["Supplementary Points"], "Supplementary Points");
-    addDetail("Explanation", point.Explanation, "Explanation");
-    addDetail("Remarks", point.Remarks, "Remarks");
-    addDetail("Flashcard View", point["Flashcard View"], "Flashcard View");
-    addDetail("Notes", point.Notes, "Notes");
-    addDetail("CAM Notes", point["CAM Notes"], "CAM Notes");
-
-    // Add/Edit Button
-    const addFieldBtn = document.createElement("button");
-    addFieldBtn.className = "add-field-btn";
-    addFieldBtn.innerHTML = "➕ Add / Edit Field";
-    addFieldBtn.onclick = () => { window.triggerEdit(point["Short Name"], "Notes"); };
-    container.appendChild(addFieldBtn);
-
-    // --- 4. RESTORE THE TOGGLE BUTTON ---
-    if (hasFilteredContent) {
-      const stickyBtnContainer = document.createElement("div"); 
-      stickyBtnContainer.className = "sticky-toggle-container";
-      
-      // Extra bottom padding so it floats nicely at the very bottom of the scrolling sheet
-      stickyBtnContainer.style.marginTop = "20px";
-      stickyBtnContainer.style.paddingBottom = "30px";
-      
-      const toggleBtn = document.createElement("button"); 
-      toggleBtn.className = "card-toggle-btn";
-      
-      const sheetEl = document.getElementById("bottomSheet");
-      
-      toggleBtn.textContent = sheetEl.classList.contains("show-all-text") ? "Show filtered text only" : "Show full text";
-      
-      toggleBtn.onclick = (ev) => {
-        ev.stopPropagation();
-        if (sheetEl.classList.contains("show-all-text")) {
-          sheetEl.classList.remove("show-all-text");
-          toggleBtn.textContent = "Show full text";
-        } else {
-          sheetEl.classList.add("show-all-text");
-          toggleBtn.textContent = "Show filtered text only";
-        }
-        // Smoothly scroll back to top so they don't get lost when the text expands/collapses!
-        document.getElementById("sheetContent").scrollTo({ top: 0, behavior: 'smooth' });
-      };
-      
-      stickyBtnContainer.appendChild(toggleBtn); 
-      container.appendChild(stickyBtnContainer); 
-    }
-  }
-
-
-      // Bind the global refresh so edits update the sheet instantly while freezing the scroll position
-  window.refreshActivePanel = (forceBackgroundRebuild = false) => {
-    // 1. Sync the bottom sheet's memory with the freshly downloaded global database
-    if (sheetContextPoints && sheetContextPoints.length > 0) {
-      sheetContextPoints = sheetContextPoints.map(oldPoint => {
-        return points.find(p => p["Short Name"] === oldPoint["Short Name"]) || oldPoint;
-      });
-    }
-    
-    // 2. Redraw the Bottom Sheet UI (only if it is currently open)
-    const sheet = document.getElementById('bottomSheet');
-    if (sheet && sheet.classList.contains('open')) {
-      updateSheetUI(false, true); // true = preserveScroll
-    }
-    
-    // 3. Keep the background search index and feed perfectly in sync!
-    if (forceBackgroundRebuild) {
-      handleSearch(true); 
-    }
-  };
-
-
-
-
-
-
 
 
   
 </script>
-
-
-
-
-
-
 </body>
 </html>
