@@ -1049,11 +1049,10 @@
           <p id="searchQueryDisplay"></p>
         </div>
         <div class="header-actions">
-  <button id="headerClearBtn" class="icon-btn clear-active-btn" onclick="clearAndCloseSearch()" style="display: none;">✕</button>
-  <label class="icon-btn search-toggle-btn" for="searchInput" onclick="toggleSearchDropdown()" style="margin: 0; display: flex;">🔍</label>
-  <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
-</div>
-
+          <button id="headerClearBtn" class="icon-btn clear-active-btn" onclick="clearAndCloseSearch()" style="display: none;">✕</button>
+          <label class="icon-btn search-toggle-btn" for="searchInput" onclick="toggleSearchDropdown()" style="margin: 0; display: flex;">🔍</label>
+          <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
+        </div>
       </div>
       
       <div id="searchDropdown">
@@ -1076,28 +1075,26 @@
         <div class="help-row"><span>&lt;&gt;</span> Exclude (e.g., <i>&lt;&gt;pain</i>)</div>
       </div>
     </div> 
+    
     <div id="cardContainer"></div>
-  </div>
-  
-  
-  
-      <div id="sheetBackdrop" onclick="closeBottomSheet()"></div>
-  
-  <div id="bottomSheet" class="bottom-sheet">
-    <div class="sheet-header">
 
-      <div id="pillContainer" class="pill-nav">
-        </div>
-      <button class="absolute-close-btn" style="top: 15px;" onclick="closeBottomSheet()">✕</button>
-    </div>
-    <div id="sheetContent" class="sheet-content">
+    <div id="sheetBackdrop" onclick="closeBottomSheet()"></div>
+    
+</div> <div id="bottomSheet" class="bottom-sheet">
+  <div class="sheet-header">
+    <div id="pillContainer" class="pill-nav">
       </div>
+    <button class="absolute-close-btn" style="top: 15px;" onclick="closeBottomSheet()">✕</button>
   </div>
+  <div id="sheetContent" class="sheet-content">
+    </div>
+</div>
+
   
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.12.26.v9";
+const APP_VERSION = "05.12.26.v10";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
