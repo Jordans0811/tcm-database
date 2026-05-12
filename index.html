@@ -21,16 +21,13 @@
       overscroll-behavior: none; /* Stops the main window from bouncing */
     }
    #appContainer {
-      height: 100%;
-      overflow-y: auto;
-      overflow-x: hidden;
-      -webkit-overflow-scrolling: touch;
-      position: relative;
-      transform: translateZ(0);
-      will-change: scroll-position;
-      contain: layout style paint;
-      overscroll-behavior-y: none; /* Stops the content list from pulling down the header */
-    }
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  overscroll-behavior-y: none;
+}
 
 
    #mainStickyHeader {
