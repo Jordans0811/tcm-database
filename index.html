@@ -138,11 +138,16 @@
       position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
       width: 16px; height: 16px; opacity: 0.7; pointer-events: none; z-index: 1;
     }
-    .search-box {
+        .search-box {
       width: 100%; padding: 10px 40px 10px 34px; font-size: 16px;
       background-color: #e3e3e8; border: none; border-radius: 10px; color: #000; box-sizing: border-box;
       -webkit-appearance: none;
+      
+      /* NEW: Forces iOS PWA to allow keyboard interaction */
+      -webkit-user-select: text !important;
+      user-select: text !important;
     }
+
     .search-box:focus { outline: none; box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3); }
     .search-box::placeholder { color: #8e8e93; }
     
@@ -428,15 +433,19 @@
     .add-field-btn:active { background: rgba(0, 122, 255, 0.1); }
 
 
-        .rich-text-editor {
-      /* Add these two properties to your existing block */
+           .rich-text-editor {
       white-space: pre-wrap;
       word-wrap: break-word;
       
       height: 200px; width: 100%; box-sizing: border-box; font-family: inherit; font-size: 14px; 
       padding: 10px; border: 1px solid #ccc; border-radius: 6px; overflow-y: auto; 
       background: white; color: black; outline: none; line-height: 1.4;
+      
+      /* NEW: Forces iOS PWA to allow keyboard interaction inside the edit modal */
+      -webkit-user-select: text !important;
+      user-select: text !important;
     }
+
 
     .rich-text-editor:empty:before { content: attr(placeholder); color: #8e8e93; pointer-events: none; display: block; }
     .rich-text-editor:focus { border-color: #007aff; box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3); }
@@ -1662,15 +1671,21 @@ bootApp(); // Start the engine
   }
   window.addEventListener('resize', debounce(updateStickyHeaderHeights, 150));
 
-  function toggleSearchDropdown() {
+    function toggleSearchDropdown() {
     const dropdown = document.getElementById("searchDropdown");
     dropdown.classList.toggle("expanded");
+    
     if (dropdown.classList.contains("expanded")) {
-      searchInput.focus();
+      // REMOVED: searchInput.focus(); <-- This was causing the iOS keyboard lock
       renderSearchHistory();
+    } else {
+      // NEW: Force the DOM to drop focus when the menu hides
+      searchInput.blur(); 
     }
+    
     updateStickyHeaderHeights(); 
   }
+
   
 
 
