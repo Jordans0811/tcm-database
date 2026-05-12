@@ -1104,7 +1104,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.12.26.v4";
+const APP_VERSION = "05.12.26.v5";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1682,19 +1682,20 @@ bootApp(); // Start the engine
   window.addEventListener('resize', debounce(updateStickyHeaderHeights, 150));
 
     function toggleSearchDropdown() {
-    const dropdown = document.getElementById("searchDropdown");
-    dropdown.classList.toggle("expanded");
-    
-    if (dropdown.classList.contains("expanded")) {
-      // REMOVED: searchInput.focus(); <-- This was causing the iOS keyboard lock
-      renderSearchHistory();
-    } else {
-      // NEW: Force the DOM to drop focus when the menu hides
-      searchInput.blur(); 
-    }
-    
-    updateStickyHeaderHeights(); 
+  const dropdown = document.getElementById("searchDropdown");
+  dropdown.classList.toggle("expanded");
+  
+  if (dropdown.classList.contains("expanded")) {
+    renderSearchHistory();
+    // Delay focus until after the layout expansion settles
+    setTimeout(() => { searchInput.focus(); }, 50);
+  } else {
+    searchInput.blur();
   }
+  
+  updateStickyHeaderHeights();
+}
+
 
   
 
@@ -2494,6 +2495,20 @@ bootApp(); // Start the engine
     document.getElementById("editTitle").textContent = "Edit Data (" + point["Short Name"] + ")";
     document.getElementById("editError").style.display = "none";
     document.getElementById("editModal").style.display = "flex";
+
+// iOS PWA requires explicit focus with a delay after modal opens
+setTimeout(() => {
+  const editor = document.getElementById("editArea");
+  editor.focus();
+  // Place cursor at end
+  const range = document.createRange();
+  const sel = window.getSelection();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}, 80);
+
   }
 
   function changeEditField() {

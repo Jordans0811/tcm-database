@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v32';
+const CACHE_VERSION = 'v33';
 const APP_CACHE = `tcm-app-${CACHE_VERSION}`;
 const IMAGE_CACHE = `tcm-images-${CACHE_VERSION}`;
 
