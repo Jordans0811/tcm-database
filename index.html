@@ -955,6 +955,25 @@
       </div>
     </div>
   </div>
+  
+    <div id="sectionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;">
+    <div class="modal-content" style="max-height: 75vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 class="modal-title" style="margin-bottom: 0;">Filter Sections</h3>
+        <button onclick="closeSectionFilterModal()" style="background: transparent; border: none; font-size: 24px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+      </div>
+      <div style="display:flex; justify-content: space-between; margin-bottom: 10px;">
+          <button onclick="selectAllSections(true)" style="background: #e3e3e8; color: black; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">Select All</button>
+          <button onclick="selectAllSections(false)" style="background: #e3e3e8; color: black; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">Clear All</button>
+      </div>
+      <div id="sectionCheckboxes" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding: 5px 0; margin-bottom:10px; flex:1;"></div>
+      <div class="modal-buttons" style="display:flex; gap: 10px;">
+        <button class="cancel-btn" onclick="toggleSectionFilterState()" id="sectionFilterToggleBtn">Turn OFF</button>
+        <button class="save-btn" onclick="applySectionFilter()">Apply</button>
+      </div>
+    </div>
+  </div>
+
 
   <div id="quickPeekModal" onclick="if(event.target===this) closeQuickPeek()">
     <div class="modal-content quick-peek-content" id="quickPeekContainer">
@@ -1094,7 +1113,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.12.26.v10";
+const APP_VERSION = "05.18.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1506,6 +1525,73 @@ bootApp(); // Start the engine
     document.getElementById("channelModal").style.display = "none";
     handleSearch();
   }
+  
+  // --- SECTION FILTER LOGIC ---
+let activeSections = [];
+let isSectionFilterActive = false;
+const allAvailableSections = [
+  "Location", "Location Notes", "Needling", "Actions", "Indications",
+  "Commentary", "Summary of Clinical Application", "Combinations",
+  "Description", "Patterns", "Diagnosis & Differentiation", "Analysis",
+  "Treatment Principle", "Point Prescription", "Supplementary Points",
+  "Explanation", "Remarks", "Flashcard View", "Notes", "CAM Notes"
+];
+
+function openSectionFilterModal() {
+  const container = document.getElementById("sectionCheckboxes");
+  container.innerHTML = "";
+  
+  allAvailableSections.forEach(sec => {
+    const lbl = document.createElement("label");
+    lbl.className = "checkbox-label";
+    // If filter is off and list is empty, default to checking everything visually
+    const isChecked = activeSections.includes(sec) || (!isSectionFilterActive && activeSections.length === 0);
+    lbl.innerHTML = `<input type="checkbox" value="${sec}" ${isChecked ? "checked" : ""}> ${sec}`;
+    container.appendChild(lbl);
+  });
+  
+  const toggleBtn = document.getElementById("sectionFilterToggleBtn");
+  if (isSectionFilterActive) {
+    toggleBtn.textContent = "Turn Filter OFF";
+    toggleBtn.style.background = "#ff3b30";
+    toggleBtn.style.color = "white";
+  } else {
+    toggleBtn.textContent = "Enable Filter";
+    toggleBtn.className = "cancel-btn"; // Resets to default styling
+    toggleBtn.style.background = "";
+    toggleBtn.style.color = "";
+  }
+  
+  document.getElementById("sectionModal").style.display = "flex";
+}
+
+function closeSectionFilterModal() {
+  document.getElementById("sectionModal").style.display = "none";
+}
+
+function selectAllSections(check) {
+  const checkboxes = document.getElementById("sectionCheckboxes").querySelectorAll("input");
+  checkboxes.forEach(cb => cb.checked = check);
+}
+
+function toggleSectionFilterState() {
+  isSectionFilterActive = !isSectionFilterActive;
+  closeSectionFilterModal();
+  updateSheetUI(false, true); // True preserves the scroll position
+  showToast(isSectionFilterActive ? "Section filter Enabled" : "Section filter Disabled");
+}
+
+function applySectionFilter() {
+  const checkboxes = document.getElementById("sectionCheckboxes").querySelectorAll("input");
+  activeSections = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+  isSectionFilterActive = true; 
+  closeSectionFilterModal();
+  updateSheetUI(false, true);
+}
+
+  
+  
+  
   
   function cancelFilter() { document.getElementById("channelModal").style.display = "none"; }
 
@@ -3366,7 +3452,7 @@ sel.addRange(range);
     headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
     container.appendChild(headerInfo);
 
-    // 2. The Prime Action Row
+        // 2. The Prime Action Row
     const actionRow = document.createElement("div");
     actionRow.className = "point-action-row";
     actionRow.innerHTML = `
@@ -3379,15 +3465,24 @@ sel.addRange(range);
       <button class="action-item" onclick="togglePrint('${point["Short Name"]}')">
         <div class="action-icon">📂</div><div class="action-label">Export</div>
       </button>
+      <button class="action-item" onclick="openSectionFilterModal()">
+        <div class="action-icon" style="${isSectionFilterActive ? 'background:#ff3b30; color:white;' : ''}">📑</div><div class="action-label">Sections</div>
+      </button>
     `;
     container.appendChild(actionRow);
+
 
     // --- NEW: Track if we found filtered paragraphs ---
     let hasFilteredContent = false;
 
     // 3. The Data Notes (RESTORED PARAGRAPH FILTERING LOGIC)
-    const addDetail = (label, value, fieldName) => {
+const addDetail = (label, value, fieldName) => {
       if (!value || String(value).trim() === "") return; 
+      
+      // --- NEW FILTER INTERCEPTOR ---
+      if (isSectionFilterActive && activeSections.length > 0 && !activeSections.includes(label)) {
+        return; 
+      }
       
       const editIcon = `<button class="section-edit-btn" onclick="event.stopPropagation(); window.triggerEdit('${point["Short Name"]}', '${fieldName}')">✏️</button>`;
       const div = document.createElement("div"); 
