@@ -717,6 +717,34 @@
     }
 
 
+ /* --- FLASHCARD MODE STYLES --- */
+.flashcard-mode .point-notes .section-content {
+  display: none !important; /* Hide answers by default */
+}
+
+.flashcard-mode .point-notes.revealed .section-content {
+  display: block !important; /* Show answer when revealed */
+}
+
+.flashcard-mode .section-label {
+  cursor: pointer;
+  background: #ffe0b2; /* Optional: slightly change color to indicate it's tappable */
+}
+
+.flashcard-mode .section-label::after {
+  content: " (Tap to reveal)";
+  font-size: 10px;
+  font-weight: normal;
+  color: #888;
+  float: right;
+  margin-top: 2px;
+}
+
+.flashcard-mode .point-notes.revealed .section-label::after {
+  content: ""; /* Hide the hint once revealed */
+}  
+ 
+
 
 
 
@@ -809,10 +837,7 @@
       .sheet-header { background: rgba(0,0,0,0.98); border-color: #38383a; }
       .pill { background: #1c1c1e; border-color: #38383a; color: #8e8e93; }
       .pill.active { background: #0a84ff; color: white; border-color: #0a84ff; }
-    
-    
-    
-    
+   
 
 
       
@@ -916,6 +941,9 @@
         }
       }
     }
+
+
+
 
 
 
@@ -1588,14 +1616,41 @@ function applySectionFilter() {
   closeSectionFilterModal();
   updateSheetUI(false, true);
 }
+   
+  
+let isFlashcardMode = false;
 
+function toggleFlashcardMode() {
+  isFlashcardMode = !isFlashcardMode;
+  const sheet = document.getElementById("sheetContent");
+  const fcIcon = document.getElementById("fcIcon"); // Grab the icon directly
   
-  
+  if (isFlashcardMode) {
+    sheet.classList.add("flashcard-mode");
+    
+    // Update the button color directly without rebuilding the DOM
+    if (fcIcon) {
+      fcIcon.style.background = "#cc5500";
+      fcIcon.style.color = "white";
+    }
+    
+    showToast("Flashcard Mode: ON");
+  } else {
+    sheet.classList.remove("flashcard-mode");
+    
+    // Revert the button color
+    if (fcIcon) {
+      fcIcon.style.background = "";
+      fcIcon.style.color = "";
+    }
+    
+    showToast("Flashcard Mode: OFF");
+  }
+}
   
   
   function cancelFilter() { document.getElementById("channelModal").style.display = "none"; }
-
-  
+    
 
   function receiveBackgroundUpdate(dataPayload) {
     try {
@@ -3468,6 +3523,9 @@ sel.addRange(range);
       <button class="action-item" onclick="openSectionFilterModal()">
         <div class="action-icon" style="${isSectionFilterActive ? 'background:#ff3b30; color:white;' : ''}">📑</div><div class="action-label">Sections</div>
       </button>
+           <button class="action-item" onclick="toggleFlashcardMode()">
+        <div class="action-icon" id="fcIcon" style="${isFlashcardMode ? 'background:#cc5500; color:white;' : ''}">🧠</div><div class="action-label">Study</div>
+      </button>
     `;
     container.appendChild(actionRow);
 
@@ -3509,7 +3567,7 @@ const addDetail = (label, value, fieldName) => {
       }
 
       const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
-      const headerHtml = "<div class='section-label' style='position:static;'>" + label + editIcon + "</div>";
+      const headerHtml = "<div class='section-label' style='position:static;' onclick='if(isFlashcardMode) this.parentElement.classList.toggle(\"revealed\")'>" + label + editIcon + "</div>";
 
       // If there is an active search AND we found irrelevant text, format it!
       if (activeHighlightRegex && nonMatchingParas.length > 0) {
