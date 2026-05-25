@@ -1141,7 +1141,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.18.26.v1";
+const APP_VERSION = "05.25.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1252,16 +1252,26 @@ async function syncMissingPhotos() {
 // --- INDEXEDDB VAULT ENGINE ---
 const DB_NAME = "TCMVaultDB";
 const STORE_NAME = "pointsStore";
+const DB_VERSION = 2; // Bumping to 2 triggers the iOS upgrade
 
 function initDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    // NEW: Catches the "hanging" bug if an old session is keeping the DB locked
+    request.onblocked = () => {
+      alert("Database upgrade blocked. Please fully swipe away/close the app and reopen it.");
+      reject("blocked");
+    };
+
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
+      if (db.objectStoreNames.contains(STORE_NAME)) {
+        db.deleteObjectStore(STORE_NAME);
       }
+      db.createObjectStore(STORE_NAME, { keyPath: "Short Name" });
     };
+    
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -1271,7 +1281,8 @@ async function getVaultData() {
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readonly");
-    const request = tx.objectStore(STORE_NAME).get("all_points");
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll(); // Natively packages rows back into the array
     request.onsuccess = () => resolve(request.result || []);
     request.onerror = () => reject(request.error);
   });
@@ -1281,7 +1292,27 @@ async function saveVaultData(dataArray) {
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
-    tx.objectStore(STORE_NAME).put(dataArray, "all_points");
+    const store = tx.objectStore(STORE_NAME);
+    store.clear(); // Wipe old data to handle deletions from Sheets
+    
+    dataArray.forEach(point => {
+      // CRITICAL SAFETY CHECK: Skip empty rows from Google Sheets
+      if (point && point["Short Name"]) {
+        store.put(point); 
+      }
+    });
+    
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// NEW: Used to instantly save a single edit to the local drive
+async function saveSinglePointToVault(pointObject) {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).put(pointObject); // Replaces only this specific row
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -1351,11 +1382,11 @@ async function processAndSaveData(newArray, versionStr) {
      return;
   }
   
-  // 1. Save to primary IndexedDB vault
+  // 1. Save to primary IndexedDB vault (Now uses row-level saving!)
   try { await saveVaultData(newArray); } catch(e) { console.log("IDB save bypassed."); }
   
-  // 2. Save to secondary LocalStorage vault (Protects against iOS wiping data)
-  try { localStorage.setItem("tcmpoints_vault", JSON.stringify(newArray)); } catch(e) { console.log("LS save bypassed."); }
+  // 2. Erase the old, bloated LocalStorage backup to free up memory
+  try { localStorage.removeItem("tcmpoints_vault"); } catch(e) {}
   
   // 3. Update version string
   if (versionStr) localStorage.setItem("tcmpoints_version", versionStr);
@@ -1400,41 +1431,26 @@ const viewportMeta = document.querySelector('meta[name="viewport"]');
 // --- NEW: Bulletproof Boot Sequence ---
 async function bootApp() {
 
-// 1. REQUEST PERSISTENCE: Ask iOS not to delete our IndexedDB
+  // 1. REQUEST PERSISTENCE: Ask iOS not to delete our IndexedDB
   if (navigator.storage && navigator.storage.persist) {
-    try {
-      const isPersistent = await navigator.storage.persist();
-      if (isPersistent) {
-        console.log("Storage is protected. iOS will not clear this database.");
-      } else {
-        console.log("Storage is standard. Subject to iOS cleanup.");
-      }
-    } catch (e) { console.log("Persistence API not supported."); }
+    try { await navigator.storage.persist(); } catch (e) {}
   }
 
-
-
-  let rawPoints = await getVaultData();
-  
-  // iOS SURVIVAL: If IndexedDB was wiped, restore it from our LocalStorage backup
-  if ((!rawPoints || rawPoints.length === 0) && localStorage.getItem("tcmpoints_vault")) {
-    console.log("IndexedDB empty. Restoring from LocalStorage backup...");
-    try {
-        rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault"));
-        // Silently rebuild the IndexedDB vault in the background
-        if (Array.isArray(rawPoints)) saveVaultData(rawPoints).catch(e=>{});
-    } catch(e) { console.error("Could not parse LocalStorage vault."); }
-  }
+  // 2. LOAD DATA
+  let rawPoints = [];
+  try {
+    rawPoints = await getVaultData();
+  } catch(e) { console.log("IDB blocked, waiting for network..."); }
 
   if (!Array.isArray(rawPoints)) rawPoints = [];
 
   if (rawPoints.length > 0) {
-    // We have data! Render instantly.
+    // We have data! Render instantly without flashing a loading message.
     points = processPoints(rawPoints);
     initDropdown();
     handleSearch(); 
   } else {
-    // True first-time load. Show a friendly message instead of a blank screen.
+    // True first-time load. Now we show the downloading message.
     document.getElementById("cardContainer").innerHTML = 
       "<div style='text-align:center; padding:40px; color:#888; font-weight:bold;'>Downloading Database...<br><span style='font-size:12px; font-weight:normal;'>This will only take a few seconds.</span></div>";
   }
@@ -2759,13 +2775,8 @@ sel.addRange(range);
     p.Important = next;
     p._searchIndex = generateSearchIndex(p);
     
-        // Update local DB instantly
-    let cleanVault = await getVaultData();
-    let targetPoint = cleanVault.find(x => x["Short Name"] === pointId);
-    if (targetPoint) {
-      targetPoint.Important = next;
-      await saveVaultData(cleanVault);
-    }
+       // Update local DB instantly using the 1kb micro-save
+    await saveSinglePointToVault(p);
 
 
         // 2. Refresh the Panels Instantly
@@ -2813,48 +2824,51 @@ sel.addRange(range);
   
   
 
-  // --- 4. The Safest Save Function (with Timeout) ---
-  function saveEdit() {
-    if (!navigator.onLine) {
-      failSave("No internet connection. Edits cannot be saved offline.");
-      return;
-    }
+// --- STRICT CLOUD-FIRST SAVE ENGINE ---
+async function saveEdit() {
+  if (!navigator.onLine) {
+    failSave("No internet connection. Edits cannot be saved offline.");
+    return;
+  }
 
-    // Extract the HTML and convert it back to BBCode for Google Sheets
-    const editor = document.getElementById("editArea");
-    const newValue = htmlToBbcode(editor).trim();
-    
-    document.getElementById("saveBtn").textContent = "Saving...";
-    document.getElementById("saveBtn").disabled = true; 
-    document.getElementById("cancelBtnEdit").disabled = true;
-    document.getElementById("editError").style.display = "none";
-    
-    const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
-    
-    // Set up the 10-Second Timeout Abort Controller
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); 
+  const editor = document.getElementById("editArea");
+  const newValue = htmlToBbcode(editor).trim();
+  
+  // 1. Lock the UI while we talk to Google
+  document.getElementById("saveBtn").textContent = "Saving to Cloud...";
+  document.getElementById("saveBtn").disabled = true; 
+  document.getElementById("cancelBtnEdit").disabled = true;
+  document.getElementById("editError").style.display = "none";
 
-    fetch(dataUrl, {
+  // 2. Prepare the payload and an 8-second timeout
+  const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000); 
+
+  // 3. Attempt the Cloud Save FIRST
+  try {
+    await fetch(dataUrl, {
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
-      signal: controller.signal // Tie the timeout to the fetch
-    })
-    .then(() => {
-      clearTimeout(timeoutId); // Success! Clear the timeout.
-      completeSave(newValue); 
-    })
-    .catch(err => {
-      clearTimeout(timeoutId);
-      if (err.name === 'AbortError') {
-        failSave("Save timed out. Google took too long. Please try again.");
-      } else {
-        failSave("Network error. Your edit was NOT saved.");
-      }
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId); // Google responded!
+    
+    // 4. Cloud succeeded, now update the local app safely
+    await completeSave(newValue);
+
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      failSave("Google Sheets timed out. Please try saving again.");
+    } else {
+      failSave("Cloud save failed. Your edit was NOT saved.");
+    }
   }
+}
 
   function closeEditModal() { 
     document.getElementById("editModal").style.display = "none"; 
@@ -3246,22 +3260,19 @@ sel.addRange(range);
 
 
 
-  // --- STANDARD SAVE LOGIC ---
-  async function completeSave(newValue) {
-    // 1. Update active memory
+// --- SAFE LOCAL UPDATE ---
+async function completeSave(newValue) {
+  try {
+    // 1. Defend against background syncs ripping the point out from under us
+    let masterPoint = points.find(p => p["Short Name"] === currentEditingPoint["Short Name"]);
+    if (masterPoint) currentEditingPoint = masterPoint;
+
+    // 2. Update active memory safely
     currentEditingPoint[currentEditingField] = newValue; 
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
-    
-    // 2. Save securely to IndexedDB
-    let cleanVault = await getVaultData();
-    let targetPoint = cleanVault.find(p => p["Short Name"] === currentEditingPoint["Short Name"]);
-    if (targetPoint) {
-      targetPoint[currentEditingField] = newValue;
-      await saveVaultData(cleanVault);
-    }
 
     // 3. Rebuild the Paragraph Array for the Search Engine
-        const fields = [
+    const fields = [
       currentEditingPoint.Important, currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
       currentEditingPoint.Actions, currentEditingPoint.Indications, currentEditingPoint.Commentary,
       currentEditingPoint["Summary of clinical application"], currentEditingPoint.Combinations, currentEditingPoint.Description, 
@@ -3270,27 +3281,41 @@ sel.addRange(range);
       currentEditingPoint.Notes, currentEditingPoint["CAM Notes"]
     ];
 
-    
     let paras = [];
     fields.forEach(f => {
       if (f) {
-         // FIXED: Strip BBCode and lowercase so the point doesn't vanish from the new search index!
          const cleanText = stripBBCode(String(f));
          paras.push(...cleanText.split(/\r?\n/).filter(p => p.trim() !== "").map(p => p.toLowerCase()));
       }
     });
     currentEditingPoint._paragraphs = paras;
 
-        // 4. Update the UI
+    // 4. Save to local hard drive (Wrapped to catch Safari locks!)
+    try {
+      await saveSinglePointToVault(currentEditingPoint);
+    } catch (dbErr) {
+      console.warn("IndexedDB write failed. Changes saved to RAM only.", dbErr);
+    }
+
+    // 5. Force UI Redraw
     if (typeof window.refreshActivePanel === 'function') {
-       window.refreshActivePanel(true); // True forces background to rebuild the search index
+       window.refreshActivePanel(true); 
     } else {
        handleSearch(true); 
     }
     
+    showToast("✅ Edit saved successfully");
+
+  } catch(e) {
+    console.error("Local UI update failed:", e);
+    // NEW: Exposes the literal error text to your screen so we can see what broke
+    showToast("⚠️ Refresh Error: " + (e.message || "Unknown error"));
+  } finally {
+    // 6. GUARANTEE the modal closes and resets
     closeEditModal(); 
     resetModalButtons();
   }
+}
 
 
 
