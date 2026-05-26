@@ -1147,7 +1147,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.26.26.v2";
+const APP_VERSION = "05.26.26.v3";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1279,26 +1279,22 @@ function logToDevMenu(msg) {
 // --- INDEXEDDB VAULT ENGINE ---
 const DB_NAME = "TCMVaultDB";
 const STORE_NAME = "pointsStore";
-const DB_VERSION = 3; // BUMPED TO 3 to force a pristine rebuild
+const DB_VERSION = 4; // Bump to 4 to trigger the non-destructive upgrade
 
 function initDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     
-    // Catches the "hanging" bug if an old session is keeping the DB locked
     request.onblocked = () => {
-      alert("Database upgrade blocked. Please fully swipe away/close the app and reopen it.");
-      reject("blocked");
+      console.warn("Database upgrade blocked by another tab.");
     };
 
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
-      // Wipe out the corrupted V2 store if it exists
-      if (db.objectStoreNames.contains(STORE_NAME)) {
-        db.deleteObjectStore(STORE_NAME);
+      // FIX 1: Non-Destructive Upgrade. Only create if it doesn't exist.
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "Short Name" });
       }
-      // Rebuild the store cleanly
-      db.createObjectStore(STORE_NAME, { keyPath: "Short Name" });
     };
     
     request.onsuccess = () => resolve(request.result);
@@ -1311,7 +1307,7 @@ async function getVaultData() {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
-    const request = store.getAll(); // Natively packages rows back into the array
+    const request = store.getAll(); 
     request.onsuccess = () => resolve(request.result || []);
     request.onerror = () => reject(request.error);
   });
@@ -1319,35 +1315,25 @@ async function getVaultData() {
 
 async function saveVaultData(dataArray) {
   const db = await initDB();
-
-  // STEP 1: Clear the old database in its own dedicated, safe transaction
-  await new Promise((resolve, reject) => {
-    const clearTx = db.transaction(STORE_NAME, "readwrite");
-    clearTx.objectStore(STORE_NAME).clear();
-    clearTx.oncomplete = () => resolve();
-    clearTx.onerror = () => reject(clearTx.error);
-  });
-
-  // STEP 2: Feed the new points to iOS in bite-sized chunks so Safari doesn't panic
-  const CHUNK_SIZE = 500; 
-  for (let i = 0; i < dataArray.length; i += CHUNK_SIZE) {
-    const chunk = dataArray.slice(i, i + CHUNK_SIZE);
+  return new Promise((resolve, reject) => {
+    // FIX 2: Single Atomic Transaction with "strict" durability 
+    // This forces iOS to flush the data directly to the disk before claiming success
+    const tx = db.transaction(STORE_NAME, "readwrite", { durability: "strict" });
+    const store = tx.objectStore(STORE_NAME);
     
-    await new Promise((resolve, reject) => {
-      const putTx = db.transaction(STORE_NAME, "readwrite");
-      const store = putTx.objectStore(STORE_NAME);
-      
-      chunk.forEach(point => {
-        // CRITICAL SAFETY CHECK: Skip empty rows from Google Sheets
-        if (point && point["Short Name"]) {
-          store.put(point); 
-        }
-      });
-      
-      putTx.oncomplete = () => resolve();
-      putTx.onerror = () => reject(putTx.error);
+    // We clear AND put in the exact same transaction.
+    // If iOS kills the app right here, the clear() is cancelled and no data is lost!
+    store.clear(); 
+    
+    dataArray.forEach(point => {
+      if (point && point["Short Name"]) {
+        store.put(point); 
+      }
     });
-  }
+    
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }
 
 // NEW: Used to instantly save a single edit to the local drive
