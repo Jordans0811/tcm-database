@@ -1147,7 +1147,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.26.26.v4";
+const APP_VERSION = "05.26.26.v5";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1353,10 +1353,11 @@ const dataUrl = "https://script.google.com/macros/s/AKfycbwfR8fLVDYzGN8guk_CR-q-
 async function loadTCMData(hasLocalData) {
   try {
     let localVersion = localStorage.getItem("tcmpoints_version");
-    let isColdBoot = !hasLocalData; // NEW: Uses the explicit boolean flag!
+    let isColdBoot = !hasLocalData;
 
-    // 1. COLD BOOT BYPASS: If we have no data, skip the version check to save time
-    if (isColdBoot || !localVersion) {
+    // 1. COLD BOOT BYPASS: If we have NO data, do a mandatory download.
+    // FIX 1: We removed the `!localVersion` trap here so we don't accidentally block offline loads.
+    if (isColdBoot) {
        console.log("Cold boot detected. Fetching full payload immediately...");
        const fullDataUrl = dataUrl + "?t=" + Date.now();
        let response = await fetch(fullDataUrl);
@@ -1375,7 +1376,8 @@ async function loadTCMData(hasLocalData) {
     
     // Safety net in case of legacy array format
     if (Array.isArray(versionData)) {
-      await processAndSaveData(versionData, null); 
+      // FIX 2a: Guarantee a version string is ALWAYS saved here too
+      await processAndSaveData(versionData, Date.now().toString()); 
       return;
     }
 
@@ -1393,10 +1395,12 @@ async function loadTCMData(hasLocalData) {
     let payload = await response.json();
     let newArray = payload.points || payload; 
     
-    await processAndSaveData(newArray, serverVersion);
+    // FIX 2b: Guarantee a version string is ALWAYS saved
+    await processAndSaveData(newArray, serverVersion || Date.now().toString());
     
   } catch (e) {
-    console.error("Critical Fetch Error: ", e);
+    console.error("Background sync failed (Offline or network error): ", e);
+    // We only show the fatal error screen if the hard drive is actually empty!
     if (points.length === 0) {
        document.getElementById("cardContainer").innerHTML = 
          "<div style='text-align:center; padding:40px; color:#ff3b30; font-weight:bold;'>Offline. Could not load database.</div>";
