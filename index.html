@@ -960,12 +960,18 @@
   
   <div id="toast">🔄 Data synced</div>
 
-  <div id="devModal">
+    <div id="devModal">
     <div class="dev-content">
       <h3 class="dev-title">System Status</h3>
       <div class="dev-stat">App Version: <span id="devAppVersion"></span></div>
       <div class="dev-stat">Photos Cached: <span id="devPhotoStatus">Checking...</span></div>
       <div class="progress-track"><div id="devProgressBar" class="progress-fill"></div></div>
+      
+      <div id="devErrorLog" style="margin: 15px 0; font-size: 12px; color: #ff3b30; background: #ffe5e5; padding: 10px; border-radius: 6px; display: none; max-height: 120px; overflow-y: auto; border: 1px solid #ffb3b0; font-family: monospace;">
+        <strong style="display:block; margin-bottom: 5px;">⚠️ System Logs</strong>
+        <div id="devErrorList"></div>
+      </div>
+
       <button id="devSyncBtn" class="dev-btn dev-btn-sync" onclick="syncMissingPhotos()">Download Missing Photos</button>
       <button class="dev-btn dev-btn-close" onclick="document.getElementById('devModal').style.display='none'">Close Menu</button>
     </div>
@@ -1141,7 +1147,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.25.26.v1";
+const APP_VERSION = "05.26.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1249,16 +1255,37 @@ async function syncMissingPhotos() {
 }
 // --- END SECERET CACHE MENU LOGIC ---
 
+
+
+
+// --- NEW: DEV MENU LOGGER ---
+function logToDevMenu(msg) {
+  const logBox = document.getElementById("devErrorLog");
+  const logList = document.getElementById("devErrorList");
+  if (!logBox || !logList) return;
+  
+  logBox.style.display = "block"; // Make the box visible
+  
+  const time = new Date().toLocaleTimeString([], { hour12: false });
+  const newLog = document.createElement("div");
+  newLog.style.marginBottom = "4px";
+  newLog.textContent = `[${time}] ${msg}`;
+  
+  logList.prepend(newLog); // Put newest errors at the top
+}
+
+
+
 // --- INDEXEDDB VAULT ENGINE ---
 const DB_NAME = "TCMVaultDB";
 const STORE_NAME = "pointsStore";
-const DB_VERSION = 2; // Bumping to 2 triggers the iOS upgrade
+const DB_VERSION = 3; // BUMPED TO 3 to force a pristine rebuild
 
 function initDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     
-    // NEW: Catches the "hanging" bug if an old session is keeping the DB locked
+    // Catches the "hanging" bug if an old session is keeping the DB locked
     request.onblocked = () => {
       alert("Database upgrade blocked. Please fully swipe away/close the app and reopen it.");
       reject("blocked");
@@ -1266,9 +1293,11 @@ function initDB() {
 
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
+      // Wipe out the corrupted V2 store if it exists
       if (db.objectStoreNames.contains(STORE_NAME)) {
         db.deleteObjectStore(STORE_NAME);
       }
+      // Rebuild the store cleanly
       db.createObjectStore(STORE_NAME, { keyPath: "Short Name" });
     };
     
@@ -1382,8 +1411,14 @@ async function processAndSaveData(newArray, versionStr) {
      return;
   }
   
-  // 1. Save to primary IndexedDB vault (Now uses row-level saving!)
-  try { await saveVaultData(newArray); } catch(e) { console.log("IDB save bypassed."); }
+  // 1. Save to primary IndexedDB vault
+  try { 
+    await saveVaultData(newArray); 
+  } catch(e) { 
+    console.error("🚨 CRITICAL: IndexedDB save failed!", e);
+    // PIPE THE ERROR TO THE DEV MENU!
+    logToDevMenu("IndexedDB Save Failed: " + (e.message || e.name || "Storage Restricted"));
+  }
   
   // 2. Erase the old, bloated LocalStorage backup to free up memory
   try { localStorage.removeItem("tcmpoints_vault"); } catch(e) {}
@@ -2835,7 +2870,7 @@ async function saveEdit() {
   const newValue = htmlToBbcode(editor).trim();
   
   // 1. Lock the UI while we talk to Google
-  document.getElementById("saveBtn").textContent = "Saving to Cloud...";
+  document.getElementById("saveBtn").textContent = "Saving...";
   document.getElementById("saveBtn").disabled = true; 
   document.getElementById("cancelBtnEdit").disabled = true;
   document.getElementById("editError").style.display = "none";
@@ -2865,7 +2900,7 @@ async function saveEdit() {
     if (err.name === 'AbortError') {
       failSave("Google Sheets timed out. Please try saving again.");
     } else {
-      failSave("Cloud save failed. Your edit was NOT saved.");
+      failSave("Google Sheets save failed. Your edit was NOT saved.");
     }
   }
 }
