@@ -1147,7 +1147,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.26.26.v3";
+const APP_VERSION = "05.26.26.v4";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1350,10 +1350,10 @@ async function saveSinglePointToVault(pointObject) {
 const dataUrl = "https://script.google.com/macros/s/AKfycbwfR8fLVDYzGN8guk_CR-q-mfDxHiCH7u9pei4gHLkovDc9875Pj-Ihlo9MymgbkpOh3w/exec";
 
 // --- NEW: Optimized Fetching Engine ---
-async function loadTCMData() {
+async function loadTCMData(hasLocalData) {
   try {
     let localVersion = localStorage.getItem("tcmpoints_version");
-    let isColdBoot = points.length === 0;
+    let isColdBoot = !hasLocalData; // NEW: Uses the explicit boolean flag!
 
     // 1. COLD BOOT BYPASS: If we have no data, skip the version check to save time
     if (isColdBoot || !localVersion) {
@@ -1442,11 +1442,13 @@ async function processAndSaveData(newArray, versionStr) {
 // The Visibility Tripwire
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
+    // NEW: Do not trigger background syncs if the hard drive is still booting!
+    if (!isAppBooted) return; 
+
     console.log("App resumed. Silently checking for updates...");
-    loadTCMData();
+    loadTCMData(points.length > 0);
     
     // --- THE IOS STICKY JOLT ---
-    // Force WebKit to recalculate sticky positioning after backgrounding
     if (appContainer && appContainer.scrollTop > 0) {
       appContainer.scrollTop += 1;
       appContainer.scrollTop -= 1;
@@ -1456,8 +1458,9 @@ document.addEventListener("visibilitychange", () => {
 
 
 // Define Globals
+let isAppBooted = false; // NEW: Prevents iOS from interrupting the boot sequence
 let points = [];
-let filteredPoints = []; 
+let filteredPoints = [];
 let activeHighlightRegex = null;
 let activeTextTerms = []; 
 let activeParsedIncludes = []; 
@@ -1486,7 +1489,6 @@ async function bootApp() {
   } catch(e) { console.log("IDB blocked, waiting for network..."); }
 
   if (!Array.isArray(rawPoints)) rawPoints = [];
-
   if (rawPoints.length > 0) {
     // We have data! Render instantly without flashing a loading message.
     points = processPoints(rawPoints);
@@ -1498,7 +1500,8 @@ async function bootApp() {
       "<div style='text-align:center; padding:40px; color:#888; font-weight:bold;'>Downloading Database...<br><span style='font-size:12px; font-weight:normal;'>This will only take a few seconds.</span></div>";
   }
   
-  loadTCMData(); // Trigger background sync
+  loadTCMData(rawPoints.length > 0); // NEW: Explicitly tell the updater if we have local data
+  isAppBooted = true; // NEW: Unlock the app for resume events
 }
 
 bootApp(); // Start the engine
