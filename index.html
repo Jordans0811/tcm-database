@@ -1147,7 +1147,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.26.26.v1";
+const APP_VERSION = "05.26.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1319,21 +1319,35 @@ async function getVaultData() {
 
 async function saveVaultData(dataArray) {
   const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    store.clear(); // Wipe old data to handle deletions from Sheets
-    
-    dataArray.forEach(point => {
-      // CRITICAL SAFETY CHECK: Skip empty rows from Google Sheets
-      if (point && point["Short Name"]) {
-        store.put(point); 
-      }
-    });
-    
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+
+  // STEP 1: Clear the old database in its own dedicated, safe transaction
+  await new Promise((resolve, reject) => {
+    const clearTx = db.transaction(STORE_NAME, "readwrite");
+    clearTx.objectStore(STORE_NAME).clear();
+    clearTx.oncomplete = () => resolve();
+    clearTx.onerror = () => reject(clearTx.error);
   });
+
+  // STEP 2: Feed the new points to iOS in bite-sized chunks so Safari doesn't panic
+  const CHUNK_SIZE = 500; 
+  for (let i = 0; i < dataArray.length; i += CHUNK_SIZE) {
+    const chunk = dataArray.slice(i, i + CHUNK_SIZE);
+    
+    await new Promise((resolve, reject) => {
+      const putTx = db.transaction(STORE_NAME, "readwrite");
+      const store = putTx.objectStore(STORE_NAME);
+      
+      chunk.forEach(point => {
+        // CRITICAL SAFETY CHECK: Skip empty rows from Google Sheets
+        if (point && point["Short Name"]) {
+          store.put(point); 
+        }
+      });
+      
+      putTx.oncomplete = () => resolve();
+      putTx.onerror = () => reject(putTx.error);
+    });
+  }
 }
 
 // NEW: Used to instantly save a single edit to the local drive
@@ -1416,8 +1430,16 @@ async function processAndSaveData(newArray, versionStr) {
     await saveVaultData(newArray); 
   } catch(e) { 
     console.error("🚨 CRITICAL: IndexedDB save failed!", e);
+    
+    let errMsg = e.message || e.name || "Storage Restricted";
+    
+    // NEW: Detector for Working Copy / Local File Previews
+    if (window.location.protocol === 'file:') {
+      errMsg += " (⚠️ Apple blocks IndexedDB saves in local file previews. Test on a live URL!)";
+    }
+    
     // PIPE THE ERROR TO THE DEV MENU!
-    logToDevMenu("IndexedDB Save Failed: " + (e.message || e.name || "Storage Restricted"));
+    logToDevMenu("IndexedDB Save Failed: " + errMsg);
   }
   
   // 2. Erase the old, bloated LocalStorage backup to free up memory
