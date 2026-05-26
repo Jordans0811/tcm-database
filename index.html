@@ -1147,7 +1147,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.26.26.v5";
+const APP_VERSION = "05.26.26.v6";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1316,13 +1316,24 @@ async function getVaultData() {
 async function saveVaultData(dataArray) {
   const db = await initDB();
   return new Promise((resolve, reject) => {
-    // FIX 2: Single Atomic Transaction with "strict" durability 
-    // This forces iOS to flush the data directly to the disk before claiming success
-    const tx = db.transaction(STORE_NAME, "readwrite", { durability: "strict" });
+    let tx;
+    
+    try {
+      // 1. Attempt the modern strict durability save
+      tx = db.transaction(STORE_NAME, "readwrite", { durability: "strict" });
+    } catch (e) {
+      // 2. Fallback for iOS/Safari versions that crash on the 3rd argument
+      tx = db.transaction(STORE_NAME, "readwrite");
+    }
+    
+    // 3. Handle all possible completion/failure states
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("IndexedDB transaction aborted"));
+
     const store = tx.objectStore(STORE_NAME);
     
     // We clear AND put in the exact same transaction.
-    // If iOS kills the app right here, the clear() is cancelled and no data is lost!
     store.clear(); 
     
     dataArray.forEach(point => {
@@ -1330,9 +1341,6 @@ async function saveVaultData(dataArray) {
         store.put(point); 
       }
     });
-    
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
   });
 }
 
