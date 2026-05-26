@@ -1147,7 +1147,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.26.26.v9";
+const APP_VERSION = "05.26.26.v10";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1279,7 +1279,7 @@ function logToDevMenu(msg) {
 // --- INDEXEDDB VAULT ENGINE ---
 const DB_NAME = "TCMVaultDB";
 const STORE_NAME = "pointsStore";
-const DB_VERSION = 4; // Bump to 4 to trigger the non-destructive upgrade
+const DB_VERSION = 5; 
 
 function initDB() {
   return new Promise((resolve, reject) => {
