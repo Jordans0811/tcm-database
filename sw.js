@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v48';
+const CACHE_VERSION = 'v49';
 const APP_CACHE = `tcm-app-${CACHE_VERSION}`;
 const IMAGE_CACHE = `tcm-images-${CACHE_VERSION}`;
 
@@ -32,22 +32,27 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // A. Handle Google Apps Script Data (Network First, fallback to offline cache)
+    // A. Handle Google Apps Script Data (Network First, fallback to offline cache)
   if (url.hostname.includes('script.google.com')) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          // Only cache GET requests (downloading the database), not POSTs (saving notes)
           if (event.request.method === 'GET') {
-            const clone = response.clone();
-            caches.open(APP_CACHE).then(cache => cache.put(event.request, clone));
+            // CRITICAL FIX: Only cache the full database, ignore the version checks!
+            if (!url.searchParams.has('checkVersion')) {
+              const clone = response.clone();
+              caches.open(APP_CACHE).then(cache => 
+                cache.put('gas-data-cache', clone)
+              );
+            }
           }
           return response;
         })
-        .catch(() => caches.match(event.request)) // If offline, serve the last downloaded JSON
+        .catch(() => caches.match('gas-data-cache'))
     );
     return;
   }
+
 
   // B. Handle Photos (Cache First, fallback to Network, save new photos invisibly)
   if (url.pathname.includes('/DeadmanPhotos/')) {

@@ -1147,7 +1147,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.26.26.v8";
+const APP_VERSION = "05.26.26.v9";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1316,17 +1316,16 @@ async function getVaultData() {
 async function saveVaultData(dataArray) {
   const db = await initDB();
 
-  // STEP 1: Clear the old data safely in its own dedicated transaction
+  // 1. Clear the old data safely
   await new Promise((resolve, reject) => {
     const clearTx = db.transaction(STORE_NAME, "readwrite");
     clearTx.oncomplete = () => resolve();
     clearTx.onerror = () => reject(clearTx.error);
-    clearTx.onabort = () => reject(new Error("Clear transaction aborted"));
     clearTx.objectStore(STORE_NAME).clear();
   });
 
-  // STEP 2: Save the new data in chunks of 50 to prevent iOS memory crashes
-  const CHUNK_SIZE = 50;
+  // 2. Save in small chunks of 25 points
+  const CHUNK_SIZE = 25;
 
   for (let i = 0; i < dataArray.length; i += CHUNK_SIZE) {
     const chunk = dataArray.slice(i, i + CHUNK_SIZE);
@@ -1341,23 +1340,19 @@ async function saveVaultData(dataArray) {
 
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error || new Error("Chunk transaction aborted"));
+      tx.onabort = () => reject(new Error("Chunk transaction aborted"));
 
       const store = tx.objectStore(STORE_NAME);
 
       chunk.forEach(point => {
-        // Guard against completely empty/invalid rows coming from Google Sheets
-        if (point && point["Short Name"] && String(point["Short Name"]).trim() !== "") {
-          const request = store.put(point);
-          
-          // STEP 3: If a specific point fails, log it and PREVENT it from killing the chunk
-          request.onerror = (e) => {
-            e.preventDefault(); 
-            console.error("Failed to save point:", point["Short Name"], e.target.error);
-          };
+        if (point && point["Short Name"]) {
+          store.put(point);
         }
       });
     });
+
+    // 3. THE LIFESAVER: Yield the thread for 20ms to let iOS clear its memory bridge!
+    await new Promise(resolve => setTimeout(resolve, 20));
   }
 }
 
