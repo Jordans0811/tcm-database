@@ -1276,95 +1276,64 @@ function logToDevMenu(msg) {
 
 
 
-// --- INDEXEDDB VAULT ENGINE ---
-const DB_NAME = "TCMVaultDB";
-const STORE_NAME = "pointsStore";
-const DB_VERSION = 5; 
+// --- NEW: BULLETPROOF CACHE API ENGINE ---
+const CACHE_VAULT_NAME = 'tcm-data-vault';
+const CACHE_FILE_URL = '/tcm-master.json'; // A synthetic file path for our database
 
-function initDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
-    request.onblocked = () => {
-      console.warn("Database upgrade blocked by another tab.");
-    };
-
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      // FIX 1: Non-Destructive Upgrade. Only create if it doesn't exist.
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: "Short Name" });
-      }
-    };
-    
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
+// 1. Read the file from the hard drive (Used during app boot)
 async function getVaultData() {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.getAll(); 
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function saveVaultData(dataArray) {
-  const db = await initDB();
-
-  // 1. Clear the old data safely
-  await new Promise((resolve, reject) => {
-    const clearTx = db.transaction(STORE_NAME, "readwrite");
-    clearTx.oncomplete = () => resolve();
-    clearTx.onerror = () => reject(clearTx.error);
-    clearTx.objectStore(STORE_NAME).clear();
-  });
-
-  // 2. Save in small chunks of 25 points
-  const CHUNK_SIZE = 25;
-
-  for (let i = 0; i < dataArray.length; i += CHUNK_SIZE) {
-    const chunk = dataArray.slice(i, i + CHUNK_SIZE);
-
-    await new Promise((resolve, reject) => {
-      let tx;
-      try {
-        tx = db.transaction(STORE_NAME, "readwrite", { durability: "strict" });
-      } catch (e) {
-        tx = db.transaction(STORE_NAME, "readwrite");
-      }
-
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(new Error("Chunk transaction aborted"));
-
-      const store = tx.objectStore(STORE_NAME);
-
-      chunk.forEach(point => {
-        if (point && point["Short Name"]) {
-          store.put(point);
-        }
-      });
-    });
-
-    // 3. THE LIFESAVER: Yield the thread for 20ms to let iOS clear its memory bridge!
-    await new Promise(resolve => setTimeout(resolve, 20));
+  try {
+    const cache = await caches.open(CACHE_VAULT_NAME);
+    const response = await cache.match(CACHE_FILE_URL);
+    if (response) {
+      return await response.json();
+    }
+    return [];
+  } catch (e) {
+    console.error("Failed to read from Cache API:", e);
+    return [];
   }
 }
 
-// NEW: Used to instantly save a single edit to the local drive
+// 2. Save the entire database (Used during background syncs)
+async function saveVaultData(dataArray) {
+  try {
+    const cache = await caches.open(CACHE_VAULT_NAME);
+    
+    // Convert the array into a raw text string and package it as a file
+    const jsonString = JSON.stringify(dataArray);
+    const response = new Response(jsonString, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    // Silently drop it into the offline cache
+    await cache.put(CACHE_FILE_URL, response);
+  } catch (e) {
+    logToDevMenu("Cache API Save Failed: " + (e.message || "Unknown error"));
+    throw e; // Pass error up so the version timestamp isn't updated falsely
+  }
+}
+
+// 3. Save a single edit (Used when you click 'Save' or toggle importance)
 async function saveSinglePointToVault(pointObject) {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    tx.objectStore(STORE_NAME).put(pointObject); // Replaces only this specific row
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  try {
+    // Grab the current saved database
+    let dataArray = await getVaultData();
+    
+    // Find the point we just edited and update it
+    const index = dataArray.findIndex(p => p["Short Name"] === pointObject["Short Name"]);
+    if (index !== -1) {
+      dataArray[index] = pointObject;
+    } else {
+      dataArray.push(pointObject);
+    }
+    
+    // Silently rewrite the file. 
+    // This happens in the background, your UI has already updated!
+    await saveVaultData(dataArray);
+  } catch (e) {
+    console.error("Failed to update single point in cache:", e);
+  }
 }
 
 const dataUrl = "https://script.google.com/macros/s/AKfycbwfR8fLVDYzGN8guk_CR-q-mfDxHiCH7u9pei4gHLkovDc9875Pj-Ihlo9MymgbkpOh3w/exec";
@@ -1439,7 +1408,7 @@ async function processAndSaveData(newArray, versionStr) {
   try { 
     await saveVaultData(newArray); 
   } catch(e) { 
-    console.error("🚨 CRITICAL: IndexedDB save failed!", e);
+    console.error("🚨 CRITICAL: Cache API save failed!", e);
     
     let errMsg = e.message || e.name || "Storage Restricted";
     
@@ -1449,7 +1418,7 @@ async function processAndSaveData(newArray, versionStr) {
     }
     
     // PIPE THE ERROR TO THE DEV MENU!
-    logToDevMenu("IndexedDB Save Failed: " + errMsg);
+    logToDevMenu("Cache API Save Failed: " + errMsg);
   }
   
   // 2. Erase the old, bloated LocalStorage backup to free up memory

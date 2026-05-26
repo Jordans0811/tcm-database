@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v50';
+const CACHE_VERSION = 'v51';
 const APP_CACHE = `tcm-app-${CACHE_VERSION}`;
 const IMAGE_CACHE = `tcm-images-${CACHE_VERSION}`;
 
@@ -32,25 +32,10 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-    // A. Handle Google Apps Script Data (Network First, fallback to offline cache)
+      // A. Handle Google Apps Script Data (Network First, fallback to offline cache)
   if (url.hostname.includes('script.google.com')) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          if (event.request.method === 'GET') {
-            // CRITICAL FIX: Only cache the full database, ignore the version checks!
-            if (!url.searchParams.has('checkVersion')) {
-              const clone = response.clone();
-              caches.open(APP_CACHE).then(cache => 
-                cache.put('gas-data-cache', clone)
-              );
-            }
-          }
-          return response;
-        })
-        .catch(() => caches.match('gas-data-cache'))
-    );
-    return;
+    // Let the frontend Cache API engine handle offline data natively!
+    return; 
   }
 
 
