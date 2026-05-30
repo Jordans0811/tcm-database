@@ -745,6 +745,35 @@
 }  
  
 
+    /* --- PARAGRAPH OCCLUSION STYLES --- */
+    .occluded-blank {
+      color: #cc5500;
+      font-weight: 375;
+      letter-spacing: 3px;
+      cursor: pointer;
+      transition: opacity 0.1s;
+      user-select: none;
+    }
+    .occluded-blank:active { opacity: 0.6; }
+    
+      .revealed-blank {
+      color: inherit;
+      font-weight: inherit;
+      text-decoration: underline;
+      text-decoration-style: dashed;
+      text-decoration-color: rgba(150, 150, 150, 0.6);
+
+      text-decoration-thickness: 1.1px; /* Increase this number to make the line thicker */
+      text-underline-offset: 1.4px;     /* Increase this to push the line further down */
+      
+      cursor: pointer;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      .revealed-blank { text-decoration-color: rgba(150, 150, 150, 0.6); }
+    }
+
+
 
 
 
@@ -1009,6 +1038,28 @@
   </div>
 
 
+  <div id="occlusionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;">
+    <div class="modal-content" style="max-height: 75vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <h3 class="modal-title" style="margin-bottom: 0;">Paragraph Occlusion</h3>
+        <button onclick="closeOcclusionModal()" style="background: transparent; border: none; font-size: 24px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+      </div>
+      <p style="margin: 0 0 15px 0; font-size: 13px; color: #888; line-height: 1.3;">Randomly hides critical words in the text to test your memory. Tap the blank line to reveal the word underneath.</p>
+      
+      <label for="occlusionSlider" style="font-weight: bold; font-size: 16px;">Occlusion Level: <span id="occPercentDisplay" style="color: #cc5500;">30%</span></label>
+      <input type="range" id="occlusionSlider" min="0" max="100" step="5" value="30" oninput="document.getElementById('occPercentDisplay').textContent = this.value + '%'" style="width: 100%; margin: 20px 0; accent-color: #cc5500;">
+
+      <div class="modal-buttons" style="display:flex; gap: 10px;">
+        <button class="cancel-btn" onclick="toggleOcclusion(false)" id="occlusionToggleBtn">Turn OFF</button>
+        <button class="save-btn" onclick="toggleOcclusion(true)">Apply</button>
+      </div>
+    </div>
+  </div>
+
+
+
+
+
   <div id="quickPeekModal" onclick="if(event.target===this) closeQuickPeek()">
     <div class="modal-content quick-peek-content" id="quickPeekContainer">
       </div>
@@ -1147,7 +1198,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.26.26.v10";
+const APP_VERSION = "05.30.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1702,6 +1753,125 @@ function toggleFlashcardMode() {
     showToast("Flashcard Mode: OFF");
   }
 }
+
+
+// --- OCCLUSION MODE LOGIC ---
+let isOcclusionMode = false;
+let occlusionLevel = 30;
+
+function openOcclusionModal() {
+  document.getElementById("occlusionSlider").value = occlusionLevel;
+  document.getElementById("occPercentDisplay").textContent = occlusionLevel + "%";
+  
+  const toggleBtn = document.getElementById("occlusionToggleBtn");
+  if (isOcclusionMode) {
+    toggleBtn.textContent = "Turn Filter OFF";
+    toggleBtn.style.background = "#ff3b30";
+    toggleBtn.style.color = "white";
+  } else {
+    toggleBtn.textContent = "Turn OFF";
+    toggleBtn.style.background = "";
+    toggleBtn.style.color = "";
+  }
+  
+  document.getElementById("occlusionModal").style.display = "flex";
+}
+
+function closeOcclusionModal() {
+  document.getElementById("occlusionModal").style.display = "none";
+}
+
+function toggleOcclusion(enable) {
+  if (enable) {
+    isOcclusionMode = true;
+    occlusionLevel = parseInt(document.getElementById("occlusionSlider").value, 10);
+    showToast(`Occlusion Mode: ON (${occlusionLevel}%)`);
+  } else {
+    isOcclusionMode = false;
+    showToast("Occlusion Mode: OFF");
+  }
+  closeOcclusionModal();
+  updateSheetUI(false, true); // Rebuilds the UI immediately to apply the filter
+}
+
+function applyOcclusionToHTML(html, percent) {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+
+  // Ignore structural HTML and common filler words
+  const stopWords = new Set(["this","that","with","from","have","they","will","what","when","where","your","then","than","into","only","also","some","very","just","like","their","these","those","which","could","should","would","been","much"]);
+
+  // TreeWalker safely extracts text without touching HTML tags (Links, Tables, Highlights)
+  const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
+  let textNodes = [];
+  let currentNode;
+  while (currentNode = walker.nextNode()) {
+    textNodes.push(currentNode);
+  }
+
+  let allWords = [];
+  textNodes.forEach((node, nodeIndex) => {
+    const text = node.nodeValue;
+    
+    // UPGRADED REGEX: Targets words 4+ letters OR explicit TCM Point combinations (e.g., LU 1, BL-13)
+    const regex = /\b([A-Za-z]{4,}|(?:LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV)\s*-?\s*\d{1,2})\b/gi;
+    
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const word = match[0];
+      if (!stopWords.has(word.toLowerCase())) {
+        allWords.push({
+          word: word,
+          nodeIndex: nodeIndex,
+          index: match.index,
+          length: word.length,
+          score: (word.length * 2) + (Math.random() * 5) 
+        });
+      }
+    }
+  });
+
+      // Bail out instantly if there are no eligible words at all OR if slider is at 0%
+  if (allWords.length === 0 || percent === 0) return tempDiv.innerHTML;
+
+  // Math.max guarantees that even short, 1-sentence notes will get at least 1 blank!
+  const totalWordsToOcclude = Math.max(1, Math.round(allWords.length * (percent / 100)));
+  
+  allWords.sort((a, b) => b.score - a.score);
+  const selectedWords = allWords.slice(0, totalWordsToOcclude);
+
+  selectedWords.sort((a, b) => {
+    if (a.nodeIndex === b.nodeIndex) return b.index - a.index;
+    return b.nodeIndex - a.nodeIndex;
+  });
+
+  selectedWords.forEach(sw => {
+    const node = textNodes[sw.nodeIndex];
+    const text = node.nodeValue;
+    
+    const before = text.substring(0, sw.index);
+    const after = text.substring(sw.index + sw.length);
+
+    const span = document.createElement('span');
+    span.className = 'occluded-blank';
+    span.dataset.original = sw.word;
+    span.textContent = '______';
+    
+    // UPGRADED TOGGLE LOGIC: 
+    // If hidden -> Stops click from triggering links and reveals word.
+    // If revealed -> Turns back to a blank, BUT allows click to bubble up to trigger any underlying point links!
+    span.setAttribute('onclick', "if(this.classList.contains('occluded-blank')) { event.stopPropagation(); this.textContent=this.dataset.original; this.className='revealed-blank'; } else { this.textContent='______'; this.className='occluded-blank'; }");
+
+    const afterNode = document.createTextNode(after);
+    node.nodeValue = before;
+    
+    node.parentNode.insertBefore(span, node.nextSibling);
+    node.parentNode.insertBefore(afterNode, span.nextSibling);
+  });
+
+  return tempDiv.innerHTML;
+}
+
   
   
   function cancelFilter() { document.getElementById("channelModal").style.display = "none"; }
@@ -3572,7 +3742,7 @@ async function completeSave(newValue) {
     container.appendChild(headerInfo);
 
         // 2. The Prime Action Row
-    const actionRow = document.createElement("div");
+        const actionRow = document.createElement("div");
     actionRow.className = "point-action-row";
     actionRow.innerHTML = `
       <button class="action-item" onclick="cycleImportance('${point["Short Name"]}'); setTimeout(updateSheetUI, 50);">
@@ -3587,8 +3757,11 @@ async function completeSave(newValue) {
       <button class="action-item" onclick="openSectionFilterModal()">
         <div class="action-icon" style="${isSectionFilterActive ? 'background:#ff3b30; color:white;' : ''}">📑</div><div class="action-label">Sections</div>
       </button>
-           <button class="action-item" onclick="toggleFlashcardMode()">
+      <button class="action-item" onclick="toggleFlashcardMode()">
         <div class="action-icon" id="fcIcon" style="${isFlashcardMode ? 'background:#cc5500; color:white;' : ''}">🧠</div><div class="action-label">Study</div>
+      </button>
+      <button class="action-item" onclick="openOcclusionModal()">
+        <div class="action-icon" id="occIcon" style="${isOcclusionMode ? 'background:#cc5500; color:white;' : ''}">🌫️</div><div class="action-label">Occlude</div>
       </button>
     `;
     container.appendChild(actionRow);
@@ -3630,7 +3803,14 @@ const addDetail = (label, value, fieldName) => {
         paras.forEach(p => matchingParas.push(p));
       }
 
-      const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
+            // (Inside addDetail)
+      let fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
+      
+      // NEW INTERCEPTOR: Apply occlusion to the primary view
+      if (isOcclusionMode) {
+        fullHtml = applyOcclusionToHTML(fullHtml, occlusionLevel);
+      }
+
       const headerHtml = "<div class='section-label' style='position:static;' onclick='if(isFlashcardMode) this.parentElement.classList.toggle(\"revealed\")'>" + label + editIcon + "</div>";
 
       // If there is an active search AND we found irrelevant text, format it!
@@ -3642,8 +3822,14 @@ const addDetail = (label, value, fieldName) => {
           div.innerHTML = headerHtml + "<div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
         } else {
           // Show only the matching lines with a [...] spacer
+          let filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
+          
+          // NEW INTERCEPTOR: Apply occlusion to the secondary filtered view
+          if (isOcclusionMode) {
+             filteredHtml = applyOcclusionToHTML(filteredHtml, occlusionLevel);
+          }
+
           div.className = "point-notes";
-          const filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
           div.innerHTML = headerHtml + "<div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
         }
       } else {
