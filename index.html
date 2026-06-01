@@ -769,6 +769,23 @@
       cursor: pointer;
     }
     
+    /* --- FIX STICKY HEADERS IN BOTTOM SHEET --- */
+.bottom-sheet .section-label {
+  position: sticky;
+  top: -15px; /* Counteracts the 15px padding of .sheet-content */
+  z-index: 90;
+}
+
+/* Ensure the flashcard mode hint still looks good when sticky */
+.bottom-sheet .flashcard-mode .section-label {
+  top: -15px; 
+}
+
+    
+    
+    
+    
+    
     @media (prefers-color-scheme: dark) {
       .revealed-blank { text-decoration-color: rgba(150, 150, 150, 0.6); }
     }
@@ -1198,7 +1215,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.30.26.v1";
+const APP_VERSION = "05.31.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1798,10 +1815,43 @@ function applyOcclusionToHTML(html, percent) {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
 
-  // Ignore structural HTML and common filler words
-  const stopWords = new Set(["this","that","with","from","have","they","will","what","when","where","your","then","than","into","only","also","some","very","just","like","their","these","those","which","could","should","would","been","much"]);
+  // 1. Expanded Stop Words (Filters out common long filler words)
+  const stopWords = new Set(["this","that","with","from","have","they","will","what","when","where","your","then","than","into","only","also","some","very","just","like","their","these","those","which","could","should","would","been","much","there","because","through","about","between","during"]);
 
-  // TreeWalker safely extracts text without touching HTML tags (Links, Tables, Highlights)
+    // 2. High-Value Priority Dictionary 
+  const tcmKeywords = new Set([
+    // Anatomical & Directional
+    "radial", "medial", "proximal", "distal", "anterior", "posterior", "lateral",
+    
+    // Core Concepts & Vital Substances
+    "qi", "blood", "yin", "yang", "essence", "jing", "fluid", "fluids", "jin", "ye", 
+    "mind", "shen", "spirit", "hun", "po", "yi", "zhi", "yuan", "gu", "zong", "zhen", 
+    "wei", "ying", "zheng", "def", "xu", "xs", "dry", "sweat", "fever", "chills", "aversion", "white", "red", "thin", "sticky", "peeled", "hot", 
+    
+    // Organs & Body Parts
+    "heart", "liver", "spleen", "lung", "lungs", "kidney", "kidneys", "pericardium", 
+    "stomach", "intestine", "gallbladder", "bladder", "triple", "burner", "san", "jiao",
+    "uterus", "brain", "marrow", "bone", "bones", "sinews", "muscles", "skin", "vessels",
+    
+    // Five Elements & Climates
+    "wood", "fire", "earth", "metal", "water", "wind", "cold", "heat", "damp", 
+    "dampness", "dryness", "summerheat",
+    
+    // Pathology & Actions
+    "deficiency", "empty", "excess", "full", "stagnation", "stasis", "rebellious", 
+    "sinking", "tonify", "sedate", "pacify", "invigorate", "resolve", "expel", 
+    "nourish", "clear", "subdue", "extinguish", "ascending", "descending", "entering", "exiting", "cough",
+    
+    // Emotions
+    "anger", "joy", "sadness", "worry", "pensiveness", "fear", "shock", "grief",
+    
+        // Pulse & Tongue Diagnostics
+    "pulse", "tongue", "coating", "body", "tip", "scattered", "leather", "front", "rear", "yellow", "ulcers"
+
+    
+  ]);
+
+
   const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
   let textNodes = [];
   let currentNode;
@@ -1813,25 +1863,43 @@ function applyOcclusionToHTML(html, percent) {
   textNodes.forEach((node, nodeIndex) => {
     const text = node.nodeValue;
     
-    // UPGRADED REGEX: Targets words 4+ letters OR explicit TCM Point combinations (e.g., LU 1, BL-13)
-    const regex = /\b([A-Za-z]{4,}|(?:LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV)\s*-?\s*\d{1,2})\b/gi;
+    // 3. Upgraded Regex: Allows 2+ letters now so we can catch "Qi", "Du", etc.
+    const regex = /\b((?:LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV)\s*-?\s*\d{1,2}|[A-Za-z]{2,})\b/gi;
+
     
     let match;
     while ((match = regex.exec(text)) !== null) {
       const word = match[0];
-      if (!stopWords.has(word.toLowerCase())) {
+      const lowerWord = word.toLowerCase();
+      
+      if (!stopWords.has(lowerWord)) {
+        
+        // 4. The Smart Scoring Engine
+        let score = 0;
+        let isPointName = /^(?:LU|LI|ST|SP|HT|SI|BL|KI|PC|SJ|GB|LR|DU|RN|CV|GV)[-\s]*\d+/i.test(word);
+
+        if (isPointName) {
+            score = 100 + (Math.random() * 10); // Tier 1: Point names (e.g., LU-5) are critical
+        } else if (tcmKeywords.has(lowerWord)) {
+            score = 75 + (Math.random() * 10);  // Tier 2: Core concepts, organs, and pathogens
+        } else if (word.length >= 4) {
+            score = (word.length * 2) + (Math.random() * 5); // Tier 3: Fallback to length for general terminology
+        } else {
+            continue; // Skip 2-3 letter words that aren't in the priority dictionary (like "and", "the", "for")
+        }
+
         allWords.push({
           word: word,
           nodeIndex: nodeIndex,
           index: match.index,
           length: word.length,
-          score: (word.length * 2) + (Math.random() * 5) 
+          score: score
         });
       }
     }
   });
 
-      // Bail out instantly if there are no eligible words at all OR if slider is at 0%
+  // Bail out instantly if there are no eligible words at all OR if slider is at 0%
   if (allWords.length === 0 || percent === 0) return tempDiv.innerHTML;
 
   // Math.max guarantees that even short, 1-sentence notes will get at least 1 blank!
@@ -1857,9 +1925,6 @@ function applyOcclusionToHTML(html, percent) {
     span.dataset.original = sw.word;
     span.textContent = '______';
     
-    // UPGRADED TOGGLE LOGIC: 
-    // If hidden -> Stops click from triggering links and reveals word.
-    // If revealed -> Turns back to a blank, BUT allows click to bubble up to trigger any underlying point links!
     span.setAttribute('onclick', "if(this.classList.contains('occluded-blank')) { event.stopPropagation(); this.textContent=this.dataset.original; this.className='revealed-blank'; } else { this.textContent='______'; this.className='occluded-blank'; }");
 
     const afterNode = document.createTextNode(after);
@@ -1871,6 +1936,7 @@ function applyOcclusionToHTML(html, percent) {
 
   return tempDiv.innerHTML;
 }
+
 
   
   
@@ -3811,7 +3877,7 @@ const addDetail = (label, value, fieldName) => {
         fullHtml = applyOcclusionToHTML(fullHtml, occlusionLevel);
       }
 
-      const headerHtml = "<div class='section-label' style='position:static;' onclick='if(isFlashcardMode) this.parentElement.classList.toggle(\"revealed\")'>" + label + editIcon + "</div>";
+      const headerHtml = "<div class='section-label' onclick='if(isFlashcardMode) this.parentElement.classList.toggle(\"revealed\")'>" + label + editIcon + "</div>";
 
       // If there is an active search AND we found irrelevant text, format it!
       if (activeHighlightRegex && nonMatchingParas.length > 0) {
