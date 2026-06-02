@@ -470,64 +470,77 @@
     .compare-actions { display: flex; align-items: center; gap: 15px; }
     
 
- /* Responsive Matrix Table */
-.compare-table {
-  width: max-content;
-  min-width: 100%;
-  margin: 0;
-  border-collapse: separate; /* CRITICAL: Sticky cells fail if this is 'collapse' */
-  border-spacing: 0;
-  font-size: 14px;
+/* --- SHRINK MODAL HEADER --- */
+.compare-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: calc(10px + env(safe-area-inset-top)) 15px 10px 15px; 
+  background: white; border-bottom: 1px solid #d1d1d6; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.compare-header h2 {
+  margin: 0; font-size: 19px; 
+  color: #333; font-weight: 800;
 }
 
-/* 1. Base Cells (Need a solid background so scrolling text doesn't bleed through) */
-.compare-table th, .compare-table td {
-  min-width: 280px;
-  max-width: 400px;
-  vertical-align: top;
-  padding: 15px;
-  background: white; 
-  border: none;
-  border-bottom: 1px solid #e0e0e0;
-  border-right: 1px solid #e0e0e0;
+/* --- DOUBLE STICKY COMPARE GRID --- */
+.compare-flex-container {
+  display: flex; flex-direction: column; gap: 20px; 
+  padding: 10px 15px 30px 15px; /* Reduced top gap so it sits closer to the main header */
 }
 
-/* 2. Frozen Top Header Row (Point Names like LU-5) */
-.compare-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 10; /* Keep above scrolling data */
-  background: #e3e3e8;
-  font-size: 18px;
+.compare-section {
+  background: white; border-radius: 12px; border: 1px solid #d1d1d6;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  /* CRITICAL: No overflow: hidden here, or Safari permanently breaks sticky headers! */
+}
+
+.compare-section-title {
+  position: sticky; 
+  top: -1px; /* Seals the sub-pixel gap against the main header */
+  left: 0; z-index: 10;
+  background: #f8f8f8; padding: 0 15px; 
+  height: 30px; /* Shrunk down from 36px */
+  display: flex; align-items: center; box-sizing: border-box;
+  font-size: 11px; /* Shrunk down from 13px */
+  letter-spacing: 0.5px; /* Adds readability to smaller uppercase text */
+  font-weight: 800; color: #cc5500;
+  text-transform: uppercase; border-bottom: 1px solid #d1d1d6;
+  border-radius: 11px 11px 0 0; 
+}
+
+.compare-section-grid {
+  display: grid;
+  gap: 1px; background: #d1d1d6; /* Creates the grid separator lines automatically */
+  border-radius: 0 0 11px 11px;
+}
+
+.compare-card-header {
+  position: sticky; 
+  top: 29px; /* Docks flawlessly under the new 30px title (-1px top = 29px) */
+  z-index: 9; 
+  background: #e3e3e8; 
+  padding: 6px 10px; /* Tighter padding to save vertical space */
+  font-size: 14px; /* Shrunk down from 16px for point names */
+  font-weight: 800; text-align: center;
   color: #333;
-  border-bottom: 2px solid #ccc;
 }
 
-/* 3. Frozen Left Column (Labels like Location, Actions) */
-.compare-table td:first-child, .compare-table th:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 5; /* Keep above normal cells, but below top header */
-  background: #f8f8f8;
-  font-weight: 800;
-  min-width: 75px;
-  max-width: 75px;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: #cc5500;
-  border-right: 2px solid #ccc;
+.compare-card-body {
+  background: white; /* Blocks out the grey grid gap lines */
+  padding: 15px 12px; font-size: 14px; line-height: 1.4;
 }
 
-/* 4. The Top-Left Corner "Data" Cell (Must be pinned in both directions) */
-.compare-table thead th:first-child {
-  position: sticky;
-  top: 0;
-  left: 0;
-  z-index: 15; /* Absolute highest layer so it stays in the corner */
-  background: #e3e3e8;
-  border-right: 2px solid #ccc;
-  border-bottom: 2px solid #ccc;
+
+
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .compare-section { background: #1c1c1e; border-color: #38383a; }
+  .compare-section-title { background: #2c2c2e; border-color: #38383a; color: #ff9f0a; }
+  .compare-section-grid { background: #38383a; }
+  .compare-card { background: #1c1c1e; }
+  .compare-card-header { background: #2c2c2e; border-color: #38383a; color: white; }
 }
+
 
 
 
@@ -1141,18 +1154,16 @@
       <div id="compareModal">
     <div class="compare-content">
       
-      <div class="compare-header">
+         <div class="compare-header">
         <h2>Compare Points</h2>
         <div class="compare-actions">
-          
-          <button class="detail-nav-btn" onclick="closeCompareModal()" style="font-size:24px; color:#555;">✕</button>
+          <button onclick="closeCompareModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
         </div>
       </div>
+
       
-      <div class="compare-table-container">
-        <table id="compareTable" class="tcm-table compare-table">
-          </table>
-      </div>
+    <div class="compare-table-container" id="compareContainer"></div>
+
 
     </div>
   </div>
@@ -1174,7 +1185,7 @@
           <label class="icon-btn search-toggle-btn" for="searchInput" onclick="toggleSearchDropdown()" style="margin: 0; display: flex;">🔍</label>
           <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
         </div>
-      </div>
+      </div>      
       <div id="searchDropdown">
         <div class="search-sort-row">
           <div class="search-container">
@@ -1192,7 +1203,7 @@
         <div class="help-row"><span>" "</span> Exact phrase (e.g., <i>"clear heat"</i>)</div>
         <div class="help-row"><span>@</span> Short Name (e.g., <i>@LU</i>)</div>
         <div class="help-row"><span>#</span> Full Name (e.g., <i>#wood</i>)</div>
-        <div class="help-row"><span>&lt;&gt;</span> Exclude (e.g., <i>&applt;&gt;pain</i>)</div>
+        <div class="help-row"><span>&lt;&gt;</span> Exclude (e.g., <i>&lt;&gt;pain</i>)</div>
       </div>
     </div> 
     
@@ -1214,7 +1225,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "06.01.26.v2";
+const APP_VERSION = "06.01.26.v4";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2156,6 +2167,42 @@ function applyOcclusionToHTML(html, percent) {
       tooltip.classList.remove("show");
     }
   });
+  
+    // --- NEW RANGE PARSER FUNCTION ---
+  function expandPointRange(term) {
+    term = term.trim();
+    // Smart Regex: Matches LU1-7, LU-1-7, LU1-LU7, and LU-1 - LU-7
+    const rangeMatch = term.match(/^([a-z\.]+)(?:[\s\-\.]*)(\d+)\s*-\s*(?:([a-z\.]+)(?:[\s\-\.]*))?(\d+)$/i);
+    
+    if (rangeMatch) {
+      const prefix1 = rangeMatch[1].toLowerCase().replace(/\./g, "");
+      const startNum = parseInt(rangeMatch[2], 10);
+      const prefix2 = rangeMatch[3] ? rangeMatch[3].toLowerCase().replace(/\./g, "") : prefix1;
+      const endNum = parseInt(rangeMatch[4], 10);
+
+      // Safety check: prefixes must match (prevents invalid searches like @LU1-SP5)
+      if (prefix1 !== prefix2) return [term];
+
+      // Determine min and max to safely handle backwards ranges (e.g., @LU7-1)
+      const min = Math.min(startNum, endNum);
+      const max = Math.max(startNum, endNum);
+      
+      // Safety cap: Prevent browser crashes from massive typos (Max TCM channel is BL with 67 points)
+      if (max - min > 100) return [term];
+
+      let results = [];
+      for (let i = min; i <= max; i++) {
+        results.push(prefix1 + i); 
+      }
+      return results; // Returns ['lu1', 'lu2', 'lu3', ...]
+    }
+    return [term]; // If it's not a range, return it normally so standard search doesn't break
+  }
+
+  
+  
+  
+  
 
     function expandTCMPoint(term) {
     term = term.trim();
@@ -2312,10 +2359,16 @@ function applyOcclusionToHTML(html, percent) {
         else if (token.startsWith("<>")) {
         const terms = token.slice(2).toLowerCase().split(",");
         terms.forEach(t => exclude.push(...expandTCMPoint(t)));
-      } else if (token.startsWith("@")) {
+            } else if (token.startsWith("@")) {
         const terms = token.slice(1).toLowerCase().split(",");
-        terms.forEach(t => headers.push(...expandTCMPoint(t)));
+        terms.forEach(t => {
+          // Pass the term through the range parser first!
+          const rangeTerms = expandPointRange(t);
+          // Then expand aliases for every generated point in the range
+          rangeTerms.forEach(rt => headers.push(...expandTCMPoint(rt)));
+        });
       } else if (token.startsWith("#")) {
+
         // Strip the # AND any quotation marks so multi-word phrases parse cleanly
         const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
         const terms = cleanToken.split(",");
@@ -2367,8 +2420,17 @@ function applyOcclusionToHTML(html, percent) {
       // 3. EXCLUSIONS <> (Fast Check)
       if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
 
-      // 4. SHORT NAMES @ (Fast Check)
-      if (headers.length > 0 && !headers.some(h => point._shortNameLower.includes(h))) return false;
+           // 4. SHORT NAMES @ (Fast Check with Smart Boundaries)
+      if (headers.length > 0 && !headers.some(h => {
+        // If the search term ends in a number (like "lu-1"), enforce a strict word boundary 
+        // so it doesn't accidentally match "lu-10" or "lu-11".
+        if (/\d$/.test(h)) {
+          return new RegExp(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "i").test(point._shortNameLower);
+        }
+        // If it's just letters (like "@LU"), standard inclusion works perfectly to grab the whole channel
+        return point._shortNameLower.includes(h);
+      })) return false;
+
 
             // 5. FULL NAMES & CHANNELS # (Fast Check)
       if (fullNames.length > 0 && !fullNames.every(f => {
@@ -3183,15 +3245,14 @@ async function saveEdit() {
     }
   }
 
-  function openCompareModal() {
+        function openCompareModal() {
     if (compareList.length === 0) return;
-    const table = document.getElementById("compareTable");
+    const container = document.getElementById("compareContainer");
     
-      // Enable Native Pinch-to-Zoom
-  viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0");
+    // Lock viewport to maintain native app feel
+    viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
     
-    // The fields to display in the matrix rows
-        const fields = [
+    const fields = [
       { key: "Location ", altKey: "Location", label: "Location" },
       { key: "Needling", label: "Needling" },
       { key: "Actions", label: "Actions" },
@@ -3213,27 +3274,63 @@ async function saveEdit() {
       { key: "CAM Notes", label: "CAM Notes" }
     ];
 
-
     let pts = compareList.map(id => points.find(p => p["Short Name"] === id)).filter(Boolean);
 
-    let html = `<thead><tr><th>Data</th>`;
-    pts.forEach(p => { html += `<th>${p["Short Name"]}</th>`; });
-    html += `</tr></thead><tbody>`;
+      // --- THE RESPONSIVE IPAD + IPHONE ALGORITHM ---
+    // 'max(100%, Xpx)' tells the browser: "If the screen is huge (iPad), stretch to take up 100% of it. 
+    // If the screen is tiny (iPhone), force it to be at least Xpx wide so it doesn't squish!"
+    let minWidth = pts.length * 150; // Minimum 150px per column
+    let explicitWidth = `max(100%, ${minWidth}px)`;
+
+    // Apply the smart width to the master wrapper 
+    let html = `<div style="width: ${explicitWidth}; padding-bottom: 40px; box-sizing: border-box;">`;
+    html += `<div class="compare-flex-container">`;
+
+
+
 
     fields.forEach(f => {
-      html += `<tr><td>${f.label}</td>`;
+      // Skip the entire section if no points have data for it
+      const hasDataInRow = pts.some(p => {
+        let val = p[f.key] || p[f.altKey] || "";
+        return val && String(val).trim() !== "";
+      });
+      if (!hasDataInRow) return;
+
+      html += `<div class="compare-section">`;
+      html += `<div class="compare-section-title">${f.label}</div>`;
+      
+      // CSS Grid perfectly aligns headers and bodies in rows
+      html += `<div class="compare-section-grid" style="grid-template-columns: repeat(${pts.length}, 1fr);">`;
+      
+      // ROW 1: Point Headers (These will double-stick right under the title!)
+      pts.forEach(p => {
+         const imp = p.Important ? String(p.Important).trim() : "";
+         const impHtml = imp !== "" ? `<span class="importance-badge" style="font-size:16px;">${imp}</span>` : "";
+         html += `<div class="compare-card-header">${p["Short Name"]} ${impHtml}</div>`;
+      });
+      
+      // ROW 2: Data Bodies
       pts.forEach(p => {
          let rawVal = p[f.key] || p[f.altKey] || "";
-         let formatted = linkifyPoints(formatTextWithTables(highlightText(rawVal)));
-         html += `<td>${formatted || "<span style='color:#999;font-style:italic;'>No data</span>"}</td>`;
+         let formatted = rawVal && String(rawVal).trim() !== "" 
+              ? linkifyPoints(formatTextWithTables(highlightText(rawVal))) 
+              : `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
+         
+         html += `<div class="compare-card-body">${formatted}</div>`;
       });
-      html += `</tr>`;
+      
+      html += `</div></div>`; // Close grid and section
     });
-
-    html += `</tbody>`;
-    table.innerHTML = html;
+    
+    html += `</div></div>`; // Close flex container and global wrapper
+    
+    container.innerHTML = html;
     document.getElementById("compareModal").style.display = "flex";
   }
+
+
+
 
   function closeCompareModal() {
   // Lock the viewport back down to protect the main app UI
