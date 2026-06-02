@@ -1225,7 +1225,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "06.01.26.v4";
+const APP_VERSION = "06.02.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1528,6 +1528,37 @@ document.addEventListener("visibilitychange", () => {
 });
 
 
+const TCM_SECTIONS = [
+  { key: "Location ", altKey: "Location", label: "Location" },
+  { key: "Location Notes", label: "Location Notes" },
+  { key: "Needling", label: "Needling" },
+  { key: "Actions", label: "Actions" },
+  { key: "Indications", label: "Indications" },
+  { key: "Commentary", label: "Commentary" },
+  { key: "Summary of clinical application", label: "Summary of Clinical Application" },
+  { key: "Combinations", label: "Combinations" },
+  { key: "Clinical Manifestations", label: "Clinical Manifestations" },
+  { key: "Aetiology", label: "Aetiology" },
+  { key: "Description", label: "Description" },
+  { key: "Precursors of Pattern", label: "Precursors of Pattern" },
+  { key: "Patterns", label: "Patterns" },
+  { key: "Developments From Pattern", label: "Developments From Pattern" },
+  { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
+  { key: "Analysis", label: "Analysis" },
+  { key: "Treatment Principle", label: "Treatment Principle" },
+  { key: "Point Prescription", label: "Point Prescription" },
+  { key: "Supplementary Points", label: "Supplementary Points" },
+  { key: "Explanation", label: "Explanation" },
+  { key: "Remarks", label: "Remarks" },
+  { key: "Flashcard View", label: "Flashcard View" },
+  { key: "Notes", label: "Notes" },
+  { key: "CAM Notes", label: "CAM Notes" }
+];
+
+
+
+
+
 // Define Globals
 let isAppBooted = false; // NEW: Prevents iOS from interrupting the boot sequence
 let points = [];
@@ -1586,20 +1617,18 @@ bootApp(); // Start the engine
     return String(str).replace(/\[\/?(b|i|u|color(?:=[^\]]+)?)\]/gi, "");
   }
 
-  function generateSearchIndex(point) {
-        const visibleData = [
-      point.Important, point["Short Name"], point["Full Name"], point["Channel Full Name"],
-      point["Channel Short Name"], point["Location"], point.Location,
-      point["Location Notes"], point.Needling, point.Actions, point.Indications, point.Commentary,
-      point["Summary of clinical application"], point.Combinations, point.Description, 
-      point.Patterns, point["Diagnosis & Differentiation"], point.Analysis, point["Treatment Principle"], 
-      point["Point Prescription"], point["Supplementary Points"], point.Explanation, point.Remarks, point["Flashcard View"],
-      point.Notes, point["CAM Notes"]
+    function generateSearchIndex(point) {
+    let visibleData = [
+      point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], 
+      point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"]
     ];
-
-    // Strip BBCode and lowercase once during boot
-    return stripBBCode(visibleData.filter(Boolean).map(v => String(v)).join(" ")).toLowerCase(); 
+    
+    // Pull the rest dynamically from the master array
+    TCM_SECTIONS.forEach(sec => visibleData.push(point[sec.key] || point[sec.altKey]));
+    
+    return stripBBCode(visibleData.filter(Boolean).map(v => String(v)).join(" ")).toLowerCase();
   }
+
 
   function processPoints(dataArray) {
     const oldMap = {};
@@ -1618,16 +1647,11 @@ bootApp(); // Start the engine
       point._shortNameLower = (point["Short Name"] || "").toString().toLowerCase();
       point._fullNameLower = (point["Full Name"] || point[" Full Name"] || "").toString().toLowerCase();
       
-            const fields = [
-        point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"],
-        point["Location "] || point.Location, point["Location Notes"], point.Needling,
-        point.Actions, point.Indications, point.Commentary,
-        point["Summary of clinical application"], point.Combinations, point.Description, 
-        point.Patterns, point["Diagnosis & Differentiation"], point.Analysis, point["Treatment Principle"], 
-        point["Point Prescription"], point["Supplementary Points"], point.Explanation, point.Remarks, point["Flashcard View"],
-        point.Notes, point["CAM Notes"]
+             let fields = [
+        point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], 
+        point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"]
       ];
-
+      TCM_SECTIONS.forEach(sec => fields.push(point[sec.key] || point[sec.altKey]));
       
       let paras = [];
       fields.forEach(f => {
@@ -1690,13 +1714,8 @@ bootApp(); // Start the engine
   // --- SECTION FILTER LOGIC ---
 let activeSections = [];
 let isSectionFilterActive = false;
-const allAvailableSections = [
-  "Location", "Location Notes", "Needling", "Actions", "Indications",
-  "Commentary", "Summary of Clinical Application", "Combinations",
-  "Description", "Patterns", "Diagnosis & Differentiation", "Analysis",
-  "Treatment Principle", "Point Prescription", "Supplementary Points",
-  "Explanation", "Remarks", "Flashcard View", "Notes", "CAM Notes"
-];
+const allAvailableSections = TCM_SECTIONS.map(sec => sec.label);
+
 
 function openSectionFilterModal() {
   const container = document.getElementById("sectionCheckboxes");
@@ -2763,27 +2782,10 @@ function applyOcclusionToHTML(html, percent) {
       container.appendChild(div);
     };
 
-    addDetail("Location", point["Location "] || point.Location);
-    addDetail("Location Notes", point["Location Notes"]);
-    addDetail("Needling", point.Needling);
-    addDetail("Actions", point.Actions);
-    addDetail("Indications", point.Indications);
-    addDetail("Commentary", point.Commentary);
-    addDetail("Summary of Clinical Application", point["Summary of clinical application"]);
-    addDetail("Combinations", point.Combinations);
-    addDetail("Description", point.Description);
-    addDetail("Patterns", point.Patterns);
-    addDetail("Diagnosis & Differentiation", point["Diagnosis & Differentiation"]);
-    addDetail("Analysis", point.Analysis);
-    addDetail("Treatment Principle", point["Treatment Principle"]);
-    addDetail("Point Prescription", point["Point Prescription"]);
-    addDetail("Supplementary Points", point["Supplementary Points"]);
-    addDetail("Explanation", point.Explanation);
-    addDetail("Remarks", point.Remarks);
-    addDetail("Flashcard View", point["Flashcard View"]);
-    addDetail("Notes", point.Notes);
-    addDetail("CAM Notes", point["CAM Notes"]);
-
+        TCM_SECTIONS.forEach(sec => {
+      let val = point[sec.key] || point[sec.altKey] || "";
+      addDetail(sec.label, val);
+    });
   }
 
 
@@ -2957,27 +2959,25 @@ function applyOcclusionToHTML(html, percent) {
   function openEditModal(point, defaultField = "Notes") {
     currentEditingPoint = point; 
     
-    // Safely fetch field names (handling your data's "Location " trailing space quirk)
-        const fields = [
-      "Important", "Notes", "CAM Notes", 
-      point.hasOwnProperty("Location ") ? "Location " : "Location", 
-      "Location Notes", "Needling", "Actions", "Indications", 
-      "Commentary", "Summary of clinical application", 
-      "Combinations", "Description",
-      "Patterns", "Diagnosis & Differentiation", "Analysis", "Treatment Principle", 
-      "Point Prescription", "Supplementary Points", "Explanation", "Remarks", "Flashcard View"
-    ];
-
-    
-    const select = document.getElementById("editFieldSelect");
+        const select = document.getElementById("editFieldSelect");
     select.innerHTML = "";
-    fields.forEach(field => {
+    
+    // Hardcode "Important" since it sits outside the standard text blocks
+    const optImp = document.createElement("option");
+    optImp.value = "Important"; optImp.textContent = "Important";
+    if ("Important" === defaultField) optImp.selected = true;
+    select.appendChild(optImp);
+    
+    // Loop through the master array for the rest
+    TCM_SECTIONS.forEach(sec => {
+      let fieldKey = (sec.label === "Location" && !point.hasOwnProperty("Location ")) ? "Location" : sec.key;
       const opt = document.createElement("option");
-      opt.value = field;
-      opt.textContent = field.trim(); // Hide trailing spaces from user
-      if (field === defaultField) opt.selected = true;
+      opt.value = fieldKey;
+      opt.textContent = sec.label;
+      if (fieldKey === defaultField) opt.selected = true;
       select.appendChild(opt);
     });
+
     
     changeEditField();
     
@@ -3252,27 +3252,8 @@ async function saveEdit() {
     // Lock viewport to maintain native app feel
     viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
     
-    const fields = [
-      { key: "Location ", altKey: "Location", label: "Location" },
-      { key: "Needling", label: "Needling" },
-      { key: "Actions", label: "Actions" },
-      { key: "Indications", label: "Indications" },
-      { key: "Combinations", label: "Combinations" },
-      { key: "Commentary", label: "Commentary" },
-      { key: "Summary of clinical application", label: "Summary of Clinical Application" },
-      { key: "Description", label: "Description" },
-      { key: "Patterns", label: "Patterns" },
-      { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
-      { key: "Analysis", label: "Analysis" },
-      { key: "Treatment Principle", label: "Treatment Principle" },
-      { key: "Point Prescription", label: "Point Prescription" },
-      { key: "Supplementary Points", label: "Supplementary Points" },
-      { key: "Explanation", label: "Explanation" },
-      { key: "Remarks", label: "Remarks" },
-      { key: "Flashcard View", label: "Flashcard View" },
-      { key: "Notes", label: "Notes" },
-      { key: "CAM Notes", label: "CAM Notes" }
-    ];
+    const fields = TCM_SECTIONS;
+
 
     let pts = compareList.map(id => points.find(p => p["Short Name"] === id)).filter(Boolean);
 
@@ -3387,28 +3368,8 @@ async function saveEdit() {
     const container = document.getElementById("printModalBody");
     container.innerHTML = ""; 
 
-    const fieldsToPrint = [
-      { key: "Location ", altKey: "Location", label: "Location" },
-      { key: "Location Notes", label: "Location Notes" },
-      { key: "Needling", label: "Needling" },
-      { key: "Actions", label: "Actions" },
-      { key: "Indications", label: "Indications" },
-      { key: "Commentary", label: "Commentary" },
-      { key: "Summary of clinical application", label: "Summary of Clinical Application" },
-      { key: "Combinations", label: "Combinations" },
-      { key: "Description", label: "Description" },
-      { key: "Patterns", label: "Patterns" },
-      { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
-      { key: "Analysis", label: "Analysis" },
-      { key: "Treatment Principle", label: "Treatment Principle" },
-      { key: "Point Prescription", label: "Point Prescription" },
-      { key: "Supplementary Points", label: "Supplementary Points" },
-      { key: "Explanation", label: "Explanation" },
-      { key: "Remarks", label: "Remarks" },
-      { key: "Flashcard View", label: "Flashcard View" },
-      { key: "Notes", label: "Notes" },
-      { key: "CAM Notes", label: "CAM Notes" }
-    ];
+    const fieldsToPrint = TCM_SECTIONS;
+
 
     printList.forEach(id => {
       const p = points.find(x => x["Short Name"] === id);
@@ -3533,28 +3494,8 @@ async function saveEdit() {
         });
       };
 
-      const fieldsToPrint = [
-        { key: "Location ", altKey: "Location", label: "Location" },
-        { key: "Location Notes", label: "Location Notes" },
-        { key: "Needling", label: "Needling" },
-        { key: "Actions", label: "Actions" },
-        { key: "Indications", label: "Indications" },
-        { key: "Commentary", label: "Commentary" },
-        { key: "Summary of clinical application", label: "Summary of Clinical Application" },
-        { key: "Combinations", label: "Combinations" },
-        { key: "Description", label: "Description" },
-        { key: "Patterns", label: "Patterns" },
-        { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
-        { key: "Analysis", label: "Analysis" },
-        { key: "Treatment Principle", label: "Treatment Principle" },
-        { key: "Point Prescription", label: "Point Prescription" },
-        { key: "Supplementary Points", label: "Supplementary Points" },
-        { key: "Explanation", label: "Explanation" },
-        { key: "Remarks", label: "Remarks" },
-        { key: "Flashcard View", label: "Flashcard View" },
-        { key: "Notes", label: "Notes" },
-        { key: "CAM Notes", label: "CAM Notes" }
-      ];
+      const fieldsToPrint = TCM_SECTIONS;
+
 
       for (let id of printList) {
         const p = points.find(x => x["Short Name"] === id);
@@ -3643,14 +3584,12 @@ async function completeSave(newValue) {
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
 
     // 3. Rebuild the Paragraph Array for the Search Engine
-    const fields = [
-      currentEditingPoint.Important, currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
-      currentEditingPoint.Actions, currentEditingPoint.Indications, currentEditingPoint.Commentary,
-      currentEditingPoint["Summary of clinical application"], currentEditingPoint.Combinations, currentEditingPoint.Description, 
-      currentEditingPoint.Patterns, currentEditingPoint["Diagnosis & Differentiation"], currentEditingPoint.Analysis, currentEditingPoint["Treatment Principle"], 
-      currentEditingPoint["Point Prescription"], currentEditingPoint["Supplementary Points"], currentEditingPoint.Explanation, currentEditingPoint.Remarks, currentEditingPoint["Flashcard View"],
-      currentEditingPoint.Notes, currentEditingPoint["CAM Notes"]
+        let fields = [
+      currentEditingPoint.Important, currentEditingPoint["Short Name"], currentEditingPoint["Full Name"] || currentEditingPoint[" Full Name"], 
+      currentEditingPoint["Channel Full Name"] || currentEditingPoint[" Channel Full Name"], currentEditingPoint["Channel Short Name"] || currentEditingPoint[" Channel Short Name"]
     ];
+    TCM_SECTIONS.forEach(sec => fields.push(currentEditingPoint[sec.key] || currentEditingPoint[sec.altKey]));
+
 
     let paras = [];
     fields.forEach(f => {
@@ -4003,26 +3942,13 @@ const addDetail = (label, value, fieldName) => {
     };
 
     // Call addDetail for all fields...
-    addDetail("Location", point["Location "] || point.Location, point.hasOwnProperty("Location ") ? "Location " : "Location");
-    addDetail("Location Notes", point["Location Notes"], "Location Notes");
-    addDetail("Needling", point.Needling, "Needling");
-    addDetail("Actions", point.Actions, "Actions");
-    addDetail("Indications", point.Indications, "Indications");
-    addDetail("Commentary", point.Commentary, "Commentary");
-    addDetail("Summary of Clinical Application", point["Summary of clinical application"], "Summary of clinical application");
-    addDetail("Combinations", point.Combinations, "Combinations");
-    addDetail("Description", point.Description, "Description");
-    addDetail("Patterns", point.Patterns, "Patterns");
-    addDetail("Diagnosis & Differentiation", point["Diagnosis & Differentiation"], "Diagnosis & Differentiation");
-    addDetail("Analysis", point.Analysis, "Analysis");
-    addDetail("Treatment Principle", point["Treatment Principle"], "Treatment Principle");
-    addDetail("Point Prescription", point["Point Prescription"], "Point Prescription");
-    addDetail("Supplementary Points", point["Supplementary Points"], "Supplementary Points");
-    addDetail("Explanation", point.Explanation, "Explanation");
-    addDetail("Remarks", point.Remarks, "Remarks");
-    addDetail("Flashcard View", point["Flashcard View"], "Flashcard View");
-    addDetail("Notes", point.Notes, "Notes");
-    addDetail("CAM Notes", point["CAM Notes"], "CAM Notes");
+        TCM_SECTIONS.forEach(sec => {
+      let val = point[sec.key] || point[sec.altKey] || "";
+      // Smart check to handle the trailing space on "Location" for the edit trigger
+      let fieldName = (sec.label === "Location" && !point.hasOwnProperty("Location ")) ? "Location" : sec.key;
+      addDetail(sec.label, val, fieldName);
+    });
+
 
     // Add/Edit Button
     const addFieldBtn = document.createElement("button");
