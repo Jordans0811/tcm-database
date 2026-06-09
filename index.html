@@ -539,6 +539,9 @@
   .compare-section-grid { background: #38383a; }
   .compare-card { background: #1c1c1e; }
   .compare-card-header { background: #2c2c2e; border-color: #38383a; color: white; }
+    .compare-card-body { background: #1c1c1e; color: #ffffff; }
+  
+  
 }
 
 
@@ -794,7 +797,47 @@
   top: -15px; 
 }
 
-    
+/* --- INVISIBLE RECALL MODE --- */
+.study-blur {
+  position: relative;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  
+  /* Forbids iOS text selection and long-press menus while hidden */
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+/* The "Blanket" that hides the text perfectly without ruining formatting */
+.study-blur::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: white; /* Matches light mode card body */
+  z-index: 1;
+}
+
+/* When tapped, this class is added to hide the blanket */
+.study-blur.study-peek::after {
+  display: none;
+}
+
+/* Restore text selection so you can use lookup tools when revealed */
+.study-blur.study-peek {
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
+  -webkit-touch-callout: default !important;
+}
+
+/* Dark Mode Blanket */
+@media (prefers-color-scheme: dark) {
+  .study-blur::after {
+    background: #1c1c1e; /* Matches dark mode card body */
+  }
+}
+
+
     
     
     
@@ -897,6 +940,9 @@
       .pill { background: #1c1c1e; border-color: #38383a; color: #8e8e93; }
       .pill.active { background: #0a84ff; color: white; border-color: #0a84ff; }
    
+   
+
+
 
 
       
@@ -3271,8 +3317,14 @@ async function saveEdit() {
 
 
     fields.forEach(f => {
-      // Skip the entire section if no points have data for it
-      const hasDataInRow = pts.some(p => {
+  // NEW: Respect the global section filter
+  if (isSectionFilterActive && activeSections.length > 0 && !activeSections.includes(f.label)) {
+    return; // Skip rendering this section entirely
+  }
+
+  // Skip the entire section if no points have data for it
+  const hasDataInRow = pts.some(p => {
+
         let val = p[f.key] || p[f.altKey] || "";
         return val && String(val).trim() !== "";
       });
@@ -3284,22 +3336,30 @@ async function saveEdit() {
       // CSS Grid perfectly aligns headers and bodies in rows
       html += `<div class="compare-section-grid" style="grid-template-columns: repeat(${pts.length}, 1fr);">`;
       
-      // ROW 1: Point Headers (These will double-stick right under the title!)
-      pts.forEach(p => {
-         const imp = p.Important ? String(p.Important).trim() : "";
-         const impHtml = imp !== "" ? `<span class="importance-badge" style="font-size:16px;">${imp}</span>` : "";
-         html += `<div class="compare-card-header">${p["Short Name"]} ${impHtml}</div>`;
-      });
-      
-      // ROW 2: Data Bodies
-      pts.forEach(p => {
-         let rawVal = p[f.key] || p[f.altKey] || "";
-         let formatted = rawVal && String(rawVal).trim() !== "" 
-              ? linkifyPoints(formatTextWithTables(highlightText(rawVal))) 
-              : `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
-         
-         html += `<div class="compare-card-body">${formatted}</div>`;
-      });
+    // ROW 1: Point Headers
+pts.forEach((p, i) => {
+   const imp = p.Important ? String(p.Important).trim() : "";
+   const impHtml = imp !== "" ? `<span class="importance-badge" style="font-size:16px;">${imp}</span>` : "";
+   
+   // Add the Eye Icon button and the data-col index
+   html += `<div class="compare-card-header" data-col="${i}">
+              <button onclick="toggleCompareColumn(${i})" style="background:transparent; border:none; cursor:pointer; padding:0 5px;">👁️</button> 
+              ${p["Short Name"]} ${impHtml}
+            </div>`;
+});
+
+// ROW 2: Data Bodies
+pts.forEach((p, i) => {
+   let rawVal = p[f.key] || p[f.altKey] || "";
+   let formatted = rawVal && String(rawVal).trim() !== "" 
+        ? linkifyPoints(formatTextWithTables(highlightText(rawVal))) 
+        : `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
+   
+   // UPDATED: Added the onclick toggle for peak mode
+   html += `<div class="compare-card-body" data-col="${i}" onclick="if(this.classList.contains('study-blur')) this.classList.toggle('study-peek');">${formatted}</div>`;
+});
+
+
       
       html += `</div></div>`; // Close grid and section
     });
@@ -4025,6 +4085,20 @@ const addDetail = (label, value, fieldName) => {
       }
     }
   });
+  
+  
+  function toggleCompareColumn(colIndex) {
+  const cells = document.querySelectorAll(`#compareModal [data-col="${colIndex}"]`);
+  
+  cells.forEach(cell => {
+    if (cell.classList.contains("compare-card-body")) {
+      cell.classList.toggle("study-blur");
+      cell.classList.remove("study-peek"); // Resets the peek state automatically
+    }
+  });
+}
+
+
 
 
 
