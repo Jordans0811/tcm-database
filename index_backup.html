@@ -21,20 +21,17 @@
       overscroll-behavior: none; /* Stops the main window from bouncing */
     }
    #appContainer {
-      height: 100%;
-      overflow-y: auto;
-      overflow-x: hidden;
-      -webkit-overflow-scrolling: touch;
-      position: relative;
-      transform: translateZ(0);
-      will-change: scroll-position;
-      contain: layout style paint;
-      overscroll-behavior-y: none; /* Stops the content list from pulling down the header */
-    }
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  overscroll-behavior-y: none;
+}
 
 
    #mainStickyHeader {
-      position: sticky; top: 0; background: #f0f0f0; z-index: 100;
+      position: sticky; top: 0; background: #f0f0f0; z-index: 10005;
       padding: calc(12px + env(safe-area-inset-top)) 0 0 0; 
       border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
     }
@@ -62,7 +59,7 @@
     .clear-active-btn { background: rgba(255, 59, 48, 0.1); color: #ff3b30; font-weight: 800; }
     .clear-active-btn:active { background: rgba(255, 59, 48, 0.2); }
 
-    /* The Dropdown Search Area (Made INSTANT to fix scroll jumping) */
+            /* The Dropdown Search Area */
     #searchDropdown {
       display: none; 
       background: #f0f0f0; 
@@ -72,6 +69,9 @@
     #searchDropdown.expanded {
       display: block; 
     }
+
+
+
     
     
         /* Search History Floating Menu Styles */
@@ -138,11 +138,14 @@
       position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
       width: 16px; height: 16px; opacity: 0.7; pointer-events: none; z-index: 1;
     }
-    .search-box {
+        .search-box {
       width: 100%; padding: 10px 40px 10px 34px; font-size: 16px;
       background-color: #e3e3e8; border: none; border-radius: 10px; color: #000; box-sizing: border-box;
       -webkit-appearance: none;
+      
+      
     }
+
     .search-box:focus { outline: none; box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3); }
     .search-box::placeholder { color: #8e8e93; }
     
@@ -428,15 +431,17 @@
     .add-field-btn:active { background: rgba(0, 122, 255, 0.1); }
 
 
-        .rich-text-editor {
-      /* Add these two properties to your existing block */
+           .rich-text-editor {
       white-space: pre-wrap;
       word-wrap: break-word;
       
       height: 200px; width: 100%; box-sizing: border-box; font-family: inherit; font-size: 14px; 
       padding: 10px; border: 1px solid #ccc; border-radius: 6px; overflow-y: auto; 
       background: white; color: black; outline: none; line-height: 1.4;
+      
+      
     }
+
 
     .rich-text-editor:empty:before { content: attr(placeholder); color: #8e8e93; pointer-events: none; display: block; }
     .rich-text-editor:focus { border-color: #007aff; box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3); }
@@ -465,64 +470,77 @@
     .compare-actions { display: flex; align-items: center; gap: 15px; }
     
 
- /* Responsive Matrix Table */
-.compare-table {
-  width: max-content;
-  min-width: 100%;
-  margin: 0;
-  border-collapse: separate; /* CRITICAL: Sticky cells fail if this is 'collapse' */
-  border-spacing: 0;
-  font-size: 14px;
+/* --- SHRINK MODAL HEADER --- */
+.compare-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: calc(10px + env(safe-area-inset-top)) 15px 10px 15px; 
+  background: white; border-bottom: 1px solid #d1d1d6; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.compare-header h2 {
+  margin: 0; font-size: 19px; 
+  color: #333; font-weight: 800;
 }
 
-/* 1. Base Cells (Need a solid background so scrolling text doesn't bleed through) */
-.compare-table th, .compare-table td {
-  min-width: 280px;
-  max-width: 400px;
-  vertical-align: top;
-  padding: 15px;
-  background: white; 
-  border: none;
-  border-bottom: 1px solid #e0e0e0;
-  border-right: 1px solid #e0e0e0;
+/* --- DOUBLE STICKY COMPARE GRID --- */
+.compare-flex-container {
+  display: flex; flex-direction: column; gap: 20px; 
+  padding: 10px 15px 30px 15px; /* Reduced top gap so it sits closer to the main header */
 }
 
-/* 2. Frozen Top Header Row (Point Names like LU-5) */
-.compare-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 10; /* Keep above scrolling data */
-  background: #e3e3e8;
-  font-size: 18px;
+.compare-section {
+  background: white; border-radius: 12px; border: 1px solid #d1d1d6;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  /* CRITICAL: No overflow: hidden here, or Safari permanently breaks sticky headers! */
+}
+
+.compare-section-title {
+  position: sticky; 
+  top: -1px; /* Seals the sub-pixel gap against the main header */
+  left: 0; z-index: 10;
+  background: #f8f8f8; padding: 0 15px; 
+  height: 30px; /* Shrunk down from 36px */
+  display: flex; align-items: center; box-sizing: border-box;
+  font-size: 11px; /* Shrunk down from 13px */
+  letter-spacing: 0.5px; /* Adds readability to smaller uppercase text */
+  font-weight: 800; color: #cc5500;
+  text-transform: uppercase; border-bottom: 1px solid #d1d1d6;
+  border-radius: 11px 11px 0 0; 
+}
+
+.compare-section-grid {
+  display: grid;
+  gap: 1px; background: #d1d1d6; /* Creates the grid separator lines automatically */
+  border-radius: 0 0 11px 11px;
+}
+
+.compare-card-header {
+  position: sticky; 
+  top: 29px; /* Docks flawlessly under the new 30px title (-1px top = 29px) */
+  z-index: 9; 
+  background: #e3e3e8; 
+  padding: 6px 10px; /* Tighter padding to save vertical space */
+  font-size: 14px; /* Shrunk down from 16px for point names */
+  font-weight: 800; text-align: center;
   color: #333;
-  border-bottom: 2px solid #ccc;
 }
 
-/* 3. Frozen Left Column (Labels like Location, Actions) */
-.compare-table td:first-child, .compare-table th:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 5; /* Keep above normal cells, but below top header */
-  background: #f8f8f8;
-  font-weight: 800;
-  min-width: 75px;
-  max-width: 75px;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: #cc5500;
-  border-right: 2px solid #ccc;
+.compare-card-body {
+  background: white; /* Blocks out the grey grid gap lines */
+  padding: 15px 12px; font-size: 14px; line-height: 1.4;
 }
 
-/* 4. The Top-Left Corner "Data" Cell (Must be pinned in both directions) */
-.compare-table thead th:first-child {
-  position: sticky;
-  top: 0;
-  left: 0;
-  z-index: 15; /* Absolute highest layer so it stays in the corner */
-  background: #e3e3e8;
-  border-right: 2px solid #ccc;
-  border-bottom: 2px solid #ccc;
+
+
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .compare-section { background: #1c1c1e; border-color: #38383a; }
+  .compare-section-title { background: #2c2c2e; border-color: #38383a; color: #ff9f0a; }
+  .compare-section-grid { background: #38383a; }
+  .compare-card { background: #1c1c1e; }
+  .compare-card-header { background: #2c2c2e; border-color: #38383a; color: white; }
 }
+
 
 
 
@@ -641,7 +659,7 @@
       background: #f0f0f5;
       border-radius: 20px 20px 0 0;
       box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
-      z-index: 10002; 
+      z-index: 10006; 
       display: flex; flex-direction: column;
       transform: translateY(100%);
       transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -693,6 +711,101 @@
       padding: 15px; 
       background: #f0f0f5;
     }
+
+     /* Bottom Sheet Click-Catcher */
+        #sheetBackdrop {
+      display: none; 
+      position: fixed; 
+      top: 0; left: 0; 
+      width: 100%; height: 100%; 
+      z-index: 10004; 
+      background: transparent; 
+      cursor: pointer; /* CRITICAL FOR IOS CLICK DELEGATION */
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    
+    #sheetBackdrop.show {
+      display: block;
+    }
+
+
+ /* --- FLASHCARD MODE STYLES --- */
+.flashcard-mode .point-notes .section-content {
+  display: none !important; /* Hide answers by default */
+}
+
+.flashcard-mode .point-notes.revealed .section-content {
+  display: block !important; /* Show answer when revealed */
+}
+
+.flashcard-mode .section-label {
+  cursor: pointer;
+  background: #ffe0b2; /* Optional: slightly change color to indicate it's tappable */
+}
+
+.flashcard-mode .section-label::after {
+  content: " (Tap to reveal)";
+  font-size: 10px;
+  font-weight: normal;
+  color: #888;
+  float: right;
+  margin-top: 2px;
+}
+
+.flashcard-mode .point-notes.revealed .section-label::after {
+  content: ""; /* Hide the hint once revealed */
+}  
+ 
+
+    /* --- PARAGRAPH OCCLUSION STYLES --- */
+    .occluded-blank {
+      color: #cc5500;
+      font-weight: 375;
+      letter-spacing: 3px;
+      cursor: pointer;
+      transition: opacity 0.1s;
+      user-select: none;
+    }
+    .occluded-blank:active { opacity: 0.6; }
+    
+      .revealed-blank {
+      color: inherit;
+      font-weight: inherit;
+      text-decoration: underline;
+      text-decoration-style: dashed;
+      text-decoration-color: rgba(150, 150, 150, 0.6);
+
+      text-decoration-thickness: 1.1px; /* Increase this number to make the line thicker */
+      text-underline-offset: 1.4px;     /* Increase this to push the line further down */
+      
+      cursor: pointer;
+    }
+    
+    /* --- FIX STICKY HEADERS IN BOTTOM SHEET --- */
+.bottom-sheet .section-label {
+  position: sticky;
+  top: -15px; /* Counteracts the 15px padding of .sheet-content */
+  z-index: 90;
+}
+
+/* Ensure the flashcard mode hint still looks good when sticky */
+.bottom-sheet .flashcard-mode .section-label {
+  top: -15px; 
+}
+
+    
+    
+    
+    
+    
+    @media (prefers-color-scheme: dark) {
+      .revealed-blank { text-decoration-color: rgba(150, 150, 150, 0.6); }
+    }
+
+
+
+
 
 
     /* Dark Mode */
@@ -783,7 +896,7 @@
       .sheet-header { background: rgba(0,0,0,0.98); border-color: #38383a; }
       .pill { background: #1c1c1e; border-color: #38383a; color: #8e8e93; }
       .pill.active { background: #0a84ff; color: white; border-color: #0a84ff; }
-    
+   
 
 
       
@@ -798,7 +911,10 @@
 
     /* iPad / Desktop Adaptive Layout */
     @media (min-width: 1900px) {
-      #searchDropdown { display: block !important; padding: 4px 15px 15px 15px; border-bottom: 1px solid #d1d1d6; }
+      #searchDropdown { height: auto !important; overflow: visible !important; opacity: 1 !important; pointer-events: auto !important; padding: 4px 15px 15px 15px; border-bottom: 1px solid #d1d1d6; }
+
+
+
       .search-toggle-btn { display: none !important; } 
     
           #editFieldSelect { background: #1c1c1e; color: #ffffff; border-color: #38383a; }
@@ -890,6 +1006,9 @@
 
 
 
+
+
+
   </style>
 </head>
 <body>
@@ -900,12 +1019,18 @@
   
   <div id="toast">🔄 Data synced</div>
 
-  <div id="devModal">
+    <div id="devModal">
     <div class="dev-content">
       <h3 class="dev-title">System Status</h3>
       <div class="dev-stat">App Version: <span id="devAppVersion"></span></div>
       <div class="dev-stat">Photos Cached: <span id="devPhotoStatus">Checking...</span></div>
       <div class="progress-track"><div id="devProgressBar" class="progress-fill"></div></div>
+      
+      <div id="devErrorLog" style="margin: 15px 0; font-size: 12px; color: #ff3b30; background: #ffe5e5; padding: 10px; border-radius: 6px; display: none; max-height: 120px; overflow-y: auto; border: 1px solid #ffb3b0; font-family: monospace;">
+        <strong style="display:block; margin-bottom: 5px;">⚠️ System Logs</strong>
+        <div id="devErrorList"></div>
+      </div>
+
       <button id="devSyncBtn" class="dev-btn dev-btn-sync" onclick="syncMissingPhotos()">Download Missing Photos</button>
       <button class="dev-btn dev-btn-close" onclick="document.getElementById('devModal').style.display='none'">Close Menu</button>
     </div>
@@ -923,6 +1048,47 @@
       </div>
     </div>
   </div>
+  
+    <div id="sectionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;">
+    <div class="modal-content" style="max-height: 75vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 class="modal-title" style="margin-bottom: 0;">Filter Sections</h3>
+        <button onclick="closeSectionFilterModal()" style="background: transparent; border: none; font-size: 24px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+      </div>
+      <div style="display:flex; justify-content: space-between; margin-bottom: 10px;">
+          <button onclick="selectAllSections(true)" style="background: #e3e3e8; color: black; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">Select All</button>
+          <button onclick="selectAllSections(false)" style="background: #e3e3e8; color: black; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">Clear All</button>
+      </div>
+      <div id="sectionCheckboxes" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding: 5px 0; margin-bottom:10px; flex:1;"></div>
+      <div class="modal-buttons" style="display:flex; gap: 10px;">
+        <button class="cancel-btn" onclick="toggleSectionFilterState()" id="sectionFilterToggleBtn">Turn OFF</button>
+        <button class="save-btn" onclick="applySectionFilter()">Apply</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="occlusionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;">
+    <div class="modal-content" style="max-height: 75vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <h3 class="modal-title" style="margin-bottom: 0;">Paragraph Occlusion</h3>
+        <button onclick="closeOcclusionModal()" style="background: transparent; border: none; font-size: 24px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+      </div>
+      <p style="margin: 0 0 15px 0; font-size: 13px; color: #888; line-height: 1.3;">Randomly hides critical words in the text to test your memory. Tap the blank line to reveal the word underneath.</p>
+      
+      <label for="occlusionSlider" style="font-weight: bold; font-size: 16px;">Occlusion Level: <span id="occPercentDisplay" style="color: #cc5500;">30%</span></label>
+      <input type="range" id="occlusionSlider" min="0" max="100" step="5" value="30" oninput="document.getElementById('occPercentDisplay').textContent = this.value + '%'" style="width: 100%; margin: 20px 0; accent-color: #cc5500;">
+
+      <div class="modal-buttons" style="display:flex; gap: 10px;">
+        <button class="cancel-btn" onclick="toggleOcclusion(false)" id="occlusionToggleBtn">Turn OFF</button>
+        <button class="save-btn" onclick="toggleOcclusion(true)">Apply</button>
+      </div>
+    </div>
+  </div>
+
+
+
+
 
   <div id="quickPeekModal" onclick="if(event.target===this) closeQuickPeek()">
     <div class="modal-content quick-peek-content" id="quickPeekContainer">
@@ -988,18 +1154,16 @@
       <div id="compareModal">
     <div class="compare-content">
       
-      <div class="compare-header">
+         <div class="compare-header">
         <h2>Compare Points</h2>
         <div class="compare-actions">
-          
-          <button class="detail-nav-btn" onclick="closeCompareModal()" style="font-size:24px; color:#555;">✕</button>
+          <button onclick="closeCompareModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
         </div>
       </div>
+
       
-      <div class="compare-table-container">
-        <table id="compareTable" class="tcm-table compare-table">
-          </table>
-      </div>
+    <div class="compare-table-container" id="compareContainer"></div>
+
 
     </div>
   </div>
@@ -1018,11 +1182,10 @@
         </div>
         <div class="header-actions">
           <button id="headerClearBtn" class="icon-btn clear-active-btn" onclick="clearAndCloseSearch()" style="display: none;">✕</button>
-          <button class="icon-btn search-toggle-btn" onclick="toggleSearchDropdown()">🔍</button>
+          <label class="icon-btn search-toggle-btn" for="searchInput" onclick="toggleSearchDropdown()" style="margin: 0; display: flex;">🔍</label>
           <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
         </div>
-      </div>
-      
+      </div>      
       <div id="searchDropdown">
         <div class="search-sort-row">
           <div class="search-container">
@@ -1043,23 +1206,26 @@
         <div class="help-row"><span>&lt;&gt;</span> Exclude (e.g., <i>&lt;&gt;pain</i>)</div>
       </div>
     </div> 
+    
     <div id="cardContainer"></div>
-  </div>
-  
-    <div id="bottomSheet" class="bottom-sheet">
-    <div class="sheet-header">
-      <div id="pillContainer" class="pill-nav">
-        </div>
-      <button class="absolute-close-btn" style="top: 15px;" onclick="closeBottomSheet()">✕</button>
-    </div>
-    <div id="sheetContent" class="sheet-content">
+
+    <div id="sheetBackdrop" onclick="closeBottomSheet()"></div>
+    
+</div> <div id="bottomSheet" class="bottom-sheet">
+  <div class="sheet-header">
+    <div id="pillContainer" class="pill-nav">
       </div>
+    <button class="absolute-close-btn" style="top: 15px;" onclick="closeBottomSheet()">✕</button>
   </div>
+  <div id="sheetContent" class="sheet-content">
+    </div>
+</div>
+
   
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "05.12.26.v1";
+const APP_VERSION = "06.02.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1167,54 +1333,98 @@ async function syncMissingPhotos() {
 }
 // --- END SECERET CACHE MENU LOGIC ---
 
-// --- INDEXEDDB VAULT ENGINE ---
-const DB_NAME = "TCMVaultDB";
-const STORE_NAME = "pointsStore";
 
-function initDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+
+
+// --- NEW: DEV MENU LOGGER ---
+function logToDevMenu(msg) {
+  const logBox = document.getElementById("devErrorLog");
+  const logList = document.getElementById("devErrorList");
+  if (!logBox || !logList) return;
+  
+  logBox.style.display = "block"; // Make the box visible
+  
+  const time = new Date().toLocaleTimeString([], { hour12: false });
+  const newLog = document.createElement("div");
+  newLog.style.marginBottom = "4px";
+  newLog.textContent = `[${time}] ${msg}`;
+  
+  logList.prepend(newLog); // Put newest errors at the top
 }
 
+
+
+// --- NEW: BULLETPROOF CACHE API ENGINE ---
+const CACHE_VAULT_NAME = 'tcm-data-vault';
+const CACHE_FILE_URL = '/tcm-master.json'; // A synthetic file path for our database
+
+// 1. Read the file from the hard drive (Used during app boot)
 async function getVaultData() {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const request = tx.objectStore(STORE_NAME).get("all_points");
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
+  try {
+    const cache = await caches.open(CACHE_VAULT_NAME);
+    const response = await cache.match(CACHE_FILE_URL);
+    if (response) {
+      return await response.json();
+    }
+    return [];
+  } catch (e) {
+    console.error("Failed to read from Cache API:", e);
+    return [];
+  }
 }
 
+// 2. Save the entire database (Used during background syncs)
 async function saveVaultData(dataArray) {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    tx.objectStore(STORE_NAME).put(dataArray, "all_points");
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  try {
+    const cache = await caches.open(CACHE_VAULT_NAME);
+    
+    // Convert the array into a raw text string and package it as a file
+    const jsonString = JSON.stringify(dataArray);
+    const response = new Response(jsonString, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    // Silently drop it into the offline cache
+    await cache.put(CACHE_FILE_URL, response);
+  } catch (e) {
+    logToDevMenu("Cache API Save Failed: " + (e.message || "Unknown error"));
+    throw e; // Pass error up so the version timestamp isn't updated falsely
+  }
+}
+
+// 3. Save a single edit (Used when you click 'Save' or toggle importance)
+async function saveSinglePointToVault(pointObject) {
+  try {
+    // Grab the current saved database
+    let dataArray = await getVaultData();
+    
+    // Find the point we just edited and update it
+    const index = dataArray.findIndex(p => p["Short Name"] === pointObject["Short Name"]);
+    if (index !== -1) {
+      dataArray[index] = pointObject;
+    } else {
+      dataArray.push(pointObject);
+    }
+    
+    // Silently rewrite the file. 
+    // This happens in the background, your UI has already updated!
+    await saveVaultData(dataArray);
+  } catch (e) {
+    console.error("Failed to update single point in cache:", e);
+  }
 }
 
 const dataUrl = "https://script.google.com/macros/s/AKfycbwfR8fLVDYzGN8guk_CR-q-mfDxHiCH7u9pei4gHLkovDc9875Pj-Ihlo9MymgbkpOh3w/exec";
 
 // --- NEW: Optimized Fetching Engine ---
-async function loadTCMData() {
+async function loadTCMData(hasLocalData) {
   try {
     let localVersion = localStorage.getItem("tcmpoints_version");
-    let isColdBoot = points.length === 0;
+    let isColdBoot = !hasLocalData;
 
-    // 1. COLD BOOT BYPASS: If we have no data, skip the version check to save time
-    if (isColdBoot || !localVersion) {
+    // 1. COLD BOOT BYPASS: If we have NO data, do a mandatory download.
+    // FIX 1: We removed the `!localVersion` trap here so we don't accidentally block offline loads.
+    if (isColdBoot) {
        console.log("Cold boot detected. Fetching full payload immediately...");
        const fullDataUrl = dataUrl + "?t=" + Date.now();
        let response = await fetch(fullDataUrl);
@@ -1233,7 +1443,8 @@ async function loadTCMData() {
     
     // Safety net in case of legacy array format
     if (Array.isArray(versionData)) {
-      await processAndSaveData(versionData, null); 
+      // FIX 2a: Guarantee a version string is ALWAYS saved here too
+      await processAndSaveData(versionData, Date.now().toString()); 
       return;
     }
 
@@ -1251,10 +1462,12 @@ async function loadTCMData() {
     let payload = await response.json();
     let newArray = payload.points || payload; 
     
-    await processAndSaveData(newArray, serverVersion);
+    // FIX 2b: Guarantee a version string is ALWAYS saved
+    await processAndSaveData(newArray, serverVersion || Date.now().toString());
     
   } catch (e) {
-    console.error("Critical Fetch Error: ", e);
+    console.error("Background sync failed (Offline or network error): ", e);
+    // We only show the fatal error screen if the hard drive is actually empty!
     if (points.length === 0) {
        document.getElementById("cardContainer").innerHTML = 
          "<div style='text-align:center; padding:40px; color:#ff3b30; font-weight:bold;'>Offline. Could not load database.</div>";
@@ -1270,10 +1483,24 @@ async function processAndSaveData(newArray, versionStr) {
   }
   
   // 1. Save to primary IndexedDB vault
-  try { await saveVaultData(newArray); } catch(e) { console.log("IDB save bypassed."); }
+  try { 
+    await saveVaultData(newArray); 
+  } catch(e) { 
+    console.error("🚨 CRITICAL: Cache API save failed!", e);
+    
+    let errMsg = e.message || e.name || "Storage Restricted";
+    
+    // NEW: Detector for Working Copy / Local File Previews
+    if (window.location.protocol === 'file:') {
+      errMsg += " (⚠️ Apple blocks IndexedDB saves in local file previews. Test on a live URL!)";
+    }
+    
+    // PIPE THE ERROR TO THE DEV MENU!
+    logToDevMenu("Cache API Save Failed: " + errMsg);
+  }
   
-  // 2. Save to secondary LocalStorage vault (Protects against iOS wiping data)
-  try { localStorage.setItem("tcmpoints_vault", JSON.stringify(newArray)); } catch(e) { console.log("LS save bypassed."); }
+  // 2. Erase the old, bloated LocalStorage backup to free up memory
+  try { localStorage.removeItem("tcmpoints_vault"); } catch(e) {}
   
   // 3. Update version string
   if (versionStr) localStorage.setItem("tcmpoints_version", versionStr);
@@ -1286,11 +1513,13 @@ async function processAndSaveData(newArray, versionStr) {
 // The Visibility Tripwire
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
+    // NEW: Do not trigger background syncs if the hard drive is still booting!
+    if (!isAppBooted) return; 
+
     console.log("App resumed. Silently checking for updates...");
-    loadTCMData();
+    loadTCMData(points.length > 0);
     
     // --- THE IOS STICKY JOLT ---
-    // Force WebKit to recalculate sticky positioning after backgrounding
     if (appContainer && appContainer.scrollTop > 0) {
       appContainer.scrollTop += 1;
       appContainer.scrollTop -= 1;
@@ -1299,9 +1528,41 @@ document.addEventListener("visibilitychange", () => {
 });
 
 
+const TCM_SECTIONS = [
+  { key: "Location ", altKey: "Location", label: "Location" },
+  { key: "Location Notes", label: "Location Notes" },
+  { key: "Needling", label: "Needling" },
+  { key: "Actions", label: "Actions" },
+  { key: "Indications", label: "Indications" },
+  { key: "Commentary", label: "Commentary" },
+  { key: "Summary of clinical application", label: "Summary of Clinical Application" },
+  { key: "Combinations", label: "Combinations" },
+  { key: "Clinical Manifestations", label: "Clinical Manifestations" },
+  { key: "Aetiology", label: "Aetiology" },
+  { key: "Description", label: "Description" },
+  { key: "Precursors of Pattern", label: "Precursors of Pattern" },
+  { key: "Patterns", label: "Patterns" },
+  { key: "Developments From Pattern", label: "Developments From Pattern" },
+  { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
+  { key: "Analysis", label: "Analysis" },
+  { key: "Treatment Principle", label: "Treatment Principle" },
+  { key: "Point Prescription", label: "Point Prescription" },
+  { key: "Supplementary Points", label: "Supplementary Points" },
+  { key: "Explanation", label: "Explanation" },
+  { key: "Remarks", label: "Remarks" },
+  { key: "Flashcard View", label: "Flashcard View" },
+  { key: "Notes", label: "Notes" },
+  { key: "CAM Notes", label: "CAM Notes" }
+];
+
+
+
+
+
 // Define Globals
+let isAppBooted = false; // NEW: Prevents iOS from interrupting the boot sequence
 let points = [];
-let filteredPoints = []; 
+let filteredPoints = [];
 let activeHighlightRegex = null;
 let activeTextTerms = []; 
 let activeParsedIncludes = []; 
@@ -1318,46 +1579,31 @@ const viewportMeta = document.querySelector('meta[name="viewport"]');
 // --- NEW: Bulletproof Boot Sequence ---
 async function bootApp() {
 
-// 1. REQUEST PERSISTENCE: Ask iOS not to delete our IndexedDB
+  // 1. REQUEST PERSISTENCE: Ask iOS not to delete our IndexedDB
   if (navigator.storage && navigator.storage.persist) {
-    try {
-      const isPersistent = await navigator.storage.persist();
-      if (isPersistent) {
-        console.log("Storage is protected. iOS will not clear this database.");
-      } else {
-        console.log("Storage is standard. Subject to iOS cleanup.");
-      }
-    } catch (e) { console.log("Persistence API not supported."); }
+    try { await navigator.storage.persist(); } catch (e) {}
   }
 
-
-
-  let rawPoints = await getVaultData();
-  
-  // iOS SURVIVAL: If IndexedDB was wiped, restore it from our LocalStorage backup
-  if ((!rawPoints || rawPoints.length === 0) && localStorage.getItem("tcmpoints_vault")) {
-    console.log("IndexedDB empty. Restoring from LocalStorage backup...");
-    try {
-        rawPoints = JSON.parse(localStorage.getItem("tcmpoints_vault"));
-        // Silently rebuild the IndexedDB vault in the background
-        if (Array.isArray(rawPoints)) saveVaultData(rawPoints).catch(e=>{});
-    } catch(e) { console.error("Could not parse LocalStorage vault."); }
-  }
+  // 2. LOAD DATA
+  let rawPoints = [];
+  try {
+    rawPoints = await getVaultData();
+  } catch(e) { console.log("IDB blocked, waiting for network..."); }
 
   if (!Array.isArray(rawPoints)) rawPoints = [];
-
   if (rawPoints.length > 0) {
-    // We have data! Render instantly.
+    // We have data! Render instantly without flashing a loading message.
     points = processPoints(rawPoints);
     initDropdown();
     handleSearch(); 
   } else {
-    // True first-time load. Show a friendly message instead of a blank screen.
+    // True first-time load. Now we show the downloading message.
     document.getElementById("cardContainer").innerHTML = 
       "<div style='text-align:center; padding:40px; color:#888; font-weight:bold;'>Downloading Database...<br><span style='font-size:12px; font-weight:normal;'>This will only take a few seconds.</span></div>";
   }
   
-  loadTCMData(); // Trigger background sync
+  loadTCMData(rawPoints.length > 0); // NEW: Explicitly tell the updater if we have local data
+  isAppBooted = true; // NEW: Unlock the app for resume events
 }
 
 bootApp(); // Start the engine
@@ -1371,20 +1617,18 @@ bootApp(); // Start the engine
     return String(str).replace(/\[\/?(b|i|u|color(?:=[^\]]+)?)\]/gi, "");
   }
 
-  function generateSearchIndex(point) {
-        const visibleData = [
-      point.Important, point["Short Name"], point["Full Name"], point["Channel Full Name"],
-      point["Channel Short Name"], point["Location"], point.Location,
-      point["Location Notes"], point.Needling, point.Actions, point.Indications, point.Commentary,
-      point["Summary of clinical application"], point.Combinations, point.Description, 
-      point.Patterns, point["Diagnosis & Differentiation"], point.Analysis, point["Treatment Principle"], 
-      point["Point Prescription"], point["Supplementary Points"], point.Explanation, point.Remarks, point["Flashcard View"],
-      point.Notes, point["CAM Notes"]
+    function generateSearchIndex(point) {
+    let visibleData = [
+      point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], 
+      point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"]
     ];
-
-    // Strip BBCode and lowercase once during boot
-    return stripBBCode(visibleData.filter(Boolean).map(v => String(v)).join(" ")).toLowerCase(); 
+    
+    // Pull the rest dynamically from the master array
+    TCM_SECTIONS.forEach(sec => visibleData.push(point[sec.key] || point[sec.altKey]));
+    
+    return stripBBCode(visibleData.filter(Boolean).map(v => String(v)).join(" ")).toLowerCase();
   }
+
 
   function processPoints(dataArray) {
     const oldMap = {};
@@ -1403,16 +1647,11 @@ bootApp(); // Start the engine
       point._shortNameLower = (point["Short Name"] || "").toString().toLowerCase();
       point._fullNameLower = (point["Full Name"] || point[" Full Name"] || "").toString().toLowerCase();
       
-            const fields = [
-        point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"],
-        point["Location "] || point.Location, point["Location Notes"], point.Needling,
-        point.Actions, point.Indications, point.Commentary,
-        point["Summary of clinical application"], point.Combinations, point.Description, 
-        point.Patterns, point["Diagnosis & Differentiation"], point.Analysis, point["Treatment Principle"], 
-        point["Point Prescription"], point["Supplementary Points"], point.Explanation, point.Remarks, point["Flashcard View"],
-        point.Notes, point["CAM Notes"]
+             let fields = [
+        point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], 
+        point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"]
       ];
-
+      TCM_SECTIONS.forEach(sec => fields.push(point[sec.key] || point[sec.altKey]));
       
       let paras = [];
       fields.forEach(f => {
@@ -1461,7 +1700,9 @@ bootApp(); // Start the engine
     if (!anyChecked) checkboxes[0].checked = true;
   }
 
-  function openChannelModal() { document.getElementById("channelModal").style.display = "flex"; }
+  function openChannelModal() { 
+      closeBottomSheet();
+  document.getElementById("channelModal").style.display = "flex"; }
   
   function applyChannels() {
     const checkboxes = document.getElementById("channelCheckboxes").querySelectorAll("input");
@@ -1470,9 +1711,266 @@ bootApp(); // Start the engine
     handleSearch();
   }
   
-  function cancelFilter() { document.getElementById("channelModal").style.display = "none"; }
+  // --- SECTION FILTER LOGIC ---
+let activeSections = [];
+let isSectionFilterActive = false;
+const allAvailableSections = TCM_SECTIONS.map(sec => sec.label);
+
+
+function openSectionFilterModal() {
+  const container = document.getElementById("sectionCheckboxes");
+  container.innerHTML = "";
+  
+  allAvailableSections.forEach(sec => {
+    const lbl = document.createElement("label");
+    lbl.className = "checkbox-label";
+    // If filter is off and list is empty, default to checking everything visually
+    const isChecked = activeSections.includes(sec) || (!isSectionFilterActive && activeSections.length === 0);
+    lbl.innerHTML = `<input type="checkbox" value="${sec}" ${isChecked ? "checked" : ""}> ${sec}`;
+    container.appendChild(lbl);
+  });
+  
+  const toggleBtn = document.getElementById("sectionFilterToggleBtn");
+  if (isSectionFilterActive) {
+    toggleBtn.textContent = "Turn Filter OFF";
+    toggleBtn.style.background = "#ff3b30";
+    toggleBtn.style.color = "white";
+  } else {
+    toggleBtn.textContent = "Enable Filter";
+    toggleBtn.className = "cancel-btn"; // Resets to default styling
+    toggleBtn.style.background = "";
+    toggleBtn.style.color = "";
+  }
+  
+  document.getElementById("sectionModal").style.display = "flex";
+}
+
+function closeSectionFilterModal() {
+  document.getElementById("sectionModal").style.display = "none";
+}
+
+function selectAllSections(check) {
+  const checkboxes = document.getElementById("sectionCheckboxes").querySelectorAll("input");
+  checkboxes.forEach(cb => cb.checked = check);
+}
+
+function toggleSectionFilterState() {
+  isSectionFilterActive = !isSectionFilterActive;
+  closeSectionFilterModal();
+  updateSheetUI(false, true); // True preserves the scroll position
+  showToast(isSectionFilterActive ? "Section filter Enabled" : "Section filter Disabled");
+}
+
+function applySectionFilter() {
+  const checkboxes = document.getElementById("sectionCheckboxes").querySelectorAll("input");
+  activeSections = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+  isSectionFilterActive = true; 
+  closeSectionFilterModal();
+  updateSheetUI(false, true);
+}
+   
+  
+let isFlashcardMode = false;
+
+function toggleFlashcardMode() {
+  isFlashcardMode = !isFlashcardMode;
+  const sheet = document.getElementById("sheetContent");
+  const fcIcon = document.getElementById("fcIcon"); // Grab the icon directly
+  
+  if (isFlashcardMode) {
+    sheet.classList.add("flashcard-mode");
+    
+    // Update the button color directly without rebuilding the DOM
+    if (fcIcon) {
+      fcIcon.style.background = "#cc5500";
+      fcIcon.style.color = "white";
+    }
+    
+    showToast("Flashcard Mode: ON");
+  } else {
+    sheet.classList.remove("flashcard-mode");
+    
+    // Revert the button color
+    if (fcIcon) {
+      fcIcon.style.background = "";
+      fcIcon.style.color = "";
+    }
+    
+    showToast("Flashcard Mode: OFF");
+  }
+}
+
+
+// --- OCCLUSION MODE LOGIC ---
+let isOcclusionMode = false;
+let occlusionLevel = 30;
+
+function openOcclusionModal() {
+  document.getElementById("occlusionSlider").value = occlusionLevel;
+  document.getElementById("occPercentDisplay").textContent = occlusionLevel + "%";
+  
+  const toggleBtn = document.getElementById("occlusionToggleBtn");
+  if (isOcclusionMode) {
+    toggleBtn.textContent = "Turn Filter OFF";
+    toggleBtn.style.background = "#ff3b30";
+    toggleBtn.style.color = "white";
+  } else {
+    toggleBtn.textContent = "Turn OFF";
+    toggleBtn.style.background = "";
+    toggleBtn.style.color = "";
+  }
+  
+  document.getElementById("occlusionModal").style.display = "flex";
+}
+
+function closeOcclusionModal() {
+  document.getElementById("occlusionModal").style.display = "none";
+}
+
+function toggleOcclusion(enable) {
+  if (enable) {
+    isOcclusionMode = true;
+    occlusionLevel = parseInt(document.getElementById("occlusionSlider").value, 10);
+    showToast(`Occlusion Mode: ON (${occlusionLevel}%)`);
+  } else {
+    isOcclusionMode = false;
+    showToast("Occlusion Mode: OFF");
+  }
+  closeOcclusionModal();
+  updateSheetUI(false, true); // Rebuilds the UI immediately to apply the filter
+}
+
+function applyOcclusionToHTML(html, percent) {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+
+  // 1. Expanded Stop Words (Filters out common long filler words)
+  const stopWords = new Set(["this","that","with","from","have","they","will","what","when","where","your","then","than","into","only","also","some","very","just","like","their","these","those","which","could","should","would","been","much","there","because","through","about","between","during"]);
+
+    // 2. High-Value Priority Dictionary 
+  const tcmKeywords = new Set([
+    // Anatomical & Directional
+    "radial", "medial", "proximal", "distal", "anterior", "posterior", "lateral",
+    
+    // Core Concepts & Vital Substances
+    "qi", "blood", "yin", "yang", "essence", "jing", "fluid", "fluids", "jin", "ye", 
+    "mind", "shen", "spirit", "hun", "po", "yi", "zhi", "yuan", "gu", "zong", "zhen", 
+    "wei", "ying", "zheng", "def", "xu", "xs", "dry", "sweat", "fever", "chills", "aversion", "white", "red", "thin", "sticky", "peeled", "hot", 
+    
+    // Organs & Body Parts
+    "heart", "liver", "spleen", "lung", "lungs", "kidney", "kidneys", "pericardium", 
+    "stomach", "intestine", "gallbladder", "bladder", "triple", "burner", "san", "jiao",
+    "uterus", "brain", "marrow", "bone", "bones", "sinews", "muscles", "skin", "vessels",
+    
+    // Five Elements & Climates
+    "wood", "fire", "earth", "metal", "water", "wind", "cold", "heat", "damp", 
+    "dampness", "dryness", "summerheat",
+    
+    // Pathology & Actions
+    "deficiency", "empty", "excess", "full", "stagnation", "stasis", "rebellious", 
+    "sinking", "tonify", "sedate", "pacify", "invigorate", "resolve", "expel", 
+    "nourish", "clear", "subdue", "extinguish", "ascending", "descending", "entering", "exiting", "cough",
+    
+    // Emotions
+    "anger", "joy", "sadness", "worry", "pensiveness", "fear", "shock", "grief",
+    
+        // Pulse & Tongue Diagnostics
+    "pulse", "tongue", "coating", "body", "tip", "scattered", "leather", "front", "rear", "yellow", "ulcers"
+
+    
+  ]);
+
+
+  const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
+  let textNodes = [];
+  let currentNode;
+  while (currentNode = walker.nextNode()) {
+    textNodes.push(currentNode);
+  }
+
+  let allWords = [];
+  textNodes.forEach((node, nodeIndex) => {
+    const text = node.nodeValue;
+    
+    // 3. Upgraded Regex: Allows 2+ letters now so we can catch "Qi", "Du", etc.
+    const regex = /\b((?:LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV)\s*-?\s*\d{1,2}|[A-Za-z]{2,})\b/gi;
+
+    
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const word = match[0];
+      const lowerWord = word.toLowerCase();
+      
+      if (!stopWords.has(lowerWord)) {
+        
+        // 4. The Smart Scoring Engine
+        let score = 0;
+        let isPointName = /^(?:LU|LI|ST|SP|HT|SI|BL|KI|PC|SJ|GB|LR|DU|RN|CV|GV)[-\s]*\d+/i.test(word);
+
+        if (isPointName) {
+            score = 100 + (Math.random() * 10); // Tier 1: Point names (e.g., LU-5) are critical
+        } else if (tcmKeywords.has(lowerWord)) {
+            score = 75 + (Math.random() * 10);  // Tier 2: Core concepts, organs, and pathogens
+        } else if (word.length >= 4) {
+            score = (word.length * 2) + (Math.random() * 5); // Tier 3: Fallback to length for general terminology
+        } else {
+            continue; // Skip 2-3 letter words that aren't in the priority dictionary (like "and", "the", "for")
+        }
+
+        allWords.push({
+          word: word,
+          nodeIndex: nodeIndex,
+          index: match.index,
+          length: word.length,
+          score: score
+        });
+      }
+    }
+  });
+
+  // Bail out instantly if there are no eligible words at all OR if slider is at 0%
+  if (allWords.length === 0 || percent === 0) return tempDiv.innerHTML;
+
+  // Math.max guarantees that even short, 1-sentence notes will get at least 1 blank!
+  const totalWordsToOcclude = Math.max(1, Math.round(allWords.length * (percent / 100)));
+  
+  allWords.sort((a, b) => b.score - a.score);
+  const selectedWords = allWords.slice(0, totalWordsToOcclude);
+
+  selectedWords.sort((a, b) => {
+    if (a.nodeIndex === b.nodeIndex) return b.index - a.index;
+    return b.nodeIndex - a.nodeIndex;
+  });
+
+  selectedWords.forEach(sw => {
+    const node = textNodes[sw.nodeIndex];
+    const text = node.nodeValue;
+    
+    const before = text.substring(0, sw.index);
+    const after = text.substring(sw.index + sw.length);
+
+    const span = document.createElement('span');
+    span.className = 'occluded-blank';
+    span.dataset.original = sw.word;
+    span.textContent = '______';
+    
+    span.setAttribute('onclick', "if(this.classList.contains('occluded-blank')) { event.stopPropagation(); this.textContent=this.dataset.original; this.className='revealed-blank'; } else { this.textContent='______'; this.className='occluded-blank'; }");
+
+    const afterNode = document.createTextNode(after);
+    node.nodeValue = before;
+    
+    node.parentNode.insertBefore(span, node.nextSibling);
+    node.parentNode.insertBefore(afterNode, span.nextSibling);
+  });
+
+  return tempDiv.innerHTML;
+}
+
 
   
+  
+  function cancelFilter() { document.getElementById("channelModal").style.display = "none"; }
+    
 
   function receiveBackgroundUpdate(dataPayload) {
     try {
@@ -1636,21 +2134,25 @@ bootApp(); // Start the engine
   }
   window.addEventListener('resize', debounce(updateStickyHeaderHeights, 150));
 
-  function toggleSearchDropdown() {
+        function toggleSearchDropdown() {
+        closeBottomSheet();    
     const dropdown = document.getElementById("searchDropdown");
-    dropdown.classList.toggle("expanded");
-    if (dropdown.classList.contains("expanded")) {
-      searchInput.focus();
+    const isExpanded = dropdown.classList.toggle("expanded");
+    
+    if (isExpanded) {
+      // The <label> tag natively handles the focus now!
       renderSearchHistory();
+    } else {
+      searchInput.blur();
     }
     updateStickyHeaderHeights(); 
   }
+
+
+
+
   
-    // --- HEADER INTERACTION LISTENER ---
-  // If the user clicks anywhere in the top header (Search, Clear, Settings, etc.), close the bottom sheet!
-  document.getElementById("mainStickyHeader").addEventListener("click", () => {
-    closeBottomSheet();
-  }, { passive: true });
+
 
   // Bulletproof fallback: If they somehow focus the search input directly, close the sheet.
   document.getElementById("searchInput").addEventListener("focus", () => {
@@ -1668,7 +2170,14 @@ bootApp(); // Start the engine
   });
 
   function clearSearchText() { searchInput.value = ""; handleSearch(); searchInput.focus(); renderSearchHistory(); }
-  function clearAndCloseSearch() { searchInput.value = ""; handleSearch(); document.getElementById("searchDropdown").classList.remove("expanded"); updateStickyHeaderHeights(); }
+    function clearAndCloseSearch() { 
+    closeBottomSheet(); // <-- Added this!
+    searchInput.value = ""; 
+    handleSearch(); 
+    document.getElementById("searchDropdown").classList.remove("expanded"); 
+    updateStickyHeaderHeights(); 
+  }
+
 
   function toggleHelp() { document.getElementById("searchHelpTooltip").classList.toggle("show"); }
   document.addEventListener("click", (e) => {
@@ -1677,6 +2186,42 @@ bootApp(); // Start the engine
       tooltip.classList.remove("show");
     }
   });
+  
+    // --- NEW RANGE PARSER FUNCTION ---
+  function expandPointRange(term) {
+    term = term.trim();
+    // Smart Regex: Matches LU1-7, LU-1-7, LU1-LU7, and LU-1 - LU-7
+    const rangeMatch = term.match(/^([a-z\.]+)(?:[\s\-\.]*)(\d+)\s*-\s*(?:([a-z\.]+)(?:[\s\-\.]*))?(\d+)$/i);
+    
+    if (rangeMatch) {
+      const prefix1 = rangeMatch[1].toLowerCase().replace(/\./g, "");
+      const startNum = parseInt(rangeMatch[2], 10);
+      const prefix2 = rangeMatch[3] ? rangeMatch[3].toLowerCase().replace(/\./g, "") : prefix1;
+      const endNum = parseInt(rangeMatch[4], 10);
+
+      // Safety check: prefixes must match (prevents invalid searches like @LU1-SP5)
+      if (prefix1 !== prefix2) return [term];
+
+      // Determine min and max to safely handle backwards ranges (e.g., @LU7-1)
+      const min = Math.min(startNum, endNum);
+      const max = Math.max(startNum, endNum);
+      
+      // Safety cap: Prevent browser crashes from massive typos (Max TCM channel is BL with 67 points)
+      if (max - min > 100) return [term];
+
+      let results = [];
+      for (let i = min; i <= max; i++) {
+        results.push(prefix1 + i); 
+      }
+      return results; // Returns ['lu1', 'lu2', 'lu3', ...]
+    }
+    return [term]; // If it's not a range, return it normally so standard search doesn't break
+  }
+
+  
+  
+  
+  
 
     function expandTCMPoint(term) {
     term = term.trim();
@@ -1833,10 +2378,16 @@ bootApp(); // Start the engine
         else if (token.startsWith("<>")) {
         const terms = token.slice(2).toLowerCase().split(",");
         terms.forEach(t => exclude.push(...expandTCMPoint(t)));
-      } else if (token.startsWith("@")) {
+            } else if (token.startsWith("@")) {
         const terms = token.slice(1).toLowerCase().split(",");
-        terms.forEach(t => headers.push(...expandTCMPoint(t)));
+        terms.forEach(t => {
+          // Pass the term through the range parser first!
+          const rangeTerms = expandPointRange(t);
+          // Then expand aliases for every generated point in the range
+          rangeTerms.forEach(rt => headers.push(...expandTCMPoint(rt)));
+        });
       } else if (token.startsWith("#")) {
+
         // Strip the # AND any quotation marks so multi-word phrases parse cleanly
         const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
         const terms = cleanToken.split(",");
@@ -1888,8 +2439,17 @@ bootApp(); // Start the engine
       // 3. EXCLUSIONS <> (Fast Check)
       if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
 
-      // 4. SHORT NAMES @ (Fast Check)
-      if (headers.length > 0 && !headers.some(h => point._shortNameLower.includes(h))) return false;
+           // 4. SHORT NAMES @ (Fast Check with Smart Boundaries)
+      if (headers.length > 0 && !headers.some(h => {
+        // If the search term ends in a number (like "lu-1"), enforce a strict word boundary 
+        // so it doesn't accidentally match "lu-10" or "lu-11".
+        if (/\d$/.test(h)) {
+          return new RegExp(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "i").test(point._shortNameLower);
+        }
+        // If it's just letters (like "@LU"), standard inclusion works perfectly to grab the whole channel
+        return point._shortNameLower.includes(h);
+      })) return false;
+
 
             // 5. FULL NAMES & CHANNELS # (Fast Check)
       if (fullNames.length > 0 && !fullNames.every(f => {
@@ -2222,27 +2782,10 @@ bootApp(); // Start the engine
       container.appendChild(div);
     };
 
-    addDetail("Location", point["Location "] || point.Location);
-    addDetail("Location Notes", point["Location Notes"]);
-    addDetail("Needling", point.Needling);
-    addDetail("Actions", point.Actions);
-    addDetail("Indications", point.Indications);
-    addDetail("Commentary", point.Commentary);
-    addDetail("Summary of Clinical Application", point["Summary of clinical application"]);
-    addDetail("Combinations", point.Combinations);
-    addDetail("Description", point.Description);
-    addDetail("Patterns", point.Patterns);
-    addDetail("Diagnosis & Differentiation", point["Diagnosis & Differentiation"]);
-    addDetail("Analysis", point.Analysis);
-    addDetail("Treatment Principle", point["Treatment Principle"]);
-    addDetail("Point Prescription", point["Point Prescription"]);
-    addDetail("Supplementary Points", point["Supplementary Points"]);
-    addDetail("Explanation", point.Explanation);
-    addDetail("Remarks", point.Remarks);
-    addDetail("Flashcard View", point["Flashcard View"]);
-    addDetail("Notes", point.Notes);
-    addDetail("CAM Notes", point["CAM Notes"]);
-
+        TCM_SECTIONS.forEach(sec => {
+      let val = point[sec.key] || point[sec.altKey] || "";
+      addDetail(sec.label, val);
+    });
   }
 
 
@@ -2263,6 +2806,8 @@ bootApp(); // Start the engine
       searchInput.blur(); // Drops the mobile keyboard so they can see results
     }
   });
+  
+
 
 
   // --- CARD CLICK GESTURE (TRIGGERS BOTTOM SHEET) ---
@@ -2414,33 +2959,47 @@ bootApp(); // Start the engine
   function openEditModal(point, defaultField = "Notes") {
     currentEditingPoint = point; 
     
-    // Safely fetch field names (handling your data's "Location " trailing space quirk)
-        const fields = [
-      "Important", "Notes", "CAM Notes", 
-      point.hasOwnProperty("Location ") ? "Location " : "Location", 
-      "Location Notes", "Needling", "Actions", "Indications", 
-      "Commentary", "Summary of clinical application", 
-      "Combinations", "Description",
-      "Patterns", "Diagnosis & Differentiation", "Analysis", "Treatment Principle", 
-      "Point Prescription", "Supplementary Points", "Explanation", "Remarks", "Flashcard View"
-    ];
-
-    
-    const select = document.getElementById("editFieldSelect");
+        const select = document.getElementById("editFieldSelect");
     select.innerHTML = "";
-    fields.forEach(field => {
+    
+    // Hardcode "Important" since it sits outside the standard text blocks
+    const optImp = document.createElement("option");
+    optImp.value = "Important"; optImp.textContent = "Important";
+    if ("Important" === defaultField) optImp.selected = true;
+    select.appendChild(optImp);
+    
+    // Loop through the master array for the rest
+    TCM_SECTIONS.forEach(sec => {
+      let fieldKey = (sec.label === "Location" && !point.hasOwnProperty("Location ")) ? "Location" : sec.key;
       const opt = document.createElement("option");
-      opt.value = field;
-      opt.textContent = field.trim(); // Hide trailing spaces from user
-      if (field === defaultField) opt.selected = true;
+      opt.value = fieldKey;
+      opt.textContent = sec.label;
+      if (fieldKey === defaultField) opt.selected = true;
       select.appendChild(opt);
     });
+
     
     changeEditField();
     
-    document.getElementById("editTitle").textContent = "Edit Data (" + point["Short Name"] + ")";
+        document.getElementById("editTitle").textContent = "Edit Data (" + point["Short Name"] + ")";
     document.getElementById("editError").style.display = "none";
-    document.getElementById("editModal").style.display = "flex";
+    
+    const modal = document.getElementById("editModal");
+    modal.style.display = "flex";
+    void modal.offsetHeight; // FORCES IOS TO CALCULATE VISIBILITY
+
+    // Execute immediately in the same click context
+    const editor = document.getElementById("editArea");
+    editor.focus();
+
+const range = document.createRange();
+const sel = window.getSelection();
+range.selectNodeContents(editor);
+range.collapse(false);
+sel.removeAllRanges();
+sel.addRange(range);
+
+
   }
 
   function changeEditField() {
@@ -2552,13 +3111,8 @@ bootApp(); // Start the engine
     p.Important = next;
     p._searchIndex = generateSearchIndex(p);
     
-        // Update local DB instantly
-    let cleanVault = await getVaultData();
-    let targetPoint = cleanVault.find(x => x["Short Name"] === pointId);
-    if (targetPoint) {
-      targetPoint.Important = next;
-      await saveVaultData(cleanVault);
-    }
+       // Update local DB instantly using the 1kb micro-save
+    await saveSinglePointToVault(p);
 
 
         // 2. Refresh the Panels Instantly
@@ -2606,48 +3160,51 @@ bootApp(); // Start the engine
   
   
 
-  // --- 4. The Safest Save Function (with Timeout) ---
-  function saveEdit() {
-    if (!navigator.onLine) {
-      failSave("No internet connection. Edits cannot be saved offline.");
-      return;
-    }
+// --- STRICT CLOUD-FIRST SAVE ENGINE ---
+async function saveEdit() {
+  if (!navigator.onLine) {
+    failSave("No internet connection. Edits cannot be saved offline.");
+    return;
+  }
 
-    // Extract the HTML and convert it back to BBCode for Google Sheets
-    const editor = document.getElementById("editArea");
-    const newValue = htmlToBbcode(editor).trim();
-    
-    document.getElementById("saveBtn").textContent = "Saving...";
-    document.getElementById("saveBtn").disabled = true; 
-    document.getElementById("cancelBtnEdit").disabled = true;
-    document.getElementById("editError").style.display = "none";
-    
-    const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
-    
-    // Set up the 10-Second Timeout Abort Controller
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); 
+  const editor = document.getElementById("editArea");
+  const newValue = htmlToBbcode(editor).trim();
+  
+  // 1. Lock the UI while we talk to Google
+  document.getElementById("saveBtn").textContent = "Saving...";
+  document.getElementById("saveBtn").disabled = true; 
+  document.getElementById("cancelBtnEdit").disabled = true;
+  document.getElementById("editError").style.display = "none";
 
-    fetch(dataUrl, {
+  // 2. Prepare the payload and an 8-second timeout
+  const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000); 
+
+  // 3. Attempt the Cloud Save FIRST
+  try {
+    await fetch(dataUrl, {
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
-      signal: controller.signal // Tie the timeout to the fetch
-    })
-    .then(() => {
-      clearTimeout(timeoutId); // Success! Clear the timeout.
-      completeSave(newValue); 
-    })
-    .catch(err => {
-      clearTimeout(timeoutId);
-      if (err.name === 'AbortError') {
-        failSave("Save timed out. Google took too long. Please try again.");
-      } else {
-        failSave("Network error. Your edit was NOT saved.");
-      }
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId); // Google responded!
+    
+    // 4. Cloud succeeded, now update the local app safely
+    await completeSave(newValue);
+
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      failSave("Google Sheets timed out. Please try saving again.");
+    } else {
+      failSave("Google Sheets save failed. Your edit was NOT saved.");
+    }
   }
+}
 
   function closeEditModal() { 
     document.getElementById("editModal").style.display = "none"; 
@@ -2688,57 +3245,73 @@ bootApp(); // Start the engine
     }
   }
 
-  function openCompareModal() {
+        function openCompareModal() {
     if (compareList.length === 0) return;
-    const table = document.getElementById("compareTable");
+    const container = document.getElementById("compareContainer");
     
-      // Enable Native Pinch-to-Zoom
-  viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0");
+    // Lock viewport to maintain native app feel
+    viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
     
-    // The fields to display in the matrix rows
-        const fields = [
-      { key: "Location ", altKey: "Location", label: "Location" },
-      { key: "Needling", label: "Needling" },
-      { key: "Actions", label: "Actions" },
-      { key: "Indications", label: "Indications" },
-      { key: "Combinations", label: "Combinations" },
-      { key: "Commentary", label: "Commentary" },
-      { key: "Summary of clinical application", label: "Summary of Clinical Application" },
-      { key: "Description", label: "Description" },
-      { key: "Patterns", label: "Patterns" },
-      { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
-      { key: "Analysis", label: "Analysis" },
-      { key: "Treatment Principle", label: "Treatment Principle" },
-      { key: "Point Prescription", label: "Point Prescription" },
-      { key: "Supplementary Points", label: "Supplementary Points" },
-      { key: "Explanation", label: "Explanation" },
-      { key: "Remarks", label: "Remarks" },
-      { key: "Flashcard View", label: "Flashcard View" },
-      { key: "Notes", label: "Notes" },
-      { key: "CAM Notes", label: "CAM Notes" }
-    ];
+    const fields = TCM_SECTIONS;
 
 
     let pts = compareList.map(id => points.find(p => p["Short Name"] === id)).filter(Boolean);
 
-    let html = `<thead><tr><th>Data</th>`;
-    pts.forEach(p => { html += `<th>${p["Short Name"]}</th>`; });
-    html += `</tr></thead><tbody>`;
+      // --- THE RESPONSIVE IPAD + IPHONE ALGORITHM ---
+    // 'max(100%, Xpx)' tells the browser: "If the screen is huge (iPad), stretch to take up 100% of it. 
+    // If the screen is tiny (iPhone), force it to be at least Xpx wide so it doesn't squish!"
+    let minWidth = pts.length * 150; // Minimum 150px per column
+    let explicitWidth = `max(100%, ${minWidth}px)`;
+
+    // Apply the smart width to the master wrapper 
+    let html = `<div style="width: ${explicitWidth}; padding-bottom: 40px; box-sizing: border-box;">`;
+    html += `<div class="compare-flex-container">`;
+
+
+
 
     fields.forEach(f => {
-      html += `<tr><td>${f.label}</td>`;
+      // Skip the entire section if no points have data for it
+      const hasDataInRow = pts.some(p => {
+        let val = p[f.key] || p[f.altKey] || "";
+        return val && String(val).trim() !== "";
+      });
+      if (!hasDataInRow) return;
+
+      html += `<div class="compare-section">`;
+      html += `<div class="compare-section-title">${f.label}</div>`;
+      
+      // CSS Grid perfectly aligns headers and bodies in rows
+      html += `<div class="compare-section-grid" style="grid-template-columns: repeat(${pts.length}, 1fr);">`;
+      
+      // ROW 1: Point Headers (These will double-stick right under the title!)
+      pts.forEach(p => {
+         const imp = p.Important ? String(p.Important).trim() : "";
+         const impHtml = imp !== "" ? `<span class="importance-badge" style="font-size:16px;">${imp}</span>` : "";
+         html += `<div class="compare-card-header">${p["Short Name"]} ${impHtml}</div>`;
+      });
+      
+      // ROW 2: Data Bodies
       pts.forEach(p => {
          let rawVal = p[f.key] || p[f.altKey] || "";
-         let formatted = linkifyPoints(formatTextWithTables(highlightText(rawVal)));
-         html += `<td>${formatted || "<span style='color:#999;font-style:italic;'>No data</span>"}</td>`;
+         let formatted = rawVal && String(rawVal).trim() !== "" 
+              ? linkifyPoints(formatTextWithTables(highlightText(rawVal))) 
+              : `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
+         
+         html += `<div class="compare-card-body">${formatted}</div>`;
       });
-      html += `</tr>`;
+      
+      html += `</div></div>`; // Close grid and section
     });
-
-    html += `</tbody>`;
-    table.innerHTML = html;
+    
+    html += `</div></div>`; // Close flex container and global wrapper
+    
+    container.innerHTML = html;
     document.getElementById("compareModal").style.display = "flex";
   }
+
+
+
 
   function closeCompareModal() {
   // Lock the viewport back down to protect the main app UI
@@ -2795,28 +3368,8 @@ bootApp(); // Start the engine
     const container = document.getElementById("printModalBody");
     container.innerHTML = ""; 
 
-    const fieldsToPrint = [
-      { key: "Location ", altKey: "Location", label: "Location" },
-      { key: "Location Notes", label: "Location Notes" },
-      { key: "Needling", label: "Needling" },
-      { key: "Actions", label: "Actions" },
-      { key: "Indications", label: "Indications" },
-      { key: "Commentary", label: "Commentary" },
-      { key: "Summary of clinical application", label: "Summary of Clinical Application" },
-      { key: "Combinations", label: "Combinations" },
-      { key: "Description", label: "Description" },
-      { key: "Patterns", label: "Patterns" },
-      { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
-      { key: "Analysis", label: "Analysis" },
-      { key: "Treatment Principle", label: "Treatment Principle" },
-      { key: "Point Prescription", label: "Point Prescription" },
-      { key: "Supplementary Points", label: "Supplementary Points" },
-      { key: "Explanation", label: "Explanation" },
-      { key: "Remarks", label: "Remarks" },
-      { key: "Flashcard View", label: "Flashcard View" },
-      { key: "Notes", label: "Notes" },
-      { key: "CAM Notes", label: "CAM Notes" }
-    ];
+    const fieldsToPrint = TCM_SECTIONS;
+
 
     printList.forEach(id => {
       const p = points.find(x => x["Short Name"] === id);
@@ -2941,28 +3494,8 @@ bootApp(); // Start the engine
         });
       };
 
-      const fieldsToPrint = [
-        { key: "Location ", altKey: "Location", label: "Location" },
-        { key: "Location Notes", label: "Location Notes" },
-        { key: "Needling", label: "Needling" },
-        { key: "Actions", label: "Actions" },
-        { key: "Indications", label: "Indications" },
-        { key: "Commentary", label: "Commentary" },
-        { key: "Summary of clinical application", label: "Summary of Clinical Application" },
-        { key: "Combinations", label: "Combinations" },
-        { key: "Description", label: "Description" },
-        { key: "Patterns", label: "Patterns" },
-        { key: "Diagnosis & Differentiation", label: "Diagnosis & Differentiation" },
-        { key: "Analysis", label: "Analysis" },
-        { key: "Treatment Principle", label: "Treatment Principle" },
-        { key: "Point Prescription", label: "Point Prescription" },
-        { key: "Supplementary Points", label: "Supplementary Points" },
-        { key: "Explanation", label: "Explanation" },
-        { key: "Remarks", label: "Remarks" },
-        { key: "Flashcard View", label: "Flashcard View" },
-        { key: "Notes", label: "Notes" },
-        { key: "CAM Notes", label: "CAM Notes" }
-      ];
+      const fieldsToPrint = TCM_SECTIONS;
+
 
       for (let id of printList) {
         const p = points.find(x => x["Short Name"] === id);
@@ -3039,51 +3572,60 @@ bootApp(); // Start the engine
 
 
 
-  // --- STANDARD SAVE LOGIC ---
-  async function completeSave(newValue) {
-    // 1. Update active memory
+// --- SAFE LOCAL UPDATE ---
+async function completeSave(newValue) {
+  try {
+    // 1. Defend against background syncs ripping the point out from under us
+    let masterPoint = points.find(p => p["Short Name"] === currentEditingPoint["Short Name"]);
+    if (masterPoint) currentEditingPoint = masterPoint;
+
+    // 2. Update active memory safely
     currentEditingPoint[currentEditingField] = newValue; 
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
-    
-    // 2. Save securely to IndexedDB
-    let cleanVault = await getVaultData();
-    let targetPoint = cleanVault.find(p => p["Short Name"] === currentEditingPoint["Short Name"]);
-    if (targetPoint) {
-      targetPoint[currentEditingField] = newValue;
-      await saveVaultData(cleanVault);
-    }
 
     // 3. Rebuild the Paragraph Array for the Search Engine
-        const fields = [
-      currentEditingPoint.Important, currentEditingPoint["Location "] || currentEditingPoint.Location, currentEditingPoint["Location Notes"], currentEditingPoint.Needling,
-      currentEditingPoint.Actions, currentEditingPoint.Indications, currentEditingPoint.Commentary,
-      currentEditingPoint["Summary of clinical application"], currentEditingPoint.Combinations, currentEditingPoint.Description, 
-      currentEditingPoint.Patterns, currentEditingPoint["Diagnosis & Differentiation"], currentEditingPoint.Analysis, currentEditingPoint["Treatment Principle"], 
-      currentEditingPoint["Point Prescription"], currentEditingPoint["Supplementary Points"], currentEditingPoint.Explanation, currentEditingPoint.Remarks, currentEditingPoint["Flashcard View"],
-      currentEditingPoint.Notes, currentEditingPoint["CAM Notes"]
+        let fields = [
+      currentEditingPoint.Important, currentEditingPoint["Short Name"], currentEditingPoint["Full Name"] || currentEditingPoint[" Full Name"], 
+      currentEditingPoint["Channel Full Name"] || currentEditingPoint[" Channel Full Name"], currentEditingPoint["Channel Short Name"] || currentEditingPoint[" Channel Short Name"]
     ];
+    TCM_SECTIONS.forEach(sec => fields.push(currentEditingPoint[sec.key] || currentEditingPoint[sec.altKey]));
 
-    
+
     let paras = [];
     fields.forEach(f => {
       if (f) {
-         // FIXED: Strip BBCode and lowercase so the point doesn't vanish from the new search index!
          const cleanText = stripBBCode(String(f));
          paras.push(...cleanText.split(/\r?\n/).filter(p => p.trim() !== "").map(p => p.toLowerCase()));
       }
     });
     currentEditingPoint._paragraphs = paras;
 
-        // 4. Update the UI
+    // 4. Save to local hard drive (Wrapped to catch Safari locks!)
+    try {
+      await saveSinglePointToVault(currentEditingPoint);
+    } catch (dbErr) {
+      console.warn("IndexedDB write failed. Changes saved to RAM only.", dbErr);
+    }
+
+    // 5. Force UI Redraw
     if (typeof window.refreshActivePanel === 'function') {
-       window.refreshActivePanel(true); // True forces background to rebuild the search index
+       window.refreshActivePanel(true); 
     } else {
        handleSearch(true); 
     }
     
+    showToast("✅ Edit saved successfully");
+
+  } catch(e) {
+    console.error("Local UI update failed:", e);
+    // NEW: Exposes the literal error text to your screen so we can see what broke
+    showToast("⚠️ Refresh Error: " + (e.message || "Unknown error"));
+  } finally {
+    // 6. GUARANTEE the modal closes and resets
     closeEditModal(); 
     resetModalButtons();
   }
+}
 
 
 
@@ -3156,6 +3698,7 @@ bootApp(); // Start the engine
 
     // 1. Start the curtain-drop animation
     sheet.classList.remove('open');
+    document.getElementById('sheetBackdrop').classList.remove('show'); // NEW: Hide Backdrop
 
     // 2. Smart Background Sync
     if (sheetContextPoints.length > 0 && currentSheetIndex >= 0) {
@@ -3200,7 +3743,7 @@ bootApp(); // Start the engine
 
 
 
-    function openBottomSheet(pointId, contextArray) {
+        function openBottomSheet(pointId, contextArray) {
     document.getElementById('bottomSheet').classList.remove('show-all-text');
     
     sheetContextPoints = contextArray;
@@ -3209,8 +3752,10 @@ bootApp(); // Start the engine
     if (currentSheetIndex === -1) return; 
     
     document.getElementById('bottomSheet').classList.add('open');
-    updateSheetUI(true); // <-- Added 'true' here to flag the initial open
+    document.getElementById('sheetBackdrop').classList.add('show'); // NEW: Show Backdrop
+    updateSheetUI(true); 
   }
+
 
 
 
@@ -3297,8 +3842,8 @@ bootApp(); // Start the engine
     headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
     container.appendChild(headerInfo);
 
-    // 2. The Prime Action Row
-    const actionRow = document.createElement("div");
+        // 2. The Prime Action Row
+        const actionRow = document.createElement("div");
     actionRow.className = "point-action-row";
     actionRow.innerHTML = `
       <button class="action-item" onclick="cycleImportance('${point["Short Name"]}'); setTimeout(updateSheetUI, 50);">
@@ -3310,15 +3855,30 @@ bootApp(); // Start the engine
       <button class="action-item" onclick="togglePrint('${point["Short Name"]}')">
         <div class="action-icon">📂</div><div class="action-label">Export</div>
       </button>
+      <button class="action-item" onclick="openSectionFilterModal()">
+        <div class="action-icon" style="${isSectionFilterActive ? 'background:#ff3b30; color:white;' : ''}">📑</div><div class="action-label">Sections</div>
+      </button>
+      <button class="action-item" onclick="toggleFlashcardMode()">
+        <div class="action-icon" id="fcIcon" style="${isFlashcardMode ? 'background:#cc5500; color:white;' : ''}">🧠</div><div class="action-label">Study</div>
+      </button>
+      <button class="action-item" onclick="openOcclusionModal()">
+        <div class="action-icon" id="occIcon" style="${isOcclusionMode ? 'background:#cc5500; color:white;' : ''}">🌫️</div><div class="action-label">Occlude</div>
+      </button>
     `;
     container.appendChild(actionRow);
+
 
     // --- NEW: Track if we found filtered paragraphs ---
     let hasFilteredContent = false;
 
     // 3. The Data Notes (RESTORED PARAGRAPH FILTERING LOGIC)
-    const addDetail = (label, value, fieldName) => {
+const addDetail = (label, value, fieldName) => {
       if (!value || String(value).trim() === "") return; 
+      
+      // --- NEW FILTER INTERCEPTOR ---
+      if (isSectionFilterActive && activeSections.length > 0 && !activeSections.includes(label)) {
+        return; 
+      }
       
       const editIcon = `<button class="section-edit-btn" onclick="event.stopPropagation(); window.triggerEdit('${point["Short Name"]}', '${fieldName}')">✏️</button>`;
       const div = document.createElement("div"); 
@@ -3344,8 +3904,15 @@ bootApp(); // Start the engine
         paras.forEach(p => matchingParas.push(p));
       }
 
-      const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
-      const headerHtml = "<div class='section-label' style='position:static;'>" + label + editIcon + "</div>";
+            // (Inside addDetail)
+      let fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
+      
+      // NEW INTERCEPTOR: Apply occlusion to the primary view
+      if (isOcclusionMode) {
+        fullHtml = applyOcclusionToHTML(fullHtml, occlusionLevel);
+      }
+
+      const headerHtml = "<div class='section-label' onclick='if(isFlashcardMode) this.parentElement.classList.toggle(\"revealed\")'>" + label + editIcon + "</div>";
 
       // If there is an active search AND we found irrelevant text, format it!
       if (activeHighlightRegex && nonMatchingParas.length > 0) {
@@ -3356,8 +3923,14 @@ bootApp(); // Start the engine
           div.innerHTML = headerHtml + "<div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
         } else {
           // Show only the matching lines with a [...] spacer
+          let filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
+          
+          // NEW INTERCEPTOR: Apply occlusion to the secondary filtered view
+          if (isOcclusionMode) {
+             filteredHtml = applyOcclusionToHTML(filteredHtml, occlusionLevel);
+          }
+
           div.className = "point-notes";
-          const filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
           div.innerHTML = headerHtml + "<div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
         }
       } else {
@@ -3369,26 +3942,13 @@ bootApp(); // Start the engine
     };
 
     // Call addDetail for all fields...
-    addDetail("Location", point["Location "] || point.Location, point.hasOwnProperty("Location ") ? "Location " : "Location");
-    addDetail("Location Notes", point["Location Notes"], "Location Notes");
-    addDetail("Needling", point.Needling, "Needling");
-    addDetail("Actions", point.Actions, "Actions");
-    addDetail("Indications", point.Indications, "Indications");
-    addDetail("Commentary", point.Commentary, "Commentary");
-    addDetail("Summary of Clinical Application", point["Summary of clinical application"], "Summary of clinical application");
-    addDetail("Combinations", point.Combinations, "Combinations");
-    addDetail("Description", point.Description, "Description");
-    addDetail("Patterns", point.Patterns, "Patterns");
-    addDetail("Diagnosis & Differentiation", point["Diagnosis & Differentiation"], "Diagnosis & Differentiation");
-    addDetail("Analysis", point.Analysis, "Analysis");
-    addDetail("Treatment Principle", point["Treatment Principle"], "Treatment Principle");
-    addDetail("Point Prescription", point["Point Prescription"], "Point Prescription");
-    addDetail("Supplementary Points", point["Supplementary Points"], "Supplementary Points");
-    addDetail("Explanation", point.Explanation, "Explanation");
-    addDetail("Remarks", point.Remarks, "Remarks");
-    addDetail("Flashcard View", point["Flashcard View"], "Flashcard View");
-    addDetail("Notes", point.Notes, "Notes");
-    addDetail("CAM Notes", point["CAM Notes"], "CAM Notes");
+        TCM_SECTIONS.forEach(sec => {
+      let val = point[sec.key] || point[sec.altKey] || "";
+      // Smart check to handle the trailing space on "Location" for the edit trigger
+      let fieldName = (sec.label === "Location" && !point.hasOwnProperty("Location ")) ? "Location" : sec.key;
+      addDetail(sec.label, val, fieldName);
+    });
+
 
     // Add/Edit Button
     const addFieldBtn = document.createElement("button");
@@ -3455,6 +4015,16 @@ bootApp(); // Start the engine
 
 
 
+  // Safety net: Close bottom sheet if user taps empty space in the header
+  document.getElementById("mainStickyHeader").addEventListener("click", (e) => {
+    const sheet = document.getElementById("bottomSheet");
+    if (sheet && sheet.classList.contains("open")) {
+      // If they didn't specifically tap a button or input, drop the sheet
+      if (!e.target.closest("button") && !e.target.closest("label") && !e.target.closest("input")) {
+        closeBottomSheet();
+      }
+    }
+  });
 
 
 
