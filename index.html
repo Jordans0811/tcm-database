@@ -496,7 +496,7 @@
 .compare-section-title {
   position: sticky; 
   top: -1px; /* Seals the sub-pixel gap against the main header */
-  left: 0; z-index: 10;
+  z-index: 10;
   background: #f8f8f8; padding: 0 15px; 
   height: 30px; /* Shrunk down from 36px */
   display: flex; align-items: center; box-sizing: border-box;
@@ -1271,7 +1271,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "06.02.26.v1";
+const APP_VERSION = "06.09.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3303,15 +3303,20 @@ async function saveEdit() {
 
     let pts = compareList.map(id => points.find(p => p["Short Name"] === id)).filter(Boolean);
 
-      // --- THE RESPONSIVE IPAD + IPHONE ALGORITHM ---
-    // 'max(100%, Xpx)' tells the browser: "If the screen is huge (iPad), stretch to take up 100% of it. 
-    // If the screen is tiny (iPhone), force it to be at least Xpx wide so it doesn't squish!"
-    let minWidth = pts.length * 150; // Minimum 150px per column
-    let explicitWidth = `max(100%, ${minWidth}px)`;
+        // --- THE RESPONSIVE IPAD + IPHONE ALGORITHM ---
+    // Determine the maximum columns to show on screen before horizontal scrolling begins
+    const isIPad = window.innerWidth >= 850;
+    const maxVisibleCols = isIPad ? 4 : 2;
+    const colsToShow = Math.min(pts.length, maxVisibleCols);
 
-    // Apply the smart width to the master wrapper 
+    // Expand the wrapper width proportionally if we exceed the visible column limit
+    // Example: 3 items on an iPhone (max 2) = (3 / 2) * 100 = 150% wrapper width.
+    let wrapperWidthPercent = (pts.length / colsToShow) * 100;
+    let explicitWidth = pts.length <= maxVisibleCols ? '100%' : `${wrapperWidthPercent}%`;
+
+    // Apply the responsive width to the master wrapper
     let html = `<div style="width: ${explicitWidth}; padding-bottom: 40px; box-sizing: border-box;">`;
-    html += `<div class="compare-flex-container">`;
+
 
 
 
