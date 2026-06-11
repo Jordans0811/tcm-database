@@ -233,7 +233,7 @@
 
 
     .sticky-toggle-container {
-  position: sticky; bottom: 20px; z-index: 89; 
+  position: sticky; bottom: 20px; z-index: 95; 
   display: flex; justify-content: center; width: 100%;
   pointer-events: none; margin-top: 15px; padding-bottom: 5px;
   
@@ -1315,7 +1315,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "06.10.26.v1";
+const APP_VERSION = "06.11.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3404,9 +3404,13 @@ pts.forEach((p, i) => {
         ? linkifyPoints(formatTextWithTables(highlightText(rawVal))) 
         : `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
    
+   // --- NEW: Run the text through your occlusion engine before rendering ---
+   formatted = applyLineOcclusionToHTML(formatted, p["Short Name"]);
+
    // UPDATED: Added the onclick toggle for peak mode
    html += `<div class="compare-card-body" data-col="${i}" onclick="if(this.classList.contains('study-blur')) this.classList.toggle('study-peek');">${formatted}</div>`;
 });
+
 
 
       
@@ -3992,13 +3996,21 @@ async function completeSave(newValue) {
     const addDetail = (label, value, fieldName) => {
       if (!value || String(value).trim() === "") return; 
       
-      // --- NEW FILTER INTERCEPTOR ---
+            // --- NEW FILTER INTERCEPTOR ---
       if (isSectionFilterActive && activeSections.length > 0 && !activeSections.includes(label)) {
         return; 
       }
       
       const editIcon = `<button class="section-edit-btn" onclick="event.stopPropagation(); window.triggerEdit('${point["Short Name"]}', '${fieldName}')">✏️</button>`;
+      
+      // --- NEW: Inject the Mark All Button ONLY if Mark Mode is ON ---
+      let markAllIcon = "";
+      if (isLineMarkMode) {
+        markAllIcon = `<button class="section-edit-btn" style="color:#cc5500; margin-right:12px;" onclick="event.stopPropagation(); markAllLinesInSection(this, '${point["Short Name"]}')">🖍️ All</button>`;
+      }
+
       const div = document.createElement("div"); 
+
       
       // Split the text into paragraphs and sort them
       const paras = String(value).split(/\r?\n/).filter(p => p.trim() !== "");
@@ -4032,7 +4044,8 @@ async function completeSave(newValue) {
         fullHtml = applyOcclusionToHTML(fullHtml, occlusionLevel);
       }
 
-      const headerHtml = "<div class='section-label' onclick='if(isFlashcardMode) this.parentElement.classList.toggle(\"revealed\")'>" + label + editIcon + "</div>";
+      const headerHtml = "<div class='section-label' onclick='if(isFlashcardMode) this.parentElement.classList.toggle(\"revealed\")'>" + label + editIcon + markAllIcon + "</div>";
+
 
       // If there is an active search AND we found irrelevant text, format it!
       if (activeHighlightRegex && nonMatchingParas.length > 0) {
@@ -4218,6 +4231,39 @@ function clearAllMarkedLines() {
   }
 }
 
+// Grabs all parsed lines in a specific section and saves them to local memory
+window.markAllLinesInSection = function(buttonEl, pointId) {
+  // 1. Find the parent section container
+  const sectionDiv = buttonEl.closest('.point-notes');
+  if (!sectionDiv) return;
+
+  // 2. Find all markable lines in this specific section
+  const targets = sectionDiv.querySelectorAll('.mark-target');
+  if (targets.length === 0) return;
+
+  // 3. Get existing localStorage data
+  let localOcc = JSON.parse(localStorage.getItem('tcm_line_occlusions')) || {};
+  if (!localOcc[pointId]) localOcc[pointId] = [];
+
+  // 4. Add all lines to the array (avoiding duplicates)
+  let changed = false;
+  targets.forEach(target => {
+    const text = target.getAttribute('data-original-text');
+    if (text && !localOcc[pointId].includes(text)) {
+      localOcc[pointId].push(text);
+      changed = true;
+    }
+  });
+
+  // 5. Save and refresh if anything was added
+  if (changed) {
+    localStorage.setItem('tcm_line_occlusions', JSON.stringify(localOcc));
+    updateSheetUI(false, true); // Rebuilds the UI while preserving scroll
+  } else {
+    showToast("All lines in this section are already marked.");
+  }
+};
+
 
 
 // The Block-Level Dynamic DOM Parser
@@ -4287,6 +4333,7 @@ function applyLineOcclusionToHTML(html, pointId) {
 
   return tempDiv.innerHTML;
 }
+
 
 
 
