@@ -838,6 +838,50 @@
 }
 
 
+
+/* 1. STUDY MODE: Hidden State */
+.line-occluded {
+  color: transparent !important;
+  border-bottom: 1px dashed rgba(204, 85, 0, 0.6);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* CRITICAL FIX: Forces nested BBCode colors/backgrounds to become transparent! */
+.line-occluded * {
+  color: transparent !important;
+  background-color: transparent !important;
+  text-shadow: none !important;
+}
+
+/* 2. STUDY MODE: Revealed State */
+.line-revealed {
+  color: inherit !important;
+  border-bottom: 1px dashed rgba(150, 150, 150, 0.6);
+  cursor: pointer;
+}
+
+/* 3. MARK MODE: Hover & Click Targets */
+.mark-target {
+  border-bottom: 1px dotted #ccc;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.mark-target.is-marked {
+  background: rgba(204, 85, 0, 0.2);
+  border-bottom: 1px dashed rgba(204, 85, 0, 0.6);
+}
+.mark-mode-active .point-link { 
+  pointer-events: none; 
+  text-decoration: none; 
+}
+
+@media (prefers-color-scheme: dark) {
+  .line-revealed { border-bottom-color: rgba(150, 150, 150, 0.6); }
+}
+
+
+
     
     
     
@@ -1271,7 +1315,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "06.09.26.v1";
+const APP_VERSION = "06.10.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3926,6 +3970,14 @@ async function completeSave(newValue) {
       <button class="action-item" onclick="toggleFlashcardMode()">
         <div class="action-icon" id="fcIcon" style="${isFlashcardMode ? 'background:#cc5500; color:white;' : ''}">🧠</div><div class="action-label">Study</div>
       </button>
+      <button class="action-item" onclick="toggleLineMarkMode()">
+  <div class="action-icon" id="lineMarkIcon" style="${isLineMarkMode ? 'background:#cc5500; color:white;' : ''}">🖍️</div><div class="action-label">Mark Lines</div>
+</button>
+
+      <button class="action-item" onclick="clearAllMarkedLines()" style="${isLineMarkMode ? 'display:flex;' : 'display:none;'}">
+        <div class="action-icon" style="background:#ff3b30; color:white;">🗑️</div><div class="action-label">Clear Marks</div>
+      </button>
+
       <button class="action-item" onclick="openOcclusionModal()">
         <div class="action-icon" id="occIcon" style="${isOcclusionMode ? 'background:#cc5500; color:white;' : ''}">🌫️</div><div class="action-label">Occlude</div>
       </button>
@@ -3937,7 +3989,7 @@ async function completeSave(newValue) {
     let hasFilteredContent = false;
 
     // 3. The Data Notes (RESTORED PARAGRAPH FILTERING LOGIC)
-const addDetail = (label, value, fieldName) => {
+    const addDetail = (label, value, fieldName) => {
       if (!value || String(value).trim() === "") return; 
       
       // --- NEW FILTER INTERCEPTOR ---
@@ -3969,10 +4021,13 @@ const addDetail = (label, value, fieldName) => {
         paras.forEach(p => matchingParas.push(p));
       }
 
-            // (Inside addDetail)
+      // --- 1. CORE HTML PROCESSING ---
       let fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
       
-      // NEW INTERCEPTOR: Apply occlusion to the primary view
+      // --- 2. APPLY MANUAL LINE OCCLUSION FIRST ---
+      fullHtml = applyLineOcclusionToHTML(fullHtml, point["Short Name"]);
+
+      // --- 3. APPLY RANDOM WORD OCCLUSION SECOND ---
       if (isOcclusionMode) {
         fullHtml = applyOcclusionToHTML(fullHtml, occlusionLevel);
       }
@@ -3990,7 +4045,10 @@ const addDetail = (label, value, fieldName) => {
           // Show only the matching lines with a [...] spacer
           let filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
           
-          // NEW INTERCEPTOR: Apply occlusion to the secondary filtered view
+          // Apply manual line occlusion to the filtered view too!
+          filteredHtml = applyLineOcclusionToHTML(filteredHtml, point["Short Name"]);
+          
+          // Apply random word occlusion to the secondary filtered view
           if (isOcclusionMode) {
              filteredHtml = applyOcclusionToHTML(filteredHtml, occlusionLevel);
           }
@@ -4005,6 +4063,7 @@ const addDetail = (label, value, fieldName) => {
       }
       container.appendChild(div);
     };
+
 
     // Call addDetail for all fields...
         TCM_SECTIONS.forEach(sec => {
@@ -4102,6 +4161,134 @@ const addDetail = (label, value, fieldName) => {
     }
   });
 }
+
+
+let isLineMarkMode = false;
+
+function toggleLineMarkMode() {
+  isLineMarkMode = !isLineMarkMode;
+  const icon = document.getElementById('lineMarkIcon');
+  
+  if (isLineMarkMode) {
+    document.body.classList.add('mark-mode-active');
+    if (icon) { icon.style.background = '#cc5500'; icon.style.color = 'white'; }
+    showToast("Mark Mode ON: Tap lines to hide them");
+  } else {
+    document.body.classList.remove('mark-mode-active');
+    if (icon) { icon.style.background = ''; icon.style.color = ''; }
+    showToast("Mark Mode OFF: Lines are hidden");
+  }
+  updateSheetUI(false, true); // Instantly rebuilds the UI while preserving scroll
+}
+
+// Saves or removes the tapped line from local memory
+function toggleMarkedLine(event, element) {
+  event.stopPropagation();
+  // Target the element explicitly
+  const text = element.getAttribute('data-original-text');
+  const pointId = sheetContextPoints[currentSheetIndex]["Short Name"];
+  
+  let localOcc = JSON.parse(localStorage.getItem('tcm_line_occlusions')) || {};
+  if (!localOcc[pointId]) localOcc[pointId] = [];
+
+  const index = localOcc[pointId].indexOf(text);
+  if (index > -1) {
+    localOcc[pointId].splice(index, 1); // Remove
+    element.classList.remove('is-marked');
+  } else {
+    localOcc[pointId].push(text); // Add
+    element.classList.add('is-marked');
+  }
+  localStorage.setItem('tcm_line_occlusions', JSON.stringify(localOcc));
+}
+
+function clearAllMarkedLines() {
+  if (!sheetContextPoints || currentSheetIndex < 0) return;
+  const pointId = sheetContextPoints[currentSheetIndex]["Short Name"];
+  
+  let localOcc = JSON.parse(localStorage.getItem('tcm_line_occlusions')) || {};
+  
+  if (localOcc[pointId] && localOcc[pointId].length > 0) {
+    delete localOcc[pointId];
+    localStorage.setItem('tcm_line_occlusions', JSON.stringify(localOcc));
+    showToast("All marked lines cleared.");
+    updateSheetUI(false, true); // Rebuilds the UI instantly
+  } else {
+    showToast("No marked lines to clear.");
+  }
+}
+
+
+
+// The Block-Level Dynamic DOM Parser
+function applyLineOcclusionToHTML(html, pointId) {
+  let localOcc = JSON.parse(localStorage.getItem('tcm_line_occlusions')) || {};
+  let savedLines = localOcc[pointId] || [];
+
+  if (!isLineMarkMode && savedLines.length === 0) return html;
+
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+
+  // Helper function to safely wrap a group of elements/text into one tappable line
+  function processLine(nodes) {
+    if (nodes.length === 0) return;
+    
+    // Extract pure text for matching, ignoring HTML tags completely
+    const rawText = nodes.reduce((acc, n) => acc + (n.textContent || ''), '').trim().replace(/\s+/g, ' ');
+    if (rawText.length < 2) return; // Skip empty lines
+
+    let shouldWrap = false;
+    let span = document.createElement('span');
+    span.setAttribute('data-original-text', rawText);
+
+    if (isLineMarkMode) {
+      shouldWrap = true;
+      span.className = 'mark-target';
+      if (savedLines.includes(rawText)) span.classList.add('is-marked');
+      span.setAttribute('onclick', 'toggleMarkedLine(event, this)');
+    } else if (savedLines.includes(rawText)) {
+      shouldWrap = true;
+      span.className = 'line-occluded';
+      span.setAttribute('onclick', "event.stopPropagation(); this.classList.toggle('line-revealed'); this.classList.toggle('line-occluded');");
+    }
+
+    if (shouldWrap) {
+      const firstNode = nodes[0];
+      const parent = firstNode.parentNode;
+      parent.insertBefore(span, firstNode);
+      // Moves all nodes (including point-links) safely inside the wrapper
+      nodes.forEach(n => span.appendChild(n));
+    }
+  }
+
+  // 1. Process Table Cells First
+  const cells = tempDiv.querySelectorAll('td, th');
+  cells.forEach(cell => {
+    processLine(Array.from(cell.childNodes));
+  });
+
+  // 2. Process Standard Lines (separated by <br> or blocks)
+  let currentLineNodes = [];
+  const rootNodes = Array.from(tempDiv.childNodes);
+  
+  rootNodes.forEach(node => {
+    const tag = node.nodeName.toLowerCase();
+    // When we hit a line break or table, process the gathered text as one line
+    if (tag === 'br' || tag === 'table' || tag === 'div' || tag === 'p') {
+      processLine(currentLineNodes);
+      currentLineNodes = [];
+    } else {
+      currentLineNodes.push(node);
+    }
+  });
+  
+  processLine(currentLineNodes); // Flush anything left at the end
+
+  return tempDiv.innerHTML;
+}
+
+
 
 
 
