@@ -1377,7 +1377,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "06.12.26.v2";
+const APP_VERSION = "06.12.26.v3";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3368,21 +3368,27 @@ async function saveEdit() {
     // --- COMPARE FEATURE LOGIC ---
   let compareList = [];
 
-    function toggleCompare(pointId) {
+      function toggleCompare(pointId) {
     if (compareList.includes(pointId)) {
-      // Remove if already in list
       compareList = compareList.filter(id => id !== pointId);
     } else {
-      // Add without limits
       compareList.push(pointId);
     }
     updateCompareBasketUI();
-    
-    // Re-render the bottom sheet instantly so the button changes color
-    if (document.getElementById('bottomSheet').classList.contains('open')) {
-      updateSheetUI(false, true); 
+
+    // Directly update the button style without thrashing the DOM
+    const icon = document.getElementById("compareIcon");
+    if (icon) {
+      if (compareList.includes(pointId)) {
+        icon.style.background = "#cc5500";
+        icon.style.color = "white";
+      } else {
+        icon.style.background = "";
+        icon.style.color = "";
+      }
     }
   }
+
 
 
 
@@ -3390,6 +3396,13 @@ async function saveEdit() {
     compareList = [];
     updateCompareBasketUI();
     closeCompareModal();
+    
+    // Reset the icon if the bottom sheet is currently open
+    const icon = document.getElementById("compareIcon");
+    if (icon) {
+      icon.style.background = "";
+      icon.style.color = "";
+    }
   }
 
   function updateCompareBasketUI() {
@@ -3517,25 +3530,40 @@ pts.forEach((p, i) => {
     // --- PRINT FEATURE LOGIC ---
   let printList = [];
 
-      function togglePrint(pointId) {
+        function togglePrint(pointId) {
     if (printList.includes(pointId)) {
       printList = printList.filter(id => id !== pointId);
     } else {
       printList.push(pointId);
     }
     updatePrintBasketUI();
-    
-    // Re-render the bottom sheet instantly so the button changes color
-    if (document.getElementById('bottomSheet').classList.contains('open')) {
-      updateSheetUI(false, true); 
+
+    // Directly update the button style without thrashing the DOM
+    const icon = document.getElementById("printIcon");
+    if (icon) {
+      if (printList.includes(pointId)) {
+        icon.style.background = "#cc5500";
+        icon.style.color = "white";
+      } else {
+        icon.style.background = "";
+        icon.style.color = "";
+      }
     }
   }
+
 
 
 
   function clearPrint() {
     printList = [];
     updatePrintBasketUI();
+    
+    // Reset the icon if the bottom sheet is currently open
+    const icon = document.getElementById("printIcon");
+    if (icon) {
+      icon.style.background = "";
+      icon.style.color = "";
+    }
   }
 
   function updatePrintBasketUI() {
@@ -4032,15 +4060,15 @@ async function completeSave(newValue) {
         // 2. The Prime Action Row
         const actionRow = document.createElement("div");
     actionRow.className = "point-action-row";
-            actionRow.innerHTML = `
+          actionRow.innerHTML = `
       <button class="action-item" onclick="cycleImportance('${point["Short Name"]}'); setTimeout(updateSheetUI, 50);">
         <div class="action-icon">❗️</div><div class="action-label">Important</div>
       </button>
       <button class="action-item" onclick="toggleCompare('${point["Short Name"]}')">
-        <div class="action-icon" style="${compareList.includes(point["Short Name"]) ? 'background:#cc5500; color:white;' : ''}">⚖️</div><div class="action-label">Compare</div>
+        <div class="action-icon" id="compareIcon" style="${compareList.includes(point["Short Name"]) ? 'background:#cc5500; color:white;' : ''}">⚖️</div><div class="action-label">Compare</div>
       </button>
       <button class="action-item" onclick="togglePrint('${point["Short Name"]}')">
-        <div class="action-icon" style="${printList.includes(point["Short Name"]) ? 'background:#cc5500; color:white;' : ''}">📂</div><div class="action-label">Export</div>
+        <div class="action-icon" id="printIcon" style="${printList.includes(point["Short Name"]) ? 'background:#cc5500; color:white;' : ''}">📂</div><div class="action-label">Export</div>
       </button>
       <button class="action-item" onclick="openSectionFilterModal()">
         <div class="action-icon" style="${isSectionFilterActive ? 'background:#ff3b30; color:white;' : ''}">📑</div><div class="action-label">Sections</div>
@@ -4052,6 +4080,7 @@ async function completeSave(newValue) {
         <div class="action-icon" id="occIcon" style="${(lineOccState !== 'off' || wordOccState !== 'off') ? 'background:#cc5500; color:white;' : ''}">🌫️</div><div class="action-label">Occlude</div>
       </button>
     `;
+
 
 
     container.appendChild(actionRow);
