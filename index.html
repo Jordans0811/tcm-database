@@ -1378,7 +1378,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "06.12.26.v3";
+const APP_VERSION = "07.06.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1591,7 +1591,7 @@ async function loadTCMData(hasLocalData) {
     
     // 2. Fast Version Check (Bypassing cache with &t=...)
     const versionUrl = dataUrl + "?checkVersion=true&t=" + Date.now();
-    let versionResponse = await fetch(versionUrl);
+    let versionResponse = await fetch(versionUrl, { cache: 'no-store' });
     let versionData = await versionResponse.json();
     
     // Safety net in case of legacy array format
@@ -1611,7 +1611,7 @@ async function loadTCMData(hasLocalData) {
     // 3. Versions didn't match. Download the new data!
     console.log("New version detected! Downloading full payload...");
     const fullDataUrl = dataUrl + "?t=" + Date.now();
-    let response = await fetch(fullDataUrl);
+    let response = await fetch(fullDataUrl, { cache: 'no-store' });
     let payload = await response.json();
     let newArray = payload.points || payload; 
     
@@ -2174,8 +2174,11 @@ function applyOcclusionToHTML(html, percent) {
         });
         
         if (typeof window.refreshActivePanel === 'function') {
-          window.refreshActivePanel(false); // Background was already manually updated above
-        }
+  window.refreshActivePanel(true);
+} else {
+  handleSearch(true);
+}
+
 
       } else {
         points = processed;
@@ -3302,7 +3305,7 @@ sel.addRange(range);
     importanceSyncTimers[pointId] = setTimeout(() => {
       const payload = { id: pointId, field: "Important", value: next };
       fetch(dataUrl, {
-        method: "POST", mode: "no-cors",
+        method: "POST", 
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
       }).catch(err => console.log("Background importance sync failed.", err));
@@ -3338,7 +3341,6 @@ async function saveEdit() {
   try {
     await fetch(dataUrl, {
       method: "POST",
-      mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
       signal: controller.signal
