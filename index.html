@@ -1378,7 +1378,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.06.26.v1";
+const APP_VERSION = "07.06.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -4299,92 +4299,23 @@ function setWordOccState(state) { wordOccState = state; updateOccToggleUI(); upd
 function openOcclusionModal() { updateOccToggleUI(); document.getElementById("occlusionModal").style.display = "flex"; }
 function closeOcclusionModal() { document.getElementById("occlusionModal").style.display = "none"; }
 
-// Clear both Lines and Words for the active point
-function clearAllOcclusions() {
-  if (!sheetContextPoints || currentSheetIndex < 0) return;
-  const pointId = sheetContextPoints[currentSheetIndex]["Short Name"];
-  
-  let lineOcc = JSON.parse(localStorage.getItem('tcm_line_occlusions')) || {};
-  let wordOcc = JSON.parse(localStorage.getItem('tcm_word_occlusions')) || {};
-  
-  let changed = false;
-  if (lineOcc[pointId] && lineOcc[pointId].length > 0) { delete lineOcc[pointId]; localStorage.setItem('tcm_line_occlusions', JSON.stringify(lineOcc)); changed = true; }
-  if (wordOcc[pointId] && wordOcc[pointId].length > 0) { delete wordOcc[pointId]; localStorage.setItem('tcm_word_occlusions', JSON.stringify(wordOcc)); changed = true; }
-
-  if (changed) {
-    showToast("All marks cleared for this point.");
-    updateSheetUI(false, true); 
-  } else { showToast("No marks to clear."); }
-  closeOcclusionModal();
-}
-
-// Grabs all parsed lines in a specific section and saves them to local memory
-window.markAllLinesInSection = function(buttonEl, pointId) {
-  const sectionDiv = buttonEl.closest('.point-notes');
-  if (!sectionDiv) return;
-
-  const targets = sectionDiv.querySelectorAll('.mark-target');
-  if (targets.length === 0) return;
-
-  let localOcc = JSON.parse(localStorage.getItem('tcm_line_occlusions')) || {};
-  if (!localOcc[pointId]) localOcc[pointId] = [];
-
-  let changed = false;
-  targets.forEach(target => {
-    const text = target.getAttribute('data-original-text');
-    if (text && !localOcc[pointId].includes(text)) {
-      localOcc[pointId].push(text);
-      changed = true;
-    }
-  });
-
-  if (changed) {
-    localStorage.setItem('tcm_line_occlusions', JSON.stringify(localOcc));
-    updateSheetUI(false, true); 
-  } else {
-    showToast("All lines in this section are already marked.");
-  }
-};
 
 
 
 
 
 
-// Memory toggles for individual clicks
-function toggleMarkedLine(event, element) {
-  event.stopPropagation();
-  const text = element.getAttribute('data-original-text');
-  const pointId = sheetContextPoints[currentSheetIndex]["Short Name"];
-  let localOcc = JSON.parse(localStorage.getItem('tcm_line_occlusions')) || {};
-  if (!localOcc[pointId]) localOcc[pointId] = [];
-  const index = localOcc[pointId].indexOf(text);
-  if (index > -1) { localOcc[pointId].splice(index, 1); element.classList.remove('is-marked'); } 
-  else { localOcc[pointId].push(text); element.classList.add('is-marked'); }
-  localStorage.setItem('tcm_line_occlusions', JSON.stringify(localOcc));
-}
 
-window.toggleMarkedWord = function(event, element) {
-  event.stopPropagation();
-  const word = element.getAttribute('data-word');
-  const pointId = sheetContextPoints[currentSheetIndex]["Short Name"];
-  let localOcc = JSON.parse(localStorage.getItem('tcm_word_occlusions')) || {};
-  if (!localOcc[pointId]) localOcc[pointId] = [];
-  const index = localOcc[pointId].indexOf(word);
-  if (index > -1) { localOcc[pointId].splice(index, 1); element.classList.remove('is-word-marked'); } 
-  else { localOcc[pointId].push(word); element.classList.add('is-word-marked'); }
-  localStorage.setItem('tcm_word_occlusions', JSON.stringify(localOcc));
-};
 
 // --- NEW MANUAL WORD DOM PARSER ---
-function applyWordOcclusionToHTML(html, pointId) {
+window.applyWordOcclusionToHTML = function(html, pointId) {
   if (wordOccState === 'off') return html;
 
-  let localOcc = JSON.parse(localStorage.getItem('tcm_word_occlusions')) || {};
-  let savedWords = localOcc[pointId] || []; 
+  let p = points.find(x => x["Short Name"] === pointId);
+  let savedWords = p ? getOcclusionArray(p, "Word Occlusions") : [];
 
   if (wordOccState === 'hide' && savedWords.length === 0) return html;
-
+  
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
 
@@ -4395,15 +4326,12 @@ function applyWordOcclusionToHTML(html, pointId) {
 
   let hideRegex = null;
   if (wordOccState === 'hide') {
-    // Escapes the saved words safely and sorts by length so multi-word terms don't break
-    const escapedWords = savedWords.sort((a,b) => b.length - a.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    // SAFE CLONE BEFORE SORTING
+    const escapedWords = [...savedWords].sort((a,b) => b.length - a.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     hideRegex = new RegExp("\\b(" + escapedWords.join("|") + ")\\b", "gi");
   }
   
-  // 1. Catches TCM points (e.g., "LU 5", "SP-6") as a single tappable block
-  // 2. Falls back to catching any alphanumeric word or number (e.g., "14", "cun", "LU7")
   const markRegex = /\b((?:LU|LI|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV)\s*-?\s*\d{1,2}|[A-Za-z0-9\-]+)\b/gi;
-
 
   textNodes.forEach(node => {
     if (!node.nodeValue.trim()) return;
@@ -4413,16 +4341,14 @@ function applyWordOcclusionToHTML(html, pointId) {
       replacedHTML = node.nodeValue.replace(markRegex, (match) => {
         let lowerMatch = match.toLowerCase();
         let isMarked = savedWords.includes(lowerMatch) ? " is-word-marked" : "";
-        return `<span class="word-mark-target${isMarked}" data-word="${lowerMatch}" onclick="toggleMarkedWord(event, this)">${match}</span>`;
+        // PASS POINT ID EXPLICITLY
+        return `<span class="word-mark-target${isMarked}" data-word="${lowerMatch}" onclick="window.toggleMarkedWord(event, this, '${pointId}')">${match}</span>`;
       });
     } else if (wordOccState === 'hide') {
       replacedHTML = node.nodeValue.replace(hideRegex, (match) => {
-        // Smart Event Bubbling: Only stops propagation when revealing. Allows it to bubble to the Quick Peek link when hiding!
         return `<span class="line-occluded" onclick="if(this.classList.contains('line-occluded')) { event.stopPropagation(); this.classList.remove('line-occluded'); this.classList.add('line-revealed'); } else { this.classList.remove('line-revealed'); this.classList.add('line-occluded'); }">${match}</span>`;
       });
     }
-
-
 
     if (replacedHTML !== null && replacedHTML !== node.nodeValue) {
       let wrapper = document.createElement('div');
@@ -4434,10 +4360,11 @@ function applyWordOcclusionToHTML(html, pointId) {
   return tempDiv.innerHTML;
 }
 
+
 // --- UPDATED LINE DOM PARSER ---
-function applyLineOcclusionToHTML(html, pointId, forceWrapAll = false) {
-  let localOcc = JSON.parse(localStorage.getItem('tcm_line_occlusions')) || {};
-  let savedLines = localOcc[pointId] || [];
+window.applyLineOcclusionToHTML = function(html, pointId, forceWrapAll = false) {
+  let p = points.find(x => x["Short Name"] === pointId);
+  let savedLines = p ? getOcclusionArray(p, "Line Occlusions") : [];
 
   if (lineOccState !== 'mark' && lineOccState !== 'hide' && !forceWrapAll) return html;
 
@@ -4457,7 +4384,8 @@ function applyLineOcclusionToHTML(html, pointId, forceWrapAll = false) {
       shouldWrap = true;
       span.className = 'mark-target';
       if (savedLines.includes(rawText)) span.classList.add('is-marked');
-      span.setAttribute('onclick', 'toggleMarkedLine(event, this)');
+      // PASS POINT ID EXPLICITLY
+      span.setAttribute('onclick', `window.toggleMarkedLine(event, this, '${pointId}')`);
     } else if (lineOccState === 'hide' && savedLines.includes(rawText)) {
       shouldWrap = true;
       span.className = 'line-occluded';
@@ -4493,6 +4421,149 @@ function applyLineOcclusionToHTML(html, pointId, forceWrapAll = false) {
 }
 
 
+
+// --- NEW CLOUD-SYNC OCCLUSION ENGINE ---
+let occlusionSyncTimers = {};
+
+// Helper to safely read stringified arrays from Google Sheets
+window.getOcclusionArray = function(point, field) {
+  if (!point || !point[field]) return [];
+  if (Array.isArray(point[field])) return point[field];
+  try { 
+    let parsed = JSON.parse(point[field]); 
+    return Array.isArray(parsed) ? parsed : [];
+  } catch(e) { return []; }
+};
+
+window.clearAllOcclusions = async function() {
+  if (!sheetContextPoints || currentSheetIndex < 0) return;
+  const pointId = sheetContextPoints[currentSheetIndex]["Short Name"];
+  let p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+
+  let changed = false;
+  let oldLines = getOcclusionArray(p, "Line Occlusions");
+  let oldWords = getOcclusionArray(p, "Word Occlusions");
+
+  if (oldLines.length > 0) { p["Line Occlusions"] = "[]"; changed = true; }
+  if (oldWords.length > 0) { p["Word Occlusions"] = "[]"; changed = true; }
+
+  if (changed) {
+    await saveSinglePointToVault(p); // Save to local IndexedDB instantly
+    showToast("All marks cleared for this point.");
+    updateSheetUI(false, true); 
+
+    // Sync to Google Sheets in the background
+    if (navigator.onLine) {
+      fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: "[]" }) });
+      fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Word Occlusions", value: "[]" }) });
+    }
+  } else { 
+    showToast("No marks to clear."); 
+  }
+  closeOcclusionModal();
+};
+
+window.markAllLinesInSection = async function(buttonEl, pointId) {
+  const sectionDiv = buttonEl.closest('.point-notes');
+  if (!sectionDiv) return;
+
+  const targets = sectionDiv.querySelectorAll('.mark-target');
+  if (targets.length === 0) return;
+
+  let p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+
+  let savedLines = getOcclusionArray(p, "Line Occlusions");
+  let changed = false;
+
+  targets.forEach(target => {
+    const text = target.getAttribute('data-original-text');
+    if (text && !savedLines.includes(text)) {
+      savedLines.push(text);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    p["Line Occlusions"] = JSON.stringify(savedLines);
+    await saveSinglePointToVault(p);
+    updateSheetUI(false, true); 
+
+    // Smart Background Sync
+    clearTimeout(occlusionSyncTimers[pointId + '_line']);
+    occlusionSyncTimers[pointId + '_line'] = setTimeout(() => {
+      if (!navigator.onLine) return;
+      const payload = { id: pointId, field: "Line Occlusions", value: p["Line Occlusions"] };
+      fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+    }, 1500);
+
+  } else {
+    showToast("All lines in this section are already marked.");
+  }
+};
+
+window.toggleMarkedLine = async function(event, element, passedPointId) {
+  event.stopPropagation();
+  const text = element.getAttribute('data-original-text');
+  const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
+  
+  let p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+
+  let savedLines = getOcclusionArray(p, "Line Occlusions");
+  const index = savedLines.indexOf(text);
+  
+  if (index > -1) { 
+    savedLines.splice(index, 1); 
+    element.classList.remove('is-marked'); 
+  } else { 
+    savedLines.push(text); 
+    element.classList.add('is-marked'); 
+  }
+  
+  p["Line Occlusions"] = JSON.stringify(savedLines);
+  await saveSinglePointToVault(p);
+
+  // Smart Background Sync
+  clearTimeout(occlusionSyncTimers[pointId + '_line']);
+  occlusionSyncTimers[pointId + '_line'] = setTimeout(() => {
+    if (!navigator.onLine) return;
+    const payload = { id: pointId, field: "Line Occlusions", value: p["Line Occlusions"] };
+    fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+  }, 1500);
+};
+
+window.toggleMarkedWord = async function(event, element, passedPointId) {
+  event.stopPropagation();
+  const word = element.getAttribute('data-word');
+  const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
+  
+  let p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+
+  let savedWords = getOcclusionArray(p, "Word Occlusions");
+  const index = savedWords.indexOf(word);
+  
+  if (index > -1) { 
+    savedWords.splice(index, 1); 
+    element.classList.remove('is-word-marked'); 
+  } else { 
+    savedWords.push(word); 
+    element.classList.add('is-word-marked'); 
+  }
+  
+  p["Word Occlusions"] = JSON.stringify(savedWords);
+  await saveSinglePointToVault(p);
+
+  // Smart Background Sync
+  clearTimeout(occlusionSyncTimers[pointId + '_word']);
+  occlusionSyncTimers[pointId + '_word'] = setTimeout(() => {
+    if (!navigator.onLine) return;
+    const payload = { id: pointId, field: "Word Occlusions", value: p["Word Occlusions"] };
+    fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+  }, 1500);
+};
 
 
 
