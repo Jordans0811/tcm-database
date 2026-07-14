@@ -1378,7 +1378,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.14.26.v1";
+const APP_VERSION = "07.14.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3912,16 +3912,11 @@ async function completeSave(newValue) {
 
 
  document.addEventListener('keydown', (e) => {
-  const sheet = document.getElementById('bottomSheet');
-  if (!sheet || !sheet.classList.contains('open')) return;
-
-  // 1. SAFELY inspect the active element to protect typing states
+  // 1. PROTECT TYPING STATES
   const activeEl = document.activeElement;
   if (activeEl) {
     const activeTag = activeEl.tagName.toLowerCase();
     const isContentEditable = activeEl.hasAttribute('contenteditable') || activeEl.contentEditable === 'true';
-    
-    // If they are typing anywhere, immediately hand control back to the browser
     if (
       activeTag === 'input' || 
       activeTag === 'textarea' || 
@@ -3929,9 +3924,72 @@ async function completeSave(newValue) {
       activeEl.id === 'editArea' || 
       activeEl.id === 'searchInput'
     ) {
+      // Allow Escape to blur inputs instead of doing nothing
+      if (e.key === 'Escape') {
+        activeEl.blur();
+      }
       return;
     }
   }
+
+  // 2. GLOBAL ESCAPE KEY (Checks Top-to-Bottom Layering)
+  if (e.key === 'Escape') {
+    if (document.getElementById('lightbox').style.display === 'flex') { closeLightbox(); return; }
+    if (document.getElementById('editModal').style.display === 'flex') { closeEditModal(); return; }
+    if (document.getElementById('quickPeekModal').style.display === 'flex') { closeQuickPeek(); return; }
+    if (document.getElementById('compareModal').style.display === 'flex') { closeCompareModal(); return; }
+    if (document.getElementById('printModal').style.display === 'flex') { closePrintQueue(); return; }
+    if (document.getElementById('channelModal').style.display === 'flex') { cancelFilter(); return; }
+    if (document.getElementById('sectionModal').style.display === 'flex') { closeSectionFilterModal(); return; }
+    if (document.getElementById('occlusionModal').style.display === 'flex') { closeOcclusionModal(); return; }
+    if (document.getElementById('devModal').style.display === 'flex') { document.getElementById('devModal').style.display = 'none'; return; }
+    
+    const searchDropdown = document.getElementById('searchDropdown');
+    if (searchDropdown && searchDropdown.classList.contains('expanded')) { clearAndCloseSearch(); return; }
+    
+    if (document.getElementById('bottomSheet').classList.contains('open')) { closeBottomSheet(); return; }
+    return; // If nothing is open, do nothing
+  }
+
+  // 3. LIGHTBOX NAVIGATION
+  const lightbox = document.getElementById('lightbox');
+  if (lightbox && lightbox.style.display === 'flex') {
+    let newIndex = currentLightboxIndex;
+
+    if (e.key === 'ArrowRight' && currentLightboxIndex < currentLightboxPoints.length - 1) {
+      newIndex++;
+    } else if (e.key === 'ArrowLeft' && currentLightboxIndex > 0) {
+      newIndex--;
+    }
+
+    if (newIndex !== currentLightboxIndex) {
+      currentLightboxIndex = newIndex; 
+      const point = currentLightboxPoints[currentLightboxIndex];
+      document.getElementById("lightbox-title").textContent = point["Short Name"]; 
+      document.getElementById("lightbox-img").src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+      
+      // Sync Background Context
+      if (currentLightboxScroller) {
+        const targetCard = currentLightboxScroller.children[currentLightboxIndex];
+        if (targetCard) { targetCard.dataset.isSilentOpen = "true"; targetCard.click(); }
+      }
+      if (document.getElementById('bottomSheet').classList.contains('open')) {
+        currentSheetIndex = currentLightboxIndex;
+        updateSheetUI();
+      }
+    }
+    return; // STOP execution here
+  }
+
+  // 4. BOTTOM SHEET NAVIGATION
+  const sheet = document.getElementById('bottomSheet');
+  if (!sheet || !sheet.classList.contains('open')) return;
+
+  // Prevent swiping if an overlapping modal is active 
+  // (Prevents background changes while editing or peeking)
+  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal']
+    .some(id => document.getElementById(id).style.display === 'flex');
+  if (isOverlayActive) return;
 
   const sheetContent = document.getElementById('sheetContent');
 
@@ -3951,7 +4009,6 @@ async function completeSave(newValue) {
       break;
       
     case 'ArrowDown':
-      // e.preventDefault() prevents the main website background from scrolling
       e.preventDefault(); 
       if (sheetContent) sheetContent.scrollBy({ top: 60, behavior: 'auto' });
       break;
@@ -3962,6 +4019,8 @@ async function completeSave(newValue) {
       break;
   }
 });
+
+
 
 
 
