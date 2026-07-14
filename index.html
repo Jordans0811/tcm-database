@@ -1378,7 +1378,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.06.26.v2";
+const APP_VERSION = "07.14.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3909,6 +3909,67 @@ async function completeSave(newValue) {
     sheetTouchStartX = null;
     sheetTouchStartY = null;
   }, {passive: true});
+
+
+ document.addEventListener('keydown', (e) => {
+  const sheet = document.getElementById('bottomSheet');
+  if (!sheet || !sheet.classList.contains('open')) return;
+
+  // 1. SAFELY inspect the active element to protect typing states
+  const activeEl = document.activeElement;
+  if (activeEl) {
+    const activeTag = activeEl.tagName.toLowerCase();
+    const isContentEditable = activeEl.hasAttribute('contenteditable') || activeEl.contentEditable === 'true';
+    
+    // If they are typing anywhere, immediately hand control back to the browser
+    if (
+      activeTag === 'input' || 
+      activeTag === 'textarea' || 
+      isContentEditable || 
+      activeEl.id === 'editArea' || 
+      activeEl.id === 'searchInput'
+    ) {
+      return;
+    }
+  }
+
+  const sheetContent = document.getElementById('sheetContent');
+
+  switch (e.key) {
+    case 'ArrowRight':
+      if (currentSheetIndex < sheetContextPoints.length - 1) {
+        currentSheetIndex++;
+        updateSheetUI();
+      }
+      break;
+      
+    case 'ArrowLeft':
+      if (currentSheetIndex > 0) {
+        currentSheetIndex--;
+        updateSheetUI();
+      }
+      break;
+      
+    case 'ArrowDown':
+      // e.preventDefault() prevents the main website background from scrolling
+      e.preventDefault(); 
+      if (sheetContent) sheetContent.scrollBy({ top: 60, behavior: 'auto' });
+      break;
+      
+    case 'ArrowUp':
+      e.preventDefault(); 
+      if (sheetContent) sheetContent.scrollBy({ top: -60, behavior: 'auto' });
+      break;
+  }
+});
+
+
+
+
+
+
+
+
 
     function closeBottomSheet() {
     const sheet = document.getElementById('bottomSheet');
