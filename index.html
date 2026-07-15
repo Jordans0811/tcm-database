@@ -769,19 +769,7 @@
   z-index: 5;
 }
 
-/* 4. Optional subtle hint */
-.flashcard-mode .point-notes:not(.revealed)::before {
-  content: "Press Space Bar/Anywhere to reveal";
-  position: absolute;
-  bottom: 12px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  color: #aaa;
-  font-size: 9px;
-  z-index: 6;
-  pointer-events: none;
-}
+
 
 /* 5. Back State */
 .flashcard-mode .point-notes.revealed .section-label {
@@ -2701,7 +2689,7 @@ const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;");
 const addAllBtn = document.getElementById("addAllCompareBtn");
 if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
   addAllBtn.style.display = "inline-block";
-  addAllBtn.textContent = "+ Compare " + filteredPoints.length;
+  addAllBtn.textContent = "+ cf. " + filteredPoints.length;
 } else {
   addAllBtn.style.display = "none";
 }
