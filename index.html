@@ -1412,7 +1412,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.15.26.v1";
+const APP_VERSION = "07.15.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1755,6 +1755,7 @@ let activeTextTerms = [];
 let activeParsedIncludes = []; 
 let lastGlobalClickTime = 0; 
 let activeChannels = ["All"];
+let isDocumentWideSearch = false;
 
 const appContainer = document.getElementById("appContainer");
 const cardContainer = document.getElementById("cardContainer");
@@ -2545,6 +2546,14 @@ const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;");
 
 
     let query = searchInput.value.trim();
+     // --- NEW: Check for the "all:" prefix ---
+    isDocumentWideSearch = false; // Reset it on every search
+    if (query.toLowerCase().startsWith("all:")) {
+      isDocumentWideSearch = true;
+      query = query.substring(4).trim();
+    }
+    
+    
     const headerClearBtn = document.getElementById("headerClearBtn");
     const historyContainer = document.getElementById("searchHistoryContainer");
         if (query.length > 0) {
@@ -2643,7 +2652,7 @@ const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;");
 
 
             // 5. FULL NAMES & CHANNELS # (Fast Check)
-      if (fullNames.length > 0 && !fullNames.every(f => {
+      if (fullNames.length > 0 && !fullNames.some(f => {
         // Combine the fields so the # searches both at the same time
         const hashTarget = (point["Full Name"] || point[" Full Name"] || "") + " " + 
                            (point["Channel Short Name"] || point[" Channel Short Name"] || "");
@@ -2676,7 +2685,9 @@ const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;");
           });
         });
         
-        if (!hasValidParagraph) return false; 
+// NEW: Bypass this check if the "all:" prefix was used
+        if (!isDocumentWideSearch && !hasValidParagraph) return false; 
+ 
       }
       
       return true; // If it survives all rules, keep it!
@@ -4394,33 +4405,46 @@ div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed
       const headerHtml = "<div class='section-label' onclick='if(isFlashcardMode) {this.parentElement.classList.toggle(\"revealed\"); event.stopPropagation();}'>" + label + editIcon + markAllIcon + "</div>";
 
 
-      // If there is an active search AND we found irrelevant text, format it!
-      if (activeHighlightRegex && nonMatchingParas.length > 0) {
-        hasFilteredContent = true;
-        if (matchingParas.length === 0) {
-          // Hide this entire block in filtered view
+            // --- UPGRADED STEP 4: SMART SECTION FILTERING ---
+      let hasAnyTerm = false;
+      if (activeHighlightRegex) {
+        activeHighlightRegex.lastIndex = 0; // Reset index for safety
+        hasAnyTerm = activeHighlightRegex.test(value);
+      }
+
+      if (isDocumentWideSearch) {
+        // BROAD SEARCH BEHAVIOR:
+        if (!hasAnyTerm) {
+          // If the section doesn't have ANY of the searched words, hide it
+          hasFilteredContent = true;
           div.className = "point-notes hidden-section";
           div.innerHTML = headerHtml + "<div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
         } else {
-          // Show only the matching lines with a [...] spacer
+          // If it has at least one word, show the full section intact
+          div.className = "point-notes";
+          div.innerHTML = headerHtml + "<div class='section-content'>" + fullHtml + "</div>";
+        }
+      } 
+      else if (activeHighlightRegex && nonMatchingParas.length > 0) {
+        // STRICT LINE-BY-LINE SEARCH BEHAVIOR (Your original code):
+        hasFilteredContent = true;
+        if (matchingParas.length === 0) {
+          div.className = "point-notes hidden-section";
+          div.innerHTML = headerHtml + "<div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
+        } else {
           let filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
-          
-          // Apply manual line occlusion to the filtered view too!
           filteredHtml = applyLineOcclusionToHTML(filteredHtml, point["Short Name"]);
-          
-          // Apply random word occlusion to the secondary filtered view
-          if (isOcclusionMode) {
-             filteredHtml = applyOcclusionToHTML(filteredHtml, occlusionLevel);
-          }
+          if (isOcclusionMode) filteredHtml = applyOcclusionToHTML(filteredHtml, occlusionLevel);
 
           div.className = "point-notes";
           div.innerHTML = headerHtml + "<div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
         }
       } else {
-        // Normal unbroken view
+        // NORMAL UNBROKEN VIEW:
         div.className = "point-notes";
         div.innerHTML = headerHtml + "<div class='section-content'>" + fullHtml + "</div>";
       }
+
       container.appendChild(div);
     };
 
