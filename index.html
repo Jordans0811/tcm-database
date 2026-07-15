@@ -734,32 +734,73 @@
     }
 
 
- /* --- FLASHCARD MODE STYLES --- */
-.flashcard-mode .point-notes .section-content {
-  display: none !important; /* Hide answers by default */
-}
+/* --- FLASHCARD MODE STYLES (PRESERVED HEIGHT) --- */
 
-.flashcard-mode .point-notes.revealed .section-content {
-  display: block !important; /* Show answer when revealed */
-}
-
-.flashcard-mode .section-label {
+/* 1. Ensure the card acts as the anchor for the overlay */
+.flashcard-mode .point-notes {
+  position: relative;
   cursor: pointer;
-  background: #ffe0b2; /* Optional: slightly change color to indicate it's tappable */
 }
 
-.flashcard-mode .section-label::after {
-  content: " (Tap to reveal)";
-  font-size: 10px;
-  font-weight: normal;
-  color: #888;
-  float: right;
-  margin-top: 2px;
+/* 2. Hide the text, but keep its physical footprint so the size NEVER changes */
+.flashcard-mode .point-notes:not(.revealed) .section-content {
+  visibility: hidden;
 }
 
-.flashcard-mode .point-notes.revealed .section-label::after {
-  content: ""; /* Hide the hint once revealed */
-}  
+/* 3. Draw the "Front" perfectly over the hidden space */
+.flashcard-mode .point-notes:not(.revealed)::after {
+  content: attr(data-point) " - " attr(data-section);
+  position: absolute;
+  top: 28px; /* Docks cleanly underneath the header */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #ffffff; /* Solid white to hide links/images underneath */
+  color: #cc5500;
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: left;
+  justify-content: left;
+  text-align: left;
+  padding: 15px;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  z-index: 5;
+}
+
+/* 4. Optional subtle hint */
+.flashcard-mode .point-notes:not(.revealed)::before {
+  content: "Press Space Bar/Anywhere to reveal";
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #aaa;
+  font-size: 9px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+/* 5. Back State */
+.flashcard-mode .point-notes.revealed .section-label {
+  background: #ffe0b2;
+}
+.flashcard-mode .point-notes.revealed {
+  cursor: default; /* Returns cursor to normal when reading text */
+}
+
+/* 6. Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .flashcard-mode .point-notes:not(.revealed)::after {
+    background: #1c1c1e;
+    color: #ff9f0a;
+  }
+}
+
+
+  
  
 
     /* --- PARAGRAPH OCCLUSION STYLES --- */
@@ -1308,11 +1349,13 @@
     <div class="compare-content">
       
          <div class="compare-header">
-        <h2>Compare Points</h2>
-        <div class="compare-actions">
-          <button onclick="closeCompareModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
-        </div>
-      </div>
+<h2>Compare Points</h2>
+<div class="compare-actions">
+<button id="compareHideAllBtn" onclick="toggleAllCompareColumns()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide All</button>
+<button onclick="closeCompareModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+</div>
+</div>
+
 
       
     <div class="compare-table-container" id="compareContainer"></div>
@@ -1330,7 +1373,10 @@
       <div class="header-top-row">
         <div>
           <h1 id="versionTapTarget">Point Database</h1>
-          <p id="resultsCounter">Search Results: 0 of 0</p>
+<div style="display: flex; align-items: center; gap: 10px;">
+<p id="resultsCounter" style="margin: 0;">Search Results: 0 of 0</p>
+<button id="addAllCompareBtn" onclick="addAllToCompare()" style="display: none; background: #e3e3e8; color: #007aff; border: none; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; cursor: pointer;">+ Compare All</button>
+</div>
           <p id="searchQueryDisplay"></p>
         </div>
         <div class="header-actions">
@@ -1378,7 +1424,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.14.26.v2";
+const APP_VERSION = "07.15.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2470,7 +2516,8 @@ function applyOcclusionToHTML(html, percent) {
         let html = "";
     history.forEach(term => {
       // Escape single quotes so points with apostrophes don't break the click handler
-      const safeTerm = term.replace(/'/g, "\\'"); 
+const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;"); 
+ 
       
       // UPGRADE: Converted to a <button> and added onmousedown
       html += `<button type="button" class="history-item" onmousedown="event.preventDefault()" onclick="applyHistorySearch('${safeTerm}')"><span class="history-icon">🕒</span> ${term}</button>`;
@@ -2649,6 +2696,15 @@ function applyOcclusionToHTML(html, percent) {
 
     
     resultsCounter.textContent = "Search Results: " + filteredPoints.length + " of " + points.length; 
+
+// Show "+ Compare All" button ONLY if results are manageable (40 or fewer)
+const addAllBtn = document.getElementById("addAllCompareBtn");
+if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
+  addAllBtn.style.display = "inline-block";
+  addAllBtn.textContent = "+ Compare " + filteredPoints.length;
+} else {
+  addAllBtn.style.display = "none";
+}
     
         const queryDisplay = document.getElementById("searchQueryDisplay");
     if (searchInput.value.trim().length > 0) {
@@ -3421,6 +3477,13 @@ async function saveEdit() {
 
         function openCompareModal() {
     if (compareList.length === 0) return;
+    
+    const hideBtn = document.getElementById("compareHideAllBtn");
+if (hideBtn) {
+   allCompareHidden = false;
+   hideBtn.textContent = "Hide All";
+}
+    
     const container = document.getElementById("compareContainer");
     
     // Lock viewport to maintain native app feel
@@ -3477,7 +3540,7 @@ pts.forEach((p, i) => {
    // Add the Eye Icon button and the data-col index
    html += `<div class="compare-card-header" data-col="${i}">
               <button onclick="toggleCompareColumn(${i})" style="background:transparent; border:none; cursor:pointer; padding:0 5px;">👁️</button> 
-              ${p["Short Name"]} ${impHtml}
+              ${highlightText(p["Short Name"])} ${impHtml}
             </div>`;
 });
 
@@ -3554,7 +3617,36 @@ pts.forEach((p, i) => {
     }
   }
 
+window.addAllToCompare = function() {
+let addedCount = 0;
+filteredPoints.forEach(p => {
+  if (!compareList.includes(p["Short Name"])) {
+    compareList.push(p["Short Name"]);
+    addedCount++;
+  }
+});
+updateCompareBasketUI();
+showToast(`Added ${addedCount} points to Compare`);
+};
 
+let allCompareHidden = false;
+window.toggleAllCompareColumns = function() {
+allCompareHidden = !allCompareHidden;
+const cells = document.querySelectorAll('#compareModal .compare-card-body');
+
+cells.forEach(cell => {
+  if (allCompareHidden) {
+    cell.classList.add("study-blur");
+    cell.classList.remove("study-peek");
+  } else {
+    cell.classList.remove("study-blur");
+    cell.classList.remove("study-peek");
+  }
+});
+
+const btn = document.getElementById("compareHideAllBtn");
+if (btn) btn.textContent = allCompareHidden ? "Show All" : "Hide All";
+};
 
 
   function clearPrint() {
@@ -3931,6 +4023,45 @@ async function completeSave(newValue) {
       return;
     }
   }
+  
+// --- NEW: FLASHCARD SPACEBAR FLIP ---
+  if (e.key === ' ' || e.code === 'Space') {
+    const sheet = document.getElementById('bottomSheet');
+    
+    // Only intercept if Flashcard Mode is ON and the sheet is open
+    if (isFlashcardMode && sheet && sheet.classList.contains('open')) {
+      e.preventDefault(); // Stops the spacebar from scrolling the page down
+      
+      const sheetContent = document.getElementById('sheetContent');
+      const cards = sheetContent.querySelectorAll('.point-notes');
+      const containerRect = sheetContent.getBoundingClientRect();
+      
+      let activeCard = null;
+      
+      // Find the topmost visible card
+      for (let i = 0; i < cards.length; i++) {
+        const rect = cards[i].getBoundingClientRect();
+        
+        // If the bottom of the card is at least 60px below the top of the viewport, 
+        // it hasn't scrolled out of view yet, making it our target.
+        if (rect.bottom > containerRect.top + 60) {
+          activeCard = cards[i];
+          break; // Stop looking, we found the highest one!
+        }
+      }
+      
+      if (activeCard) {
+        // Find the label inside the active card and click it to trigger your existing logic
+        const label = activeCard.querySelector('.section-label');
+        if (label) label.click();
+      }
+      return; // Stop execution here
+    }
+  }
+
+
+
+  
 
   // 2. GLOBAL ESCAPE KEY (Checks Top-to-Bottom Layering)
   if (e.key === 'Escape') {
@@ -4231,6 +4362,14 @@ async function completeSave(newValue) {
       }
 
       const div = document.createElement("div"); 
+      
+      
+      // Pass data to CSS for the Flashcard Front
+div.setAttribute("data-point", stripBBCode(point["Short Name"]));
+div.setAttribute("data-section", stripBBCode(label));
+
+// Let tapping anywhere on the hidden card flip it open!
+div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed');");
 
       
       // Split the text into paragraphs and sort them
@@ -4264,7 +4403,7 @@ async function completeSave(newValue) {
       fullHtml = applyLineOcclusionToHTML(fullHtml, point["Short Name"]);
 
 
-      const headerHtml = "<div class='section-label' onclick='if(isFlashcardMode) this.parentElement.classList.toggle(\"revealed\")'>" + label + editIcon + markAllIcon + "</div>";
+      const headerHtml = "<div class='section-label' onclick='if(isFlashcardMode) {this.parentElement.classList.toggle(\"revealed\"); event.stopPropagation();}'>" + label + editIcon + markAllIcon + "</div>";
 
 
       // If there is an active search AND we found irrelevant text, format it!
