@@ -1385,13 +1385,16 @@
       </div>
       
       <div id="searchHelpTooltip">
-        <div class="help-row"><span>space</span> AND (e.g., <i>cough asthma</i>)</div>
-        <div class="help-row"><span>|</span> OR (e.g., <i>cough | asthma</i>)</div>
-        <div class="help-row"><span>" "</span> Exact phrase (e.g., <i>"clear heat"</i>)</div>
-        <div class="help-row"><span>@</span> Short Name (e.g., <i>@LU</i>)</div>
-        <div class="help-row"><span>#</span> Full Name (e.g., <i>#wood</i>)</div>
-        <div class="help-row"><span>&lt;&gt;</span> Exclude (e.g., <i>&lt;&gt;pain</i>)</div>
-      </div>
+  <div class="help-row"><span>space</span> AND in same section (e.g., <i>night insomnia</i>)</div>
+  <div class="help-row"><span>all:</span> AND anywhere on card (e.g., <i>all: red insomnia</i>)</div>
+  <div class="help-row"><span>|</span> OR (e.g., <i>cough | asthma</i>)</div>
+  <div class="help-row"><span>" "</span> Exact phrase (e.g., <i>"clear heat"</i>)</div>
+  <div class="help-row"><span>@</span> Point or Range (e.g., <i>@LU1-5</i>, <i>@stomachyin</i>)</div>
+  <div class="help-row"><span>#</span> Name or Channel (e.g., <i>#"heart fire",liver</i>)</div>
+  <div class="help-row"><span>&lt;&gt;</span> Exclude (e.g., <i>&lt;&gt;pain</i>)</div>
+  <div class="help-row"><span>!</span> Importance rating (e.g., <i>!!</i>)</div>
+</div>
+
     </div> 
     
     <div id="cardContainer"></div>
@@ -1412,7 +1415,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.15.26.v2";
+const APP_VERSION = "07.16.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2578,8 +2581,11 @@ const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         else if (token.startsWith("<>")) {
         const terms = token.slice(2).toLowerCase().split(",");
         terms.forEach(t => exclude.push(...expandTCMPoint(t)));
-            } else if (token.startsWith("@")) {
-        const terms = token.slice(1).toLowerCase().split(",");
+            }       else if (token.startsWith("@")) {
+        // Strip quotation marks so multi-word custom points parse cleanly!
+        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
+        const terms = cleanToken.split(",");
+
         terms.forEach(t => {
           // Pass the term through the range parser first!
           const rangeTerms = expandPointRange(t);
@@ -2646,8 +2652,12 @@ const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         if (/\d$/.test(h)) {
           return new RegExp(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "i").test(point._shortNameLower);
         }
-        // If it's just letters (like "@LU"), standard inclusion works perfectly to grab the whole channel
-        return point._shortNameLower.includes(h);
+                // NEW: Strip spaces and hyphens from both the search term and the card name 
+        // so it finds the point regardless of how it is punctuated!
+        let cleanH = h.replace(/[\s\-]/g, "");
+        let cleanName = point._shortNameLower.replace(/[\s\-]/g, "");
+        return cleanName.includes(cleanH);
+
       })) return false;
 
 
@@ -4375,20 +4385,24 @@ div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed
       const paras = String(value).split(/\r?\n/).filter(p => p.trim() !== "");
       let matchingParas = []; let nonMatchingParas = [];
 
-      if (activeParsedIncludes && activeParsedIncludes.length > 0) {
+            if (activeParsedIncludes && activeParsedIncludes.length > 0) {
         paras.forEach(p => {
+          // NEW: Strip BBCode before checking so the UI matches the Search Engine!
+          const cleanP = stripBBCode(p).toLowerCase();
+          
           const passesAll = activeParsedIncludes.every(orGroup => {
             return orGroup.some(term => {
               if (term.type === 'exact') {
-                term.regex.lastIndex = 0; return term.regex.test(p);
+                term.regex.lastIndex = 0; return term.regex.test(cleanP);
               } else {
-                return p.toLowerCase().includes(term.text);
+                return cleanP.includes(term.text);
               }
             });
           });
           if (passesAll) matchingParas.push(p); else nonMatchingParas.push(p); 
         });
       } else {
+
         paras.forEach(p => matchingParas.push(p));
       }
 
