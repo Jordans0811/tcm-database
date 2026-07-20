@@ -908,6 +908,11 @@
 }
 
 
+.point-card.keyboard-focus {
+  border-color: #cc5500;
+  transform: scale(1.03);
+  box-shadow: 0 6px 16px rgba(204, 85, 0, 0.25);
+}
 
 
 
@@ -4062,7 +4067,7 @@ async function completeSave(newValue) {
     }
   }
 
-  // 3. GLOBAL ESCAPE KEY (Checks Top-to-Bottom Layering)
+  // 3. GLOBAL ESCAPE KEY
   if (e.key === 'Escape') {
     if (document.getElementById('lightbox').style.display === 'flex') { closeLightbox(); return; }
     if (document.getElementById('editModal').style.display === 'flex') { closeEditModal(); return; }
@@ -4128,12 +4133,11 @@ async function completeSave(newValue) {
         if (sheetContent) sheetContent.scrollBy({ top: -60, behavior: 'auto' });
         break;
     }
-    return; // Stop here if the bottom sheet handled the keys
+    return; 
   }
 
-  // 6. MAIN PAGE NAVIGATION 
-  // Added keyCode 13 to catch the iPad Bluetooth Enter signal
-  const isNavKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key) || e.keyCode === 13;
+  // 6. MAIN PAGE NAVIGATION (Arrows Only)
+  const isNavKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
   
   if (isNavKey && !isOverlayActive) {
     e.preventDefault(); 
@@ -4141,27 +4145,12 @@ async function completeSave(newValue) {
     const appContainer = document.getElementById('appContainer');
     const header = document.getElementById("mainStickyHeader");
     const headerHeight = header ? header.offsetHeight : 100;
-
-    // --- BULLETPROOF ENTER KEY (iPad Bluetooth Fix) ---
-    if (e.key === 'Enter' || e.keyCode === 13) {
-      const focusedCard = document.querySelector('.point-card.active');
-      if (focusedCard) {
-        const pointId = focusedCard.dataset.id;
-        const wrapper = focusedCard.closest('.channel-wrapper');
-        const contextArray = (wrapper && wrapper._pointsData) ? wrapper._pointsData : points;
-        
-        openBottomSheet(pointId, contextArray);
-        focusedCard.classList.remove('active'); 
-      }
-      return;
-    }
-
     const allWrappers = Array.from(document.querySelectorAll('.channel-wrapper'));
     if (allWrappers.length === 0) return;
 
     const currentScroll = appContainer.scrollTop;
 
-    // --- SNAPPING UP / DOWN (Instant Outline & Sync Render) ---
+    // --- SNAPPING UP / DOWN ---
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       let targetWrapper = null;
       
@@ -4173,21 +4162,17 @@ async function completeSave(newValue) {
       }
 
       if (targetWrapper) {
-        // 1. Force the row to render instantly if the virtualizer hasn't built it yet
         if (!targetWrapper.hasChildNodes() && typeof buildRow === 'function') {
           targetWrapper.appendChild(buildRow(targetWrapper.dataset.channel, targetWrapper._pointsData));
           targetWrapper.style.height = ''; 
         }
 
-        // 2. Snap scroll
         appContainer.scrollTo({ top: targetWrapper.offsetTop - headerHeight - 10, behavior: 'auto' });
         
-        // 3. Instant Outline (No Debounce Required)
         document.querySelectorAll('.point-card.active').forEach(c => c.classList.remove('active'));
         const firstCard = targetWrapper.querySelector('.point-card');
         if (firstCard) {
           firstCard.classList.add('active');
-          // Reset horizontal scroll of the new row so the highlighted card is visible
           const scroller = targetWrapper.querySelector('.scroller');
           if (scroller) scroller.scrollLeft = 0; 
         }
@@ -4195,17 +4180,14 @@ async function completeSave(newValue) {
       return;
     }
 
-    // --- HORIZONTAL NAVIGATION (Bottom Row Fix) ---
-    // Calculate if the user has scrolled to the absolute bottom of the container
+    // --- HORIZONTAL NAVIGATION ---
     const isAtBottom = Math.abs(appContainer.scrollHeight - appContainer.scrollTop - appContainer.clientHeight) < 20;
     let activeWrapper = null;
 
     if (isAtBottom) {
-      // If at the absolute bottom, force the last rendered row to be the active one
       const renderedWrappers = allWrappers.filter(w => w.hasChildNodes());
       activeWrapper = renderedWrappers[renderedWrappers.length - 1];
     } else {
-      // Otherwise, use the standard math to find the row directly under the header
       activeWrapper = allWrappers.find(w => {
          const top = w.offsetTop;
          const bottom = w.offsetTop + w.offsetHeight;
@@ -4246,6 +4228,38 @@ async function completeSave(newValue) {
         const scrollerCenter = scroller.clientWidth / 2;
         scroller.scrollTo({ left: cardCenter - scrollerCenter, behavior: 'smooth' });
       }
+    }
+  }
+});
+
+// --- NEW: IPAD BLUETOOTH ENTER KEY WORKAROUND ---
+document.addEventListener('keyup', (e) => {
+  // Protect typing states
+  const activeEl = document.activeElement;
+  if (activeEl) {
+    const activeTag = activeEl.tagName.toLowerCase();
+    const isContentEditable = activeEl.hasAttribute('contenteditable') || activeEl.contentEditable === 'true';
+    if (activeTag === 'input' || activeTag === 'textarea' || isContentEditable || activeEl.id === 'searchInput') {
+      return;
+    }
+  }
+
+  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal'].some(id => document.getElementById(id).style.display === 'flex');
+  
+  if ((e.key === 'Enter' || e.keyCode === 13) && !isOverlayActive) {
+    // Stop if the bottom sheet is already open
+    const sheet = document.getElementById('bottomSheet');
+    if (sheet && sheet.classList.contains('open')) return;
+
+    // Find the highlighted card and execute
+    const focusedCard = document.querySelector('.point-card.active');
+    if (focusedCard) {
+      e.preventDefault();
+      const pointId = focusedCard.dataset.id;
+      const wrapper = focusedCard.closest('.channel-wrapper');
+      const contextArray = (wrapper && wrapper._pointsData) ? wrapper._pointsData : points;
+      
+      openBottomSheet(pointId, contextArray);
     }
   }
 });
