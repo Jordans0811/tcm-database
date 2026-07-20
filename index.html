@@ -1427,7 +1427,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.20.26.v1";
+const APP_VERSION = "07.20.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -4045,7 +4045,7 @@ async function completeSave(newValue) {
   }, {passive: true});
 
 
- // --- BULLETPROOF ENTER KEY ENGINE ---
+// --- BULLETPROOF ENTER KEY ENGINE ---
 let lastEnterTime = 0;
 
 function handleGlobalEnter(e) {
@@ -4058,7 +4058,6 @@ function handleGlobalEnter(e) {
 
   // Don't fire if a modal is open
   const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal', 'channelModal', 'sectionModal', 'occlusionModal', 'devModal'].some(id => document.getElementById(id).style.display === 'flex');
-
   if (isOverlayActive) return;
 
   // Don't fire if the bottom sheet is already open
@@ -4072,12 +4071,21 @@ function handleGlobalEnter(e) {
     lastEnterTime = Date.now(); // Start the debounce timer
     
     const pointId = focusedCard.dataset.id;
-    const wrapper = focusedCard.closest('.channel-wrapper');
-    const contextArray = (wrapper && wrapper._pointsData) ? wrapper._pointsData : points;
+    let contextArray = [];
+    const searchInput = document.getElementById("searchInput");
+
+    // --- NEW: Check if a search is active before building the context array! ---
+    if (searchInput && searchInput.value.trim().length > 0) {
+      contextArray = filteredPoints; // Load ALL search results into the bottom sheet
+    } else {
+      const wrapper = focusedCard.closest('.channel-wrapper');
+      contextArray = (wrapper && wrapper._pointsData) ? wrapper._pointsData : points; // Load just the row
+    }
     
     openBottomSheet(pointId, contextArray);
   }
 }
+
 
 
 // --- MASTER KEYBOARD LISTENER ---
