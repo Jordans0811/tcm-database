@@ -1427,7 +1427,7 @@
 
 <script>
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.16.26.v1";
+const APP_VERSION = "07.20.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2537,10 +2537,15 @@ const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;");
   }
 
   function applyHistorySearch(term) {
-    searchInput.value = term;
-    saveSearchHistory(term); // Bumps this term back to the top of the list!
-    handleSearch();
-  }
+  searchInput.value = term;
+  saveSearchHistory(term); // Bumps this term back to the top of the list!
+  handleSearch();
+  
+  // Also close the dropdown when clicking a history item
+  document.getElementById("searchDropdown").classList.remove("expanded");
+  updateStickyHeaderHeights();
+}
+
 
   function clearSearchHistory() {
     localStorage.removeItem('tcm_search_history');
@@ -3031,14 +3036,30 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
   }
 
   function debounce(fn, delay = 300) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn.apply(this, args), delay); }; }
-  searchInput.addEventListener("input", debounce(() => handleSearch(false), 300));
-    searchInput.addEventListener("keydown", e => { 
-    if (e.key === "Escape") clearSearchText(); 
-    if (e.key === "Enter") {
-      saveSearchHistory(searchInput.value);
-      searchInput.blur(); // Drops the mobile keyboard so they can see results
-    }
-  });
+
+
+searchInput.addEventListener("input", debounce(() => handleSearch(false), 300));
+
+searchInput.addEventListener("keydown", e => { 
+  if (e.key === "Escape") clearSearchText(); 
+  if (e.key === "Enter") {
+    e.preventDefault(); 
+    saveSearchHistory(searchInput.value);
+    
+    // Notice that handleSearch() is completely REMOVED from here!
+    
+    searchInput.blur(); // Drops the mobile keyboard
+    
+    // Hide the search dropdown
+    document.getElementById("searchDropdown").classList.remove("expanded"); 
+    
+    // Recalculate the sticky header so the cards slide up cleanly
+    updateStickyHeaderHeights(); 
+  }
+});
+
+
+
   
 
 
@@ -4024,25 +4045,77 @@ async function completeSave(newValue) {
   }, {passive: true});
 
 
- document.addEventListener('keydown', (e) => {
-  // 1. PROTECT TYPING STATES
+ // --- BULLETPROOF ENTER KEY ENGINE ---
+let lastEnterTime = 0;
+
+function handleGlobalEnter(e) {
+  // Prevent double firing if iPad sends both keydown and keyup
+  if (Date.now() - lastEnterTime < 300) return;
+  
+  // Protect typing states
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
+
+  // Don't fire if a modal is open
+  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal', 'channelModal', 'sectionModal', 'occlusionModal', 'devModal'].some(id => document.getElementById(id).style.display === 'flex');
+
+  if (isOverlayActive) return;
+
+  // Don't fire if the bottom sheet is already open
+  const sheet = document.getElementById('bottomSheet');
+  if (sheet && sheet.classList.contains('open')) return;
+
+  // Find the highlighted card and execute
+  const focusedCard = document.querySelector('.point-card.active');
+  if (focusedCard) {
+    e.preventDefault();
+    lastEnterTime = Date.now(); // Start the debounce timer
+    
+    const pointId = focusedCard.dataset.id;
+    const wrapper = focusedCard.closest('.channel-wrapper');
+    const contextArray = (wrapper && wrapper._pointsData) ? wrapper._pointsData : points;
+    
+    openBottomSheet(pointId, contextArray);
+  }
+}
+
+
+// --- MASTER KEYBOARD LISTENER ---
+document.addEventListener('keydown', (e) => {
+  
+  // 1. SEARCH SHORTCUTS (Cmd/Ctrl + F  OR  "/")
+  if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') || e.key === '/') {
+    const activeEl = document.activeElement;
+    // Only trigger if we aren't already actively typing in a text box
+    if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA' && !activeEl.isContentEditable)) {
+      e.preventDefault(); // Stop native browser find or typing the '/' character
+      
+      const dropdown = document.getElementById("searchDropdown");
+      if (dropdown && !dropdown.classList.contains("expanded")) {
+        toggleSearchDropdown();
+      }
+      document.getElementById("searchInput").focus();
+      return;
+    }
+  }
+
+  // 2. PROTECT TYPING STATES
   const activeEl = document.activeElement;
   if (activeEl) {
     const activeTag = activeEl.tagName.toLowerCase();
     const isContentEditable = activeEl.hasAttribute('contenteditable') || activeEl.contentEditable === 'true';
-    if (
-      activeTag === 'input' || 
-      activeTag === 'textarea' || 
-      isContentEditable || 
-      activeEl.id === 'editArea' || 
-      activeEl.id === 'searchInput'
-    ) {
+    if (activeTag === 'input' || activeTag === 'textarea' || isContentEditable || activeEl.id === 'editArea' || activeEl.id === 'searchInput') {
       if (e.key === 'Escape') activeEl.blur();
-      return;
+      return; 
     }
   }
+
+  // 3. ENTER KEY ROUTER
+  if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {
+    handleGlobalEnter(e);
+  }
   
-  // 2. FLASHCARD SPACEBAR FLIP
+  // 4. FLASHCARD SPACEBAR FLIP
   if (e.key === ' ' || e.code === 'Space') {
     const sheet = document.getElementById('bottomSheet');
     if (isFlashcardMode && sheet && sheet.classList.contains('open')) {
@@ -4067,7 +4140,7 @@ async function completeSave(newValue) {
     }
   }
 
-  // 3. GLOBAL ESCAPE KEY
+  // 5. GLOBAL ESCAPE KEY
   if (e.key === 'Escape') {
     if (document.getElementById('lightbox').style.display === 'flex') { closeLightbox(); return; }
     if (document.getElementById('editModal').style.display === 'flex') { closeEditModal(); return; }
@@ -4086,7 +4159,7 @@ async function completeSave(newValue) {
     return;
   }
 
-  // 4. LIGHTBOX NAVIGATION
+  // 6. LIGHTBOX NAVIGATION
   const lightbox = document.getElementById('lightbox');
   if (lightbox && lightbox.style.display === 'flex') {
     let newIndex = currentLightboxIndex;
@@ -4111,7 +4184,7 @@ async function completeSave(newValue) {
     return; 
   }
 
-  // 5. BOTTOM SHEET NAVIGATION
+  // 7. BOTTOM SHEET NAVIGATION
   const sheet = document.getElementById('bottomSheet');
   const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal'].some(id => document.getElementById(id).style.display === 'flex');
   
@@ -4136,7 +4209,7 @@ async function completeSave(newValue) {
     return; 
   }
 
-  // 6. MAIN PAGE NAVIGATION (Arrows Only)
+  // 8. MAIN PAGE NAVIGATION (Arrows Only)
   const isNavKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
   
   if (isNavKey && !isOverlayActive) {
@@ -4232,37 +4305,13 @@ async function completeSave(newValue) {
   }
 });
 
-// --- NEW: IPAD BLUETOOTH ENTER KEY WORKAROUND ---
+// Fallback listener strictly to catch iPad hardware 'Enter' overrides
 document.addEventListener('keyup', (e) => {
-  // Protect typing states
-  const activeEl = document.activeElement;
-  if (activeEl) {
-    const activeTag = activeEl.tagName.toLowerCase();
-    const isContentEditable = activeEl.hasAttribute('contenteditable') || activeEl.contentEditable === 'true';
-    if (activeTag === 'input' || activeTag === 'textarea' || isContentEditable || activeEl.id === 'searchInput') {
-      return;
-    }
-  }
-
-  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal'].some(id => document.getElementById(id).style.display === 'flex');
-  
-  if ((e.key === 'Enter' || e.keyCode === 13) && !isOverlayActive) {
-    // Stop if the bottom sheet is already open
-    const sheet = document.getElementById('bottomSheet');
-    if (sheet && sheet.classList.contains('open')) return;
-
-    // Find the highlighted card and execute
-    const focusedCard = document.querySelector('.point-card.active');
-    if (focusedCard) {
-      e.preventDefault();
-      const pointId = focusedCard.dataset.id;
-      const wrapper = focusedCard.closest('.channel-wrapper');
-      const contextArray = (wrapper && wrapper._pointsData) ? wrapper._pointsData : points;
-      
-      openBottomSheet(pointId, contextArray);
-    }
+  if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {
+    handleGlobalEnter(e);
   }
 });
+
 
 
 
@@ -4957,6 +5006,10 @@ window.toggleMarkedWord = async function(event, element, passedPointId) {
 };
 
 
+// --- WIPE KEYBOARD CURSOR ON TOUCH ---
+document.getElementById('appContainer').addEventListener('touchstart', () => {
+  document.querySelectorAll('.point-card.active').forEach(c => c.classList.remove('active'));
+}, { passive: true });
 
 
 
