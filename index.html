@@ -936,6 +936,23 @@
   background: rgba(0, 122, 255, 0.1);
 }
 
+/* --- Locked Modal Layouts to Prevent Jumping --- */
+#channelModal .modal-content, 
+#sectionModal .modal-content {
+  height: 60vh; /* Sets a rigid starting height */
+  max-height: 60vh !important;
+  display: flex;
+  flex-direction: column;
+}
+
+#channelCheckboxes, 
+#sectionCheckboxes {
+  flex: 1; /* Forces the list to fill the available space */
+  overflow-y: auto; /* Keeps the internal scrollbar active */
+  min-height: 250px; /* Ensures space remains even if everything is filtered out */
+}
+
+
 @media (prefers-color-scheme: dark) {
   .history-item.history-item-focus {
     background: rgba(10, 132, 255, 0.2);
@@ -1259,8 +1276,12 @@
         <button id="cancelBtn" onclick="cancelFilter()" style="background: transparent; border: none; font-size: 24px; cursor: pointer; color: #555; padding: 0; line-height: 1;" aria-label="Close">&times;</button>
       </div>
 
-      <!-- NEW: Search and Bulk Actions -->
-      <input type="text" id="channelSearchInput" class="search-box" style="margin-bottom: 10px; padding: 8px 12px; font-size: 14px;" placeholder="Filter channels..." onkeydown="handleModalKeyboard(event)" oninput="filterModalOptions()">
+          <!-- Search and Bulk Actions -->
+      <div class="search-container" style="margin-bottom: 10px;">
+        <input type="text" id="channelSearchInput" class="search-box" style="padding: 8px 35px 8px 34px; font-size: 14px;" placeholder="Filter channels..." onkeydown="handleModalKeyboard(event)" oninput="filterModalOptions()">
+        <div class="clear-btn-hitbox" onclick="clearChannelSearch()"><span class="clear-btn-icon">✕</span></div>
+      </div>
+
       
   <div style="display:flex; justify-content: space-between; margin-bottom: 10px;">
     <button onclick="selectAllFilteredChannels(true)" style="background: #e3e3e8; color: black; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;">
@@ -1287,8 +1308,12 @@
         <button onclick="closeSectionFilterModal()" style="background: transparent; border: none; font-size: 24px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
       </div>
 
-      <!-- NEW: Search and Bulk Actions -->
-      <input type="text" id="sectionSearchInput" class="search-box" style="margin-bottom: 10px; padding: 8px 12px; font-size: 14px;" placeholder="Filter sections..." onkeydown="handleSectionModalKeyboard(event)" oninput="filterSectionModalOptions()">
+          <!-- Search and Bulk Actions -->
+      <div class="search-container" style="margin-bottom: 10px;">
+        <input type="text" id="sectionSearchInput" class="search-box" style="padding: 8px 35px 8px 34px; font-size: 14px;" placeholder="Filter sections..." onkeydown="handleSectionModalKeyboard(event)" oninput="filterSectionModalOptions()">
+        <div class="clear-btn-hitbox" onclick="clearSectionSearch()"><span class="clear-btn-icon">✕</span></div>
+      </div>
+
       
       <div style="display:flex; justify-content: space-between; margin-bottom: 10px;">
           <button onclick="selectAllFilteredSections(true)" style="background: #e3e3e8; color: black; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;">
@@ -1493,7 +1518,7 @@
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.24.26.v1";
+const APP_VERSION = "07.24.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -5334,6 +5359,19 @@ function updateModalFocus(visibleLabels) {
   }
 }
 
+function clearChannelSearch() {
+  const input = document.getElementById("channelSearchInput");
+  input.value = "";
+  filterModalOptions();
+  input.focus();
+}
+
+function clearSectionSearch() {
+  const input = document.getElementById("sectionSearchInput");
+  input.value = "";
+  filterSectionModalOptions();
+  input.focus();
+}
 
 
 
