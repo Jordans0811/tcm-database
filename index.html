@@ -1517,7 +1517,7 @@
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.24.26.v3";
+const APP_VERSION = "07.30.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3749,6 +3749,7 @@ pts.forEach((p, i) => {
         : `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
    
    // --- NEW: Run the text through your occlusion engine before rendering ---
+   formatted = applyWordOcclusionToHTML(formatted, p["Short Name"]);
    formatted = applyLineOcclusionToHTML(formatted, p["Short Name"]);
 
    // UPDATED: Added the onclick toggle for peak mode
