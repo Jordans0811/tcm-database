@@ -1517,7 +1517,7 @@
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "07.30.26.v1";
+const APP_VERSION = "08.04.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1706,7 +1706,9 @@ async function saveSinglePointToVault(pointObject) {
   }
 }
 
-const dataUrl = "https://script.google.com/macros/s/AKfycbwfR8fLVDYzGN8guk_CR-q-mfDxHiCH7u9pei4gHLkovDc9875Pj-Ihlo9MymgbkpOh3w/exec";
+// --- NEW: SPLIT ARCHITECTURE ENDPOINTS ---
+const readUrl = "https://tcmapi.jordanacudata0811.workers.dev/";
+const writeUrl = "https://script.google.com/macros/s/AKfycbwfR8fLVDYzGN8guk_CR-q-mfDxHiCH7u9pei4gHLkovDc9875Pj-Ihlo9MymgbkpOh3w/exec";
 
 // --- NEW: Optimized Fetching Engine ---
 async function loadTCMData(hasLocalData) {
@@ -1718,7 +1720,7 @@ async function loadTCMData(hasLocalData) {
     // FIX 1: We removed the `!localVersion` trap here so we don't accidentally block offline loads.
     if (isColdBoot) {
        console.log("Cold boot detected. Fetching full payload immediately...");
-       const fullDataUrl = dataUrl + "?t=" + Date.now();
+       const fullDataUrl = readUrl + "?t=" + Date.now();
        let response = await fetch(fullDataUrl);
        let payload = await response.json();
        let newArray = payload.points || payload;
@@ -1729,7 +1731,7 @@ async function loadTCMData(hasLocalData) {
     console.log("Checking for updates in the background...");
     
     // 2. Fast Version Check (Bypassing cache with &t=...)
-    const versionUrl = dataUrl + "?checkVersion=true&t=" + Date.now();
+    const versionUrl = readUrl + "?checkVersion=true&t=" + Date.now();
     let versionResponse = await fetch(versionUrl, { cache: 'no-store' });
     let versionData = await versionResponse.json();
     
@@ -1749,7 +1751,7 @@ async function loadTCMData(hasLocalData) {
 
     // 3. Versions didn't match. Download the new data!
     console.log("New version detected! Downloading full payload...");
-    const fullDataUrl = dataUrl + "?t=" + Date.now();
+    const fullDataUrl = readUrl + "?t=" + Date.now();
     let response = await fetch(fullDataUrl, { 
   cache: 'no-store',
   redirect: 'follow' 
@@ -3557,7 +3559,7 @@ sel.addRange(range);
     // Wait 1.5 seconds after they STOP clicking before sending the final data to Google
     importanceSyncTimers[pointId] = setTimeout(() => {
       const payload = { id: pointId, field: "Important", value: next };
-      fetch(dataUrl, {
+      fetch(writeUrl, {
         method: "POST", 
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
@@ -3588,11 +3590,11 @@ async function saveEdit() {
   // 2. Prepare the payload and an 8-second timeout
   const payload = { id: currentEditingPoint["Short Name"], field: currentEditingField, value: newValue };
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); 
+  const timeoutId = setTimeout(() => controller.abort(), 10000); 
 
   // 3. Attempt the Cloud Save FIRST
   try {
-    await fetch(dataUrl, {
+    await fetch(writeUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
@@ -5087,8 +5089,8 @@ window.clearAllOcclusions = async function() {
 
     // Sync to Google Sheets in the background
     if (navigator.onLine) {
-      fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: "[]" }) });
-      fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Word Occlusions", value: "[]" }) });
+      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: "[]" }) });
+      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Word Occlusions", value: "[]" }) });
     }
   } else { 
     showToast("No marks to clear."); 
@@ -5127,7 +5129,7 @@ window.markAllLinesInSection = async function(buttonEl, pointId) {
     occlusionSyncTimers[pointId + '_line'] = setTimeout(() => {
       if (!navigator.onLine) return;
       const payload = { id: pointId, field: "Line Occlusions", value: p["Line Occlusions"] };
-      fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
     }, 1500);
 
   } else {
@@ -5162,7 +5164,7 @@ window.toggleMarkedLine = async function(event, element, passedPointId) {
   occlusionSyncTimers[pointId + '_line'] = setTimeout(() => {
     if (!navigator.onLine) return;
     const payload = { id: pointId, field: "Line Occlusions", value: p["Line Occlusions"] };
-    fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+    fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
   }, 1500);
 };
 
@@ -5193,7 +5195,7 @@ window.toggleMarkedWord = async function(event, element, passedPointId) {
   occlusionSyncTimers[pointId + '_word'] = setTimeout(() => {
     if (!navigator.onLine) return;
     const payload = { id: pointId, field: "Word Occlusions", value: p["Word Occlusions"] };
-    fetch(dataUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+    fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
   }, 1500);
 };
 
