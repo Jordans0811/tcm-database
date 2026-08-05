@@ -954,6 +954,19 @@
 
 
 
+/* Hides the point names but keeps them clickable */
+.hide-names-active .compare-point-name {
+  opacity: 0;
+  cursor: pointer;
+
+}
+
+/* Class applied when a hidden name is clicked */
+.hide-names-active .compare-point-name.name-revealed {
+  opacity: 1;
+}
+
+
 @media (prefers-color-scheme: dark) {
   .history-item.history-item-focus {
     background: rgba(10, 132, 255, 0.2);
@@ -1437,8 +1450,10 @@
          <div class="compare-header">
 <h2>Compare Points</h2>
 <div class="compare-actions">
-<button id="compareHideAllBtn" onclick="toggleAllCompareColumns()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide All</button>
-<button onclick="closeCompareModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+  <button id="compareToggleNamesBtn" onclick="toggleCompareNames()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide Names</button>
+  <button onclick="shuffleCompare()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">🔀 Shuffle</button>
+  <button id="compareHideAllBtn" onclick="toggleAllCompareColumns()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide All</button>
+  <button onclick="closeCompareModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
 </div>
 </div>
 
@@ -1517,7 +1532,7 @@
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "08.04.26.v1";
+const APP_VERSION = "08.05.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3651,17 +3666,18 @@ async function saveEdit() {
 
 
   function clearCompare() {
-    compareList = [];
-    updateCompareBasketUI();
-    closeCompareModal();
-    
-    // Reset the icon if the bottom sheet is currently open
-    const icon = document.getElementById("compareIcon");
-    if (icon) {
-      icon.style.background = "";
-      icon.style.color = "";
-    }
+  compareList = [];
+  backupCompareList = []; // Clear the backup memory too
+  updateCompareBasketUI();
+  closeCompareModal();
+  
+  // Reset the icon if the bottom sheet is currently open
+  const icon = document.getElementById("compareIcon");
+  if (icon) {
+    icon.style.background = "";
+    icon.style.color = "";
   }
+}
 
   function updateCompareBasketUI() {
     const basket = document.getElementById("compareBasket");
@@ -3681,6 +3697,13 @@ async function saveEdit() {
 if (hideBtn) {
    allCompareHidden = false;
    hideBtn.textContent = "Hide All";
+}
+
+const namesBtn = document.getElementById("compareToggleNamesBtn");
+if (namesBtn) {
+   compareNamesHidden = false;
+   document.getElementById("compareModal").classList.remove("hide-names-active");
+   namesBtn.textContent = "Hide Names";
 }
     
     const container = document.getElementById("compareContainer");
@@ -3739,7 +3762,7 @@ pts.forEach((p, i) => {
    // Add the Eye Icon button and the data-col index
    html += `<div class="compare-card-header" data-col="${i}">
               <button onclick="toggleCompareColumn(${i})" style="background:transparent; border:none; cursor:pointer; padding:0 5px;">👁️</button> 
-              ${highlightText(p["Short Name"])} ${impHtml}
+              <span class="compare-point-name" onclick="this.classList.toggle('name-revealed')">${highlightText(p["Short Name"])} ${impHtml}</span>
             </div>`;
 });
 
@@ -3777,6 +3800,12 @@ pts.forEach((p, i) => {
   // Lock the viewport back down to protect the main app UI
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
   document.getElementById("compareModal").style.display = "none";
+  
+  // RESTORE ORIGINAL ORDER IF SHUFFLED
+  if (backupCompareList.length > 0) {
+    compareList = [...backupCompareList];
+    backupCompareList = []; // Clear the backup memory
+  }
 }
 
   // --- COMPARE ZOOM LOGIC ---
@@ -3847,6 +3876,47 @@ cells.forEach(cell => {
 const btn = document.getElementById("compareHideAllBtn");
 if (btn) btn.textContent = allCompareHidden ? "Show All" : "Hide All";
 };
+
+// --- COMPARE: HIDE NAMES LOGIC ---
+let compareNamesHidden = false;
+window.toggleCompareNames = function() {
+  compareNamesHidden = !compareNamesHidden;
+  const modal = document.getElementById("compareModal");
+  const btn = document.getElementById("compareToggleNamesBtn");
+  
+  if (compareNamesHidden) {
+    // Reset any previously clicked names so they all start hidden
+    document.querySelectorAll(".name-revealed").forEach(el => el.classList.remove("name-revealed"));
+    
+    modal.classList.add("hide-names-active");
+    if (btn) btn.textContent = "Show Names";
+  } else {
+    modal.classList.remove("hide-names-active");
+    if (btn) btn.textContent = "Hide Names";
+  }
+};
+
+// --- COMPARE: RANDOMIZE / SHUFFLE LOGIC ---
+let backupCompareList = []; // Saves the original order
+
+window.shuffleCompare = function() {
+  if (compareList.length < 2) return; 
+  
+  // Back up the original order the FIRST time we shuffle in this session
+  if (backupCompareList.length === 0) {
+    backupCompareList = [...compareList];
+  }
+  
+  // Fisher-Yates shuffle algorithm
+  for (let i = compareList.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [compareList[i], compareList[j]] = [compareList[j], compareList[i]];
+  }
+  
+  openCompareModal(); 
+};
+
+
 
 
   function clearPrint() {
