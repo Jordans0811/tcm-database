@@ -1532,7 +1532,7 @@
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "08.05.26.v1";
+const APP_VERSION = "08.06.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1608,7 +1608,8 @@ async function syncMissingPhotos() {
     
     // Build precise URLs so we can match them against what is cached
     const baseOrigin = new URL('.', document.baseURI).href;
-    let expectedUrls = Array.from(status.expectedIds).map(id => baseOrigin + `DeadmanPhotos/${id}.jpg`);
+    let expectedUrls = Array.from(status.expectedIds).map(id => baseOrigin + getImagePath({ "Image ID": id }));
+
     let missingUrls = expectedUrls.filter(url => !status.cachedUrls.has(url));
 
     let successCount = status.cachedUrls.size;
@@ -2339,7 +2340,7 @@ function applyOcclusionToHTML(html, percent) {
           
           const img = card.querySelector('img');
           if (img) {
-            const newSrc = "DeadmanPhotos/" + newPoint["Image ID"] + ".jpg";
+            const newSrc = getImagePath(newPoint);
             if (img.src !== newSrc) img.src = newSrc;
           }
 
@@ -2406,14 +2407,14 @@ function applyOcclusionToHTML(html, percent) {
     currentLightboxIndex = index; currentLightboxPoints = pointsList; currentLightboxScroller = scrollerEl;
     const point = currentLightboxPoints[currentLightboxIndex];
     document.getElementById("lightbox-title").textContent = point["Short Name"]; 
-    document.getElementById("lightbox-img").src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+    document.getElementById("lightbox-img").src = getImagePath(point);
     document.getElementById("lightbox").style.display = "flex";
   }
 
   function openLightboxSingle(pointId, imageId) {
     viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0");
     document.getElementById("lightbox-title").textContent = pointId; 
-    document.getElementById("lightbox-img").src = "DeadmanPhotos/" + imageId + ".jpg";
+    document.getElementById("lightbox-img").src = getImagePath({ "Image ID": imageId });
     document.getElementById("lightbox").style.display = "flex";
   }
 
@@ -2451,7 +2452,8 @@ function applyOcclusionToHTML(html, percent) {
       if (newIndex !== currentLightboxIndex) {
         currentLightboxIndex = newIndex; const point = currentLightboxPoints[currentLightboxIndex];
         document.getElementById("lightbox-title").textContent = point["Short Name"]; 
-        document.getElementById("lightbox-img").src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+document.getElementById("lightbox-img").src = getImagePath(point);
+
         
         // --- NEW BACKGROUND SYNC LOGIC ---
         // 1. Legacy fallback just in case
@@ -3116,7 +3118,7 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
     const headerInfo = document.createElement("div"); headerInfo.className = "detail-header-info";
     
     const imgInfo = document.createElement("img"); 
-    imgInfo.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+    imgInfo.src = getImagePath(point);
     imgInfo.onclick = (e) => { e.stopPropagation(); openLightboxSingle(point["Short Name"], point["Image ID"]); };
     
     const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
@@ -3291,7 +3293,7 @@ searchInput.addEventListener("keydown", e => {
       card.dataset.id = point["Short Name"]; 
       
       const imgContainer = document.createElement("div"); imgContainer.className = "card-img-container";
-      const img = document.createElement("img"); img.dataset.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+      const img = document.createElement("img"); img.dataset.src = getImagePath(point);
       img.decoding = "async";
       
       const label = document.createElement("div"); label.className = "card-label";
@@ -3964,7 +3966,7 @@ window.shuffleCompare = function() {
       headerInfo.style.position = "static"; 
       
       const imgInfo = document.createElement("img");
-      imgInfo.src = "DeadmanPhotos/" + p["Image ID"] + ".jpg";
+      imgInfo.src = getImagePath(p);
       imgInfo.style.width = "50px"; 
       imgInfo.style.height = "70px";
       
@@ -4081,7 +4083,7 @@ window.shuffleCompare = function() {
         const p = points.find(x => x["Short Name"] === id);
         if (!p) continue;
 
-        let b64Img = await getBase64("DeadmanPhotos/" + p["Image ID"] + ".jpg");
+        let b64Img = await getBase64(getImagePath(p));
         let imgTag = b64Img ? `<img src="${b64Img}">` : '';
 
         const imp = p.Important ? String(p.Important).trim() : "";
@@ -4434,7 +4436,8 @@ document.addEventListener('keydown', (e) => {
       currentLightboxIndex = newIndex; 
       const point = currentLightboxPoints[currentLightboxIndex];
       document.getElementById("lightbox-title").textContent = point["Short Name"]; 
-      document.getElementById("lightbox-img").src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+document.getElementById("lightbox-img").src = getImagePath(point);
+
       
       if (currentLightboxScroller) {
         const targetCard = currentLightboxScroller.children[currentLightboxIndex];
@@ -4721,7 +4724,7 @@ document.addEventListener('keyup', (e) => {
     headerInfo.style.margin = "0 0 15px 0";
     
     const imgInfo = document.createElement("img"); 
-    imgInfo.src = "DeadmanPhotos/" + point["Image ID"] + ".jpg";
+    imgInfo.src = getImagePath(point);
     imgInfo.onclick = (e) => { e.stopPropagation(); openLightbox(currentSheetIndex, sheetContextPoints, null); };
     
     const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
@@ -5449,6 +5452,22 @@ function clearSectionSearch() {
   filterSectionModalOptions();
   input.focus();
 }
+
+function getImagePath(point) {
+  if (!point || !point["Image ID"]) return "";
+  
+  const imageId = String(point["Image ID"]).trim();
+  
+  // Checks if the ID ends with a valid image extension (.png, .jpg, .webp, .jpeg, .gif)
+  if (/\.(png|jpe?g|webp|gif|svg)$/i.test(imageId)) {
+    return "DeadmanPhotos/" + imageId;
+  }
+  
+  // If no extension is found, default to .jpg
+  const ext = point["Image Ext"] || "jpg";
+  return "DeadmanPhotos/" + imageId + "." + ext;
+}
+
 
 
 
