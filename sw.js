@@ -6,6 +6,7 @@ const INITIAL_CACHED_RESOURCES = [
   './',
   './index.html',
   './manifest.json'
+  './ontology.js' 
 ];
 
 // 1. Install Event: Lock the core files in the vault immediately
