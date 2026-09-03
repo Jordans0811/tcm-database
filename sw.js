@@ -5,8 +5,10 @@ const IMAGE_CACHE = `tcm-images-${CACHE_VERSION}`;
 const INITIAL_CACHED_RESOURCES = [
   './',
   './index.html',
-  './manifest.json'
-  './ontology.js' 
+  './manifest.json',
+  './tcm-stopwords.js',
+  './tcm-keywords.js',
+  './tcm-semantic-map.js'
 ];
 
 // 1. Install Event: Lock the core files in the vault immediately
