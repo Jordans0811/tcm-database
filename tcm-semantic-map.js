@@ -133,5 +133,48 @@ const TCM_SEMANTIC_MAP = {
   "ganglion cyst": "nodule phlegm",
   "lipoma": "lipoma phlegm nodule",           
   "varicose vein": "blood stasis vessels",    
-  "varicose": "stasis"
+  "varicose": "stasis",
+  
+    // --- Modern Gynecology & Women's Health ---
+  "pcos": "phlegm dampness",
+  "endometriosis": "blood stasis",
+  "fibroids": "stasis nodule",
+  "pms": "stagnation swings irritability",
+  "pmdd": "stagnation swings irritability depression",
+  "hot flashes": "heat sweat deficiency", 
+  "night sweats": "sweat deficiency",
+  "yeast infection": "damp heat discharges",
+  "uti": "damp heat burning urination", // Translates Urinary Tract Infection
+
+  // --- Modern Gastrointestinal ---
+  "gerd": "reflux rebellious",
+  "acid reflux": "reflux rebellious",
+  "ibs": "diarrhoea constipation cramps", 
+  "leaky gut": "deficiency diarrhoea fatigue",
+  "crohns": "damp heat diarrhoea blood",
+  "ulcerative colitis": "damp heat diarrhoea blood",
+  "hemorrhoids": "prolapse blood stasis",
+
+  // --- Neuro, Mood & Fatigue ---
+  "brain fog": "phlegm misting memory",
+  "panic attack": "palpitations fear breathlessness",
+  "chronic fatigue": "deficiency exhausted",
+  "fibromyalgia": "pain stasis stagnation",
+  "neuropathy": "stasis deficiency tingling", // You may want to add "tingling" or "numbness" to your keywords
+  "adhd": "fidgetiness memory restlessness",
+  "insomnia": "insomnia", // Just to catch it if they say "I have insomnia"
+
+  // --- Modern Slang & Colloquialisms ---
+  "hangry": "anger hunger", 
+  "meat sweats": "sweat heat",
+  "butterflies in stomach": "palpitations uneasiness",
+  "run down": "deficiency exhausted",
+  "tossed and turned": "insomnia restlessness",
+  "scalloped tongue": "toothmarked",
+  "fast pulse": "rapid",
+  "thick coat": "greasy"
+
+  
+  
+  
 };
