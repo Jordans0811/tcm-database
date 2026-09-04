@@ -1,5 +1,5 @@
 // tcm-graph.js
-// LAYER 2 & 3: The Knowledge Graph and Inference Schema
+// LAYER 2 & 3: The Knowledge Graph and Inference Schema 
 
 const TCM_CONCEPTS = {
   "C_IRRITABILITY": { name: "Irritability", category: "SYMPTOM" },

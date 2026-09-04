@@ -1,6 +1,6 @@
 // tcm-lexicon.js
 // LAYER 1: Lexical Normalization
-// Maps raw human text to a standardized Concept ID (CID).
+// Maps raw human text to a standardized Concept ID (CID). 
 
 const TCM_LEXICON = {
   "irritated easily": "C_IRRITABILITY",
