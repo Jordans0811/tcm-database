@@ -1,18 +1,26 @@
 const TCM_SEMANTIC_MAP = {
-  // --- Pathological Qualities (Adjectives to TCM Pathogens) ---
-  "heavy": "dampness",
-  "sluggish": "dampness",
-  "sticky": "dampness",
-  "sharp": "stasis",
-  "stabbing": "stasis",
-  "fixed": "stasis",
-  "burning": "heat",
-  "dry mouth": "dryness",
-  "thirsty": "dryness",
-  "exhausted": "deficiency",
-  "fatigued": "deficiency",
-  "weak": "deficiency",
-  "tired": "deficiency",
+
+//---The Formula: ⁠[Standard Symptom] + [Zang-Fu Organ] + [8-Principle/Pathogen]⁠ ---
+
+   // --- The Energy & Fatigue Cluster ---
+  "exhausted": "fatigue exhaustion weakness deficiency tired tiredness",
+  "fatigued": "fatigue exhaustion weakness deficiency tired tiredness",
+  "fatigue": "fatigue exhaustion weakness deficiency tired tiredness",
+  "exhaustion": "fatigue exhaustion weakness deficiency tired tiredness",
+  "weakness": "fatigue exhaustion weakness deficiency tired tiredness",
+  "weak": "fatigue exhaustion weakness deficiency tired tiredness",
+  "tired": "fatigue exhaustion weakness deficiency tired tiredness",
+  "tiredness": "fatigue exhaustion weakness deficiency tired tiredness",
+  "napping": "fatigue exhaustion weakness deficiency tired tiredness",
+  "lack of energy": "fatigue exhaustion weakness deficiency tired tiredness",
+  "low energy": "fatigue exhaustion weakness deficiency tired tiredness",
+  "no energy": "fatigue exhaustion weakness deficiency tired tiredness",
+  "run down": "fatigue exhaustion weakness deficiency tired tiredness",
+  "lethargic": "fatigue exhaustion weakness deficiency tired tiredness",
+  "sluggish": "fatigue exhaustion weakness deficiency tired tiredness dampness",
+
+
+
 
   // --- Sleep & Shen (Heart / Mind Orifice) ---
   "trouble sleeping": "insomnia",
@@ -31,20 +39,19 @@ const TCM_SEMANTIC_MAP = {
   "anxious": "uneasiness",
   "talking to oneself": "muttering",
 
-  // --- Moods & Emotional Pathogens ---
-  "mad": "anger",
-  "frustrated": "anger",
-  "irritability": "anger",
-  "short temper": "anger",
-  "stressed": "anger",
-  "sad": "sadness",
-  "grieving": "grief",
-  "depressed": "depression",
-  "mood swings": "swings",
-  "worrying": "worry",
-  "overthinking": "pensiveness",
-  "scared": "fear",
-  "frightened": "shock",
+  // --- Moods & Emotional Pathogens (The Additive Clusters) ---
+  "irritability": "irritability anger frustration liver fire",
+  "irritated": "irritability anger frustration liver fire",
+  "frustration": "irritability anger frustration liver fire",
+  "frustrated": "irritability anger frustration liver fire",
+  
+  "mad": "anger irritability liver fire",
+  "short temper": "anger irritability liver fire",
+  "stressed": "anger irritability liver fire stagnation",
+  
+  "sad": "sadness grief lung",
+  "depressed": "depression melancholy stagnation liver",
+
 
   // --- Respiratory & Qi Descent (Lung / Gathering Qi) ---
   "coughing": "cough",
@@ -71,12 +78,18 @@ const TCM_SEMANTIC_MAP = {
   "heartburn": "reflux",
   "nauseous": "nausea",
   "throwing up": "vomiting",
-  "loose stools": "diarrhoea",
-  "diarrhea": "diarrhoea",
   "constipated": "constipation",
   "can't poop": "constipation",
   "craving sweets": "pensiveness", // Pensive/Worrying Spleen state seeking Sweet Earth flavor
   "bruises easily": "bruising",    // Spleen Qi failing to hold Blood in vessels
+  
+    // --- The Diarrhea Cluster ---
+  "diarrhea": "diarrhea diarrhoea loose stool",
+  "diarrhoea": "diarrhea diarrhoea loose stool",
+  "loose stools": "diarrhea diarrhoea loose stool",
+  "loose stool": "diarrhea diarrhoea loose stool",
+  "the runs": "diarrhea diarrhoea loose stool",
+
 
   // --- Urinary & Kidney Essence (Kidney / Bladder / Lower Jiao) ---
   "waking up to pee": "nocturia",
@@ -172,9 +185,99 @@ const TCM_SEMANTIC_MAP = {
   "tossed and turned": "insomnia restlessness",
   "scalloped tongue": "toothmarked",
   "fast pulse": "rapid",
-  "thick coat": "greasy"
+  "thick coat": "greasy",
 
+  // --- Pulse Topography to Zang-Fu ---
+  "left cun": "heart",
+  "right cun": "lung",
+  "cun pulse": "heart lung",
+  "cun position": "heart lung",
+  "left guan": "liver",
+  "right guan": "spleen",
+  "guan pulse": "liver spleen",
+  "guan position": "liver spleen",
+  "chi pulse": "kidney",
+  "chi position": "kidney",
+  "chi": "kidney", 
+
+  // --- Tongue Topography to Zang-Fu ---
+  "tongue tip": "heart",
+  "tip of tongue": "heart",
+  "tongue sides": "liver gallbladder",
+  "sides of tongue": "liver gallbladder",
+  "center of tongue": "spleen stomach",
+  "tongue root": "kidney",
+  "back of tongue": "kidney",
+  "front of tongue": "lung heart",
   
-  
-  
+    // --- Pain Qualities to Pathogens (The 8 Principles) ---
+  "dull pain": "pain deficiency",
+  "lingering pain": "pain deficiency",
+  "stabbing pain": "pain blood stasis",
+  "sharp pain": "pain blood stasis",
+  "wandering pain": "pain wind",
+  "moving pain": "pain wind",
+  "distending pain": "pain qi stagnation",
+  "bloating pain": "pain qi stagnation",
+  "severe pain": "pain cold excess",
+  "cramping pain": "cramp cold",
+  "burning pain": "pain heat",
+
+
+  // --- Phlegm & Mucus ---
+  "yellow phlegm": "phlegm heat",
+  "green phlegm": "phlegm heat",
+  "white phlegm": "phlegm cold",
+  "clear phlegm": "phlegm cold",
+  "watery phlegm": "phlegm dampness",
+  "dry phlegm": "phlegm dryness",
+  "sticky phlegm": "phlegm dampness",
+
+  // --- Urine ---
+  "dark urine": "urine heat",
+  "yellow urine": "urine heat",
+  "clear urine": "urine cold deficiency",
+  "profuse urine": "urine cold deficiency",
+  "scanty urine": "urine heat",
+  "cloudy urine": "urine dampness",
+
+  // --- Menstruation ---
+  "dark blood": "blood heat",
+  "pale blood": "blood deficiency",
+  "purple clots": "blood stasis",
+  "dark clots": "blood stasis",
+
+  // --- Tongue Body & Coat Combinations ---
+  "red tongue yellow coat": "heat excess",
+  "red tongue no coat": "yin deficiency heat",
+  "red and peeled": "yin deficiency",
+  "pale tongue white coat": "qi blood deficiency cold",
+  "pale and wet": "yang deficiency dampness",
+  "purple spots": "blood stasis",
+  "dark sublinguals": "blood stasis",
+  "scalloped edges": "toothmarked spleen qi deficiency",
+  "greasy yellow": "damp heat",
+  "greasy white": "damp cold",
+  "thick yellow coat": "damp heat",
+  "thick white coat": "damp cold",
+
+  // --- Classical Pulse Combinations ---
+  "wiry and rapid": "wiry rapid liver heat",
+  "wiry rapid": "wiry rapid liver heat",
+  "floating and tight": "floating tight wind cold",
+  "floating and rapid": "floating rapid wind heat",
+  "deep and weak": "deep weak kidney yang deficiency",
+  "deep and fine": "deep fine yin deficiency",
+  "slippery and rapid": "slippery rapid damp heat phlegm",
+  "thready and rapid": "fine rapid yin deficiency", // 'thready' translates to the standard keyword 'fine'
+
+    // --- Classical Pulse Combinations ---
+  "wiry and rapid": "wiry rapid liver heat",
+  "wiry rapid": "wiry rapid liver heat",
+  "floating and tight": "floating tight wind cold",
+  "floating and rapid": "floating rapid wind heat",
+  "deep and weak": "deep weak kidney yang deficiency",
+  "deep and fine": "deep fine yin deficiency",
+  "slippery and rapid": "slippery rapid damp heat phlegm",
+  "thready and rapid": "fine rapid yin deficiency" 
 };
