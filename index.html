@@ -1260,9 +1260,9 @@
 <script src="./tcm-stopwords.js"></script>
 <script src="./tcm-keywords.js"></script>
 <script src="./tcm-semantic-map.js"></script>
-<script src="./tcm-lexicon.js?v=1"></script>
-<script src="./tcm-graph.js?v=1"></script>
-<script src="./tcm-inference-engine.js?v=1"></script>
+<script src="./tcm-lexicon.js"></script>
+<script src="./tcm-graph.js"></script>
+<script src="./tcm-inference-engine.js"></script>
 
 </head>
 </head>
@@ -1356,7 +1356,8 @@
 
   <!-- THE INTAKE MODAL GOES EXACTLY HERE -->
   <div id="intakeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;" onclick="if(event.target===this) closeIntakeModal()">
-    <div class="modal-content" style="height: 80vh; max-height: 800px; display: flex; flex-direction: column;">
+    <div class="modal-content" style="height: 80vh; max-height: 800px; overflow-y: auto;
+display: flex; flex-direction: column;">
       
            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
       <h2 style="margin: 0; font-size: 18px; color: #333;">Intake Parser</h2>
@@ -1381,24 +1382,33 @@
 
 
     <div class="modal-buttons" style="flex-shrink: 0;">
-      <button class="cancel-btn" onclick="document.getElementById('intakeInput').value = ''; document.getElementById('intakeResults').style.display = 'none'; document.getElementById('intakeInput').style.height = '120px'; document.getElementById('toggleInputBtn').style.display = 'none';">Clear</button>
+      <button class="cancel-btn" onclick="document.getElementById('intakeInput').value = ''; document.getElementById('intakeResults').style.display = 'none'; document.getElementById('intakeInput').style.height = '120px'; document.getElementById('toggleInputBtn').style.display = 'none'; activeHighlightRegex = null; if(typeof handleSearch === 'function') handleSearch(true);">Clear</button>
       <button class="save-btn" onclick="processIntake()">Process Case</button>
     </div>
 
     <!-- RESULTS CONTAINER -->
     <div id="intakeResults" style="display: none; flex-direction: column; margin-top: 10px; padding-bottom: 10px; width: 100%;"></div>
 
-<!-- === SEMANTIC ENGINE DEBUGGER === -->
-    <div style="margin-top: 15px; padding: 10px; background: #1a1a1a; border-radius: 6px; border: 1px solid #333; width: 100%; box-sizing: border-box;">
-      <label style="color: #fff; font-weight: bold; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-        <input type="checkbox" id="toggleSemanticEngine" checked style="transform: scale(1.2);">
-        Enable Semantic Inference Engine
-      </label>
-      <div style="margin-top: 10px; padding: 8px; background: #000; color: #00ff00; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; border-radius: 4px;">
-        <pre id="semanticDebugOutput" style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">Awaiting intake input...</pre>
+    <!-- === SEMANTIC ENGINE DEBUGGER === -->
+    <div style="margin-top: 15px; width: 100%; box-sizing: border-box;">
+      <!-- The new Toggle Button -->
+      <button type="button" onclick="document.getElementById('debugContainer').style.display = document.getElementById('debugContainer').style.display === 'none' ? 'block' : 'none'" style="background: #333; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; width: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+        🛠 Toggle Semantic Debugger
+      </button>
+      
+      <!-- The Collapsible Container -->
+      <div id="debugContainer" style="display: none; margin-top: 10px; padding: 10px; background: #1a1a1a; border-radius: 6px; border: 1px solid #333; width: 100%; box-sizing: border-box;">
+        <label style="color: #fff; font-weight: bold; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+          <input type="checkbox" id="toggleSemanticEngine" checked style="transform: scale(1.2);">
+          Enable Semantic Inference Engine
+        </label>
+        <div style="margin-top: 10px; padding: 8px; background: #000; color: #00ff00; font-family: monospace; font-size: 11px; max-height: 150px; overflow-y: auto; border-radius: 4px;">
+          <pre id="semanticDebugOutput" style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">Awaiting intake input...</pre>
+        </div>
       </div>
     </div>
     <!-- === END SEMANTIC ENGINE DEBUGGER === -->
+
 
       
     </div>
@@ -1592,7 +1602,7 @@
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "08.07.26.v1";
+const APP_VERSION = "09.04.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3745,9 +3755,9 @@ async function saveEdit() {
   if (intakeResults) {
     const compareBtns = intakeResults.querySelectorAll("button");
     compareBtns.forEach(btn => {
-      if (btn.textContent.trim() === "Added ✓") {
+      if (btn.textContent.trim() === "✓") {
         btn.style.background = "#007aff";
-        btn.textContent = "+ Compare";
+        btn.textContent = "+";
       }
     });
   }
@@ -5549,6 +5559,10 @@ function openIntakeModal() {
 
 function closeIntakeModal() {
   document.getElementById("intakeModal").style.display = "none";
+  // Wipes the intake highlights and completely restores the main search state!
+  if (typeof handleSearch === 'function') {
+    handleSearch(true); 
+  }
 }
 
 
@@ -5783,10 +5797,20 @@ function processIntake() {
       }
     });
 
-    // --- 6. BUILD THE 3-COLUMN CAROUSEL DASHBOARD ---
+   // --- 6. BUILD THE 3-COLUMN CAROUSEL DASHBOARD ---
     const displayKeywords = activeKeywords.map(kw => ccKeywords.has(kw) ? `⭐ <strong>${kw}</strong>` : kw);
     
-    let html = `<div style="font-size:12px; margin-bottom: 10px; color:#555; background: #e3e3e8; padding: 6px 8px; border-radius: 6px; line-height: 1.4;"><strong>Keywords:</strong> ${displayKeywords.join(', ')}</div>`;
+    // UPDATE GLOBAL REGEX: This automatically hooks into your existing Quick Peek highlighter!
+    const validRegexParts = activeKeywords.filter(t => t.trim().length > 2).sort((a, b) => b.length - a.length);
+    if (validRegexParts.length > 0) {
+      const escapedParts = validRegexParts.map(kw => kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      activeHighlightRegex = new RegExp("\\b(" + escapedParts.join("|") + ")\\b", "gi");
+    } else {
+      activeHighlightRegex = null;
+    }
+    
+    let html = `<div style="font-size:12px; margin-bottom: 10px; color:#555; background: #e3e3e8; padding: 6px 8px; border-radius: 6px; line-height: 1.4; max-height: 50px; overflow-y: auto; border: 1px solid #d1d1d6;"><strong>Keywords:</strong> ${displayKeywords.join(', ')}</div>`;
+
     
     // The Horizontal Snap-Scroll Container
     html += `<div style="display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding-bottom: 10px; width: 100%; box-sizing: border-box; align-items: flex-start; scroll-padding: 0 5%;">`;
@@ -5873,6 +5897,37 @@ function processIntake() {
 
 
 
+  // --- INTAKE MODAL KEYBOARD SHORTCUTS ---
+  document.addEventListener('keydown', function(event) {
+    const intakeModal = document.getElementById('intakeModal'); 
+    if (!intakeModal) return;
+
+    const isCmd = event.metaKey || event.ctrlKey;
+
+    // 1. CLOSE MODAL (Escape OR Cmd + .)
+    if (event.key === 'Escape' || (isCmd && event.key === '.')) {
+      if (intakeModal.style.display !== 'none') {
+        event.preventDefault();
+        closeIntakeModal(); // <--- CHANGED THIS LINE
+      }
+    }
+
+    // 2. OPEN MODAL (Cmd + i)
+    if (isCmd && event.key.toLowerCase() === 'i') {
+      event.preventDefault(); 
+      
+      if (intakeModal.style.display === 'none' || intakeModal.style.display === '') {
+        intakeModal.style.display = 'flex'; 
+        
+        const textArea = intakeModal.querySelector('textarea'); 
+        if (textArea) {
+          setTimeout(() => textArea.focus(), 100); 
+        }
+      } else {
+        closeIntakeModal(); // <--- CHANGED THIS LINE
+      }
+    }
+  });
 
 
 

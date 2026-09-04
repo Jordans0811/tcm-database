@@ -1,6 +1,6 @@
 const TCM_SEMANTIC_MAP = {
 
-//---The Formula: ⁠[Standard Symptom] + [Zang-Fu Organ] + [8-Principle/Pathogen]⁠ ---
+//---The Formula: ⁠[Standard Symptom] + [Zang-Fu Organ] + [8-Principle/Pathogen]⁠ --- 
 
    // --- The Energy & Fatigue Cluster ---
   "exhausted": "fatigue exhaustion weakness deficiency tired tiredness",

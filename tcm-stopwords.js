@@ -1,5 +1,5 @@
 const TCM_STOPWORDS = new Set([
-  // --- Original Template Keywords ---
+  // --- Original Template Keywords --- 
   "this", "that", "with", "from", "have", "they", "will", "what", "when", 
   "where", "your", "then", "than", "into", "only", "also", "some", "very", 
   "just", "like", "their", "these", "those", "which", "could", "should", 

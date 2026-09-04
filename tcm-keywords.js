@@ -1,5 +1,5 @@
 const TCM_KEYWORDS = new Set([
-  // --- Fundamental Substances & Pathogens ---
+  // --- Fundamental Substances & Pathogens --- 
   "qi", "blood", "yin", "yang", "essence", "jing", "fluid", "jin", "ye", 
   "shen", "spirit", "hun", "po", "yi", "zhi", "yuan", "gu", "zong", "zhen", 
   "wei", "ying", "zheng", "deficiency", "excess", "wood", "fire", "earth", 

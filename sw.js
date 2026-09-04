@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v86';
+const CACHE_VERSION = 'v88';
 const APP_CACHE = `tcm-app-${CACHE_VERSION}`;
 const IMAGE_CACHE = `tcm-images-${CACHE_VERSION}`;
 
@@ -8,7 +8,10 @@ const INITIAL_CACHED_RESOURCES = [
   './manifest.json',
   './tcm-stopwords.js',
   './tcm-keywords.js',
-  './tcm-semantic-map.js'
+  './tcm-semantic-map.js',
+  './tcm-lexicon.js',
+  './tcm-graph.js',
+  './tcm-inference-engine.js'
 ];
 
 // 1. Install Event: Lock the core files in the vault immediately

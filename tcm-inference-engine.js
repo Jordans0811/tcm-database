@@ -1,5 +1,5 @@
 // tcm-inference-engine.js
-// The 5-Layer Semantic Inference Pipeline 
+// The 5-Layer Semantic Inference Pipeline  
 
 class SemanticInferenceEngine {
   
