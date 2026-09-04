@@ -34,11 +34,18 @@ class SemanticInferenceEngine {
     for (const [phrase, cid] of Object.entries(this.lexicon)) {
       const phraseIndex = lowerText.indexOf(phrase);
       if (phraseIndex !== -1) {
-        // Extract context window (approx 20 characters before the phrase)
-        const contextWindow = lowerText.substring(Math.max(0, phraseIndex - 20), phraseIndex);
+            // Extract context window (approx 30 characters before the phrase)
+        let contextWindow = lowerText.substring(Math.max(0, phraseIndex - 30), phraseIndex);
+        
+        // PREVENT CONTEXT BLEED: Stop looking backward if we hit punctuation!
+        const lastPunctuation = contextWindow.search(/[.;,!?](?!.*[.;,!?])/);
+        if (lastPunctuation !== -1) {
+          contextWindow = contextWindow.substring(lastPunctuation + 1);
+        }
         
         let state = "PRESENT";
         let strength = 1.0;
+
 
         if (negationRegex.test(contextWindow)) state = "NEGATED";
         if (severeRegex.test(contextWindow)) strength = 1.2;

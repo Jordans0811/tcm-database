@@ -1289,24 +1289,6 @@
       <button id="devSyncBtn" class="dev-btn dev-btn-sync" onclick="syncMissingPhotos()">Download Missing Photos</button>
       <button class="dev-btn dev-btn-close" onclick="document.getElementById('devModal').style.display='none'">Close Menu</button>
     </div>
-    
-    <!-- === SEMANTIC ENGINE DEBUGGER === -->
-<div style="margin-top: 15px; padding: 10px; background: #1a1a1a; border-radius: 6px; border: 1px solid #333;">
-  
-  <!-- The Toggle -->
-  <label style="color: #fff; font-weight: bold; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-    <input type="checkbox" id="toggleSemanticEngine" checked style="transform: scale(1.2);">
-    Enable Semantic Inference Engine
-  </label>
-  
-  <!-- The Output Trace -->
-  <div style="margin-top: 10px; padding: 8px; background: #000; color: #00ff00; font-family: monospace; font-size: 11px; max-height: 300px; overflow-y: auto; border-radius: 4px;">
-    <pre id="semanticDebugOutput" style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">Awaiting intake input...</pre>
-  </div>
-
-</div>
-<!-- === END SEMANTIC ENGINE DEBUGGER === -->
-
   </div>
 
     <div id="channelModal" onclick="if(event.target===this) cancelFilter()">
@@ -1405,6 +1387,18 @@
 
     <!-- RESULTS CONTAINER -->
     <div id="intakeResults" style="display: none; flex-direction: column; margin-top: 10px; padding-bottom: 10px; width: 100%;"></div>
+
+<!-- === SEMANTIC ENGINE DEBUGGER === -->
+    <div style="margin-top: 15px; padding: 10px; background: #1a1a1a; border-radius: 6px; border: 1px solid #333; width: 100%; box-sizing: border-box;">
+      <label style="color: #fff; font-weight: bold; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+        <input type="checkbox" id="toggleSemanticEngine" checked style="transform: scale(1.2);">
+        Enable Semantic Inference Engine
+      </label>
+      <div style="margin-top: 10px; padding: 8px; background: #000; color: #00ff00; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; border-radius: 4px;">
+        <pre id="semanticDebugOutput" style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">Awaiting intake input...</pre>
+      </div>
+    </div>
+    <!-- === END SEMANTIC ENGINE DEBUGGER === -->
 
       
     </div>
@@ -5619,50 +5613,59 @@ function processIntake() {
       ccText = ccMatch[1];
     }
     
+    const extractedKeywords = new Set();
+    const ccKeywords = new Set(); 
     
-    // --- SEMANTIC ENGINE INTERCEPT (Layered Integration) ---
-const useSemanticEngine = document.getElementById('toggleSemanticEngine').checked;
-let semanticKeywords = new Set(); // To inject back into the old scoring loop
+    // --- SEMANTIC ENGINE INTERCEPT (With Diagnostics) ---
+    const useSemanticEngine = document.getElementById('toggleSemanticEngine').checked;
+    let semanticKeywords = new Set(); 
 
-if (useSemanticEngine && typeof SemanticInferenceEngine !== 'undefined') {
-  const engine = new SemanticInferenceEngine(TCM_LEXICON, TCM_CONCEPTS, TCM_RELATIONSHIPS, TCM_INFERENCE_RULES);
-    const semanticResult = engine.process(rawText); 
+    if (useSemanticEngine) {
+      
+      // 1. DIAGNOSTIC FILE CHECK
+      let missingFiles = [];
+      if (typeof TCM_LEXICON === 'undefined') missingFiles.push("tcm-lexicon.js");
+      if (typeof TCM_CONCEPTS === 'undefined') missingFiles.push("tcm-graph.js");
+      if (typeof SemanticInferenceEngine === 'undefined') missingFiles.push("tcm-inference-engine.js");
 
-  
-  // 1. Output the beautiful, separated JSON to the Debug panel
-  document.getElementById('semanticDebugOutput').textContent = JSON.stringify(semanticResult, null, 2);
-  
-  // 2. Re-hydrate the CIDs into strings for your legacy JSON database scorer.
-  // We extract names from Explicit, Semantic, and Clinical buckets.
-  Object.keys(semanticResult.EXPLICIT_EVIDENCE).forEach(cid => {
-    // Only pass it to the DB if it's PRESENT (prevents "No thirst" from searching for Thirst)
-    if(semanticResult.EXPLICIT_EVIDENCE[cid].state === "PRESENT") {
-      semanticKeywords.add(TCM_CONCEPTS[cid].name.toLowerCase());
+      if (missingFiles.length > 0) {
+        // If files are missing, print the exact error to the terminal and stop.
+        document.getElementById('semanticDebugOutput').textContent = 
+          "⚠️ FILE LOAD ERROR!\nThe browser cannot find the following files:\n- " + 
+          missingFiles.join("\n- ") + 
+          "\n\nRefresh the page twice, or check file paths.";
+      } else {
+        // 2. RUN THE ENGINE (Files loaded successfully!)
+        const engine = new SemanticInferenceEngine(TCM_LEXICON, TCM_CONCEPTS, TCM_RELATIONSHIPS, TCM_INFERENCE_RULES);
+        const semanticResult = engine.process(rawText); 
+        
+        document.getElementById('semanticDebugOutput').textContent = JSON.stringify(semanticResult, null, 2);
+        
+        Object.keys(semanticResult.EXPLICIT_EVIDENCE).forEach(cid => {
+          if(semanticResult.EXPLICIT_EVIDENCE[cid].state === "PRESENT") {
+            semanticKeywords.add(TCM_CONCEPTS[cid].name.toLowerCase());
+          }
+        });
+        Object.keys(semanticResult.SEMANTIC_EXPANSION).forEach(cid => {
+          semanticKeywords.add(TCM_CONCEPTS[cid].name.toLowerCase());
+        });
+        Object.keys(semanticResult.CLINICAL_INFERENCE).forEach(cid => {
+          if(semanticResult.CLINICAL_INFERENCE[cid].aggregated_score > 0.3) {
+             semanticKeywords.add(TCM_CONCEPTS[cid].name.toLowerCase());
+          }
+        });
+
+        semanticKeywords.forEach(kw => extractedKeywords.add(kw)); 
+      }
+    } else {
+      document.getElementById('semanticDebugOutput').textContent = "Semantic Engine Disabled. Using Legacy Keyword Parser.";
     }
-  });
-  
-  Object.keys(semanticResult.SEMANTIC_EXPANSION).forEach(cid => {
-    semanticKeywords.add(TCM_CONCEPTS[cid].name.toLowerCase());
-  });
-  
-  Object.keys(semanticResult.CLINICAL_INFERENCE).forEach(cid => {
-    // Only add it if the aggregated evidence score is somewhat meaningful (e.g. > 0.3)
-    if(semanticResult.CLINICAL_INFERENCE[cid].aggregated_score > 0.3) {
-       semanticKeywords.add(TCM_CONCEPTS[cid].name.toLowerCase());
-    }
-  });
+    // --- END SEMANTIC ENGINE INTERCEPT ---
 
-  // Inject these newly reasoned concepts into your legacy keyword array so your old scoring loop uses them!
-  semanticKeywords.forEach(kw => extractedKeywords.add(kw)); 
-} else {
-  document.getElementById('semanticDebugOutput').textContent = "Semantic Engine Disabled. Using Legacy Keyword Parser.";
-}
-// --- END SEMANTIC ENGINE INTERCEPT ---
 
 
     // --- 3. KEYWORD EXTRACTION (NEGATION AWARE) ---
-    const extractedKeywords = new Set();
-    const ccKeywords = new Set(); 
+    
     const negationRegex = /\b(?:no|not|without|denies|denied|negative|zero)\b(?:\s+[a-z,]+){0,4}\s*$/i;
 
     // AUTO-SYNC: Automatically add every word from your Semantic Map into the Keywords list!
