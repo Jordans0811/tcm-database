@@ -355,7 +355,7 @@
       align-items: stretch; /* Stretches it to the very top and bottom */
       padding: 0;
       background: transparent; /* This removes the dark grey overlay */
-      z-index: 10014;
+      z-index: 10020;
     }
     
           #quickPeekModal .quick-peek-content {
@@ -1256,6 +1256,11 @@
 
 
   </style>
+  
+<script src="./tcm-stopwords.js"></script>
+<script src="./tcm-keywords.js"></script>
+<script src="./tcm-semantic-map.js"></script>
+</head>
 </head>
 <body>
   <div id="lightbox" onclick="closeLightbox()">
@@ -1344,6 +1349,30 @@
       </div>
     </div>
   </div>
+
+  <!-- THE INTAKE MODAL GOES EXACTLY HERE -->
+  <div id="intakeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;" onclick="if(event.target===this) closeIntakeModal()">
+    <div class="modal-content" style="height: 80vh; max-height: 800px; display: flex; flex-direction: column;">
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 10px;">
+        <h3 class="modal-title" style="margin-bottom: 0;">Clinical Intake Parser</h3>
+        <button onclick="closeIntakeModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+      </div>
+
+      <p style="margin: 0 0 10px 0; font-size: 13px; color: #888; line-height: 1.3;">Paste unstructured case notes here. The engine will extract clinical keywords and find matching patterns and points.</p>
+
+      <textarea id="intakeInput" style="flex: 1; width: 100%; box-sizing: border-box; font-family: inherit; font-size: 15px; padding: 12px; border: 1px solid #ccc; border-radius: 8px; resize: none; margin-bottom: 15px; line-height: 1.4;" placeholder="e.g., Patient is a 45yo female presenting with a headache and trouble sleeping. She reports feeling highly frustrated lately. Pulse is wiry, tongue is red on the sides."></textarea>
+
+      <div class="modal-buttons" style="flex-shrink: 0;">
+        <button class="cancel-btn" onclick="document.getElementById('intakeInput').value = ''; document.getElementById('intakeResults').style.display = 'none';">Clear</button>
+        <button class="save-btn" onclick="processIntake()">Process Case</button>
+      </div>
+
+      <!-- NEW: The Results Container -->
+      <div id="intakeResults" style="display: none; flex-direction: column; gap: 10px; margin-top: 15px; overflow-y: auto; padding-right: 5px; padding-bottom: 20px;"></div>
+      
+    </div>
+  </div>
 
 
 
@@ -1481,10 +1510,11 @@
           <p id="searchQueryDisplay"></p>
         </div>
         <div class="header-actions">
-          <button id="headerClearBtn" class="icon-btn clear-active-btn" onclick="clearAndCloseSearch()" style="display: none;">✕</button>
-          <label class="icon-btn search-toggle-btn" for="searchInput" onclick="toggleSearchDropdown()" style="margin: 0; display: flex;">🔍</label>
-          <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
-        </div>
+  <button id="headerClearBtn" class="icon-btn clear-active-btn" onclick="clearAndCloseSearch()" style="display: none;">✕</button>
+  <button class="icon-btn" onclick="openIntakeModal()">📋</button> <!-- NEW BUTTON -->
+  <label class="icon-btn search-toggle-btn" for="searchInput" onclick="toggleSearchDropdown()" style="margin: 0; display: flex;">🔍</label>
+  <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
+</div>
       </div>      
       <div id="searchDropdown">
         <div class="search-sort-row">
@@ -3679,7 +3709,20 @@ async function saveEdit() {
     icon.style.background = "";
     icon.style.color = "";
   }
+
+  // --- NEW: Reset Intake Parser Buttons ---
+  const intakeResults = document.getElementById("intakeResults");
+  if (intakeResults) {
+    const compareBtns = intakeResults.querySelectorAll("button");
+    compareBtns.forEach(btn => {
+      if (btn.textContent.trim() === "Added ✓") {
+        btn.style.background = "#007aff";
+        btn.textContent = "+ Compare";
+      }
+    });
+  }
 }
+
 
   function updateCompareBasketUI() {
     const basket = document.getElementById("compareBasket");
@@ -5467,6 +5510,268 @@ function getImagePath(point) {
   const ext = point["Image Ext"] || "jpg";
   return "DeadmanPhotos/" + imageId + "." + ext;
 }
+
+function openIntakeModal() {
+  closeBottomSheet();
+  document.getElementById("intakeModal").style.display = "flex";
+  setTimeout(() => document.getElementById("intakeInput").focus(), 10);
+}
+
+function closeIntakeModal() {
+  document.getElementById("intakeModal").style.display = "none";
+}
+
+
+window.openQuickPeekById = function(pointId) {
+  const targetPoint = points.find(p => p["Short Name"] === pointId);
+  if (!targetPoint) { 
+    showToast("Record not found."); 
+    return; 
+  }
+  
+  buildQuickPeekDOM(targetPoint);
+  document.getElementById("quickPeekModal").style.display = "flex";
+  document.getElementById("quickPeekContainer").scrollTop = 0; 
+  
+  // Recalculate dynamic header height for sticky sections
+  setTimeout(() => {
+    const qpHeader = document.querySelector('#quickPeekModal .detail-header-info');
+    if (qpHeader) {
+      document.documentElement.style.setProperty('--qp-header-height', qpHeader.getBoundingClientRect().height + 'px');
+    }
+  }, 10);
+};
+
+
+
+
+function processIntake() {
+  const inputEl = document.getElementById('intakeInput');
+  const resultsEl = document.getElementById('intakeResults');
+  let rawText = inputEl.value.toLowerCase();
+
+  if (!rawText.trim()) {
+    showToast("Please enter some case notes first.");
+    return;
+  }
+
+  const btn = document.querySelector('#intakeModal .save-btn');
+  const originalBtnText = btn.textContent;
+  btn.textContent = "Processing...";
+
+  const buildFlexibleRegex = (kw) => {
+    let escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    escaped = escaped.replace(/\\-| /g, '[-\\s]+');
+    const suffix = kw.length >= 4 ? "(?:s|es|d|ed|ing|ness|ly)?" : "";
+    return new RegExp("\\b" + escaped + suffix + "\\b", "gi");
+  };
+
+  setTimeout(() => {
+    // --- 1. SEMANTIC NORMALIZATION ---
+    let normalizedText = rawText;
+    if (typeof TCM_SEMANTIC_MAP !== 'undefined') {
+      for (const [phrase, translation] of Object.entries(TCM_SEMANTIC_MAP)) {
+        const regex = buildFlexibleRegex(phrase);
+        normalizedText = normalizedText.replace(regex, " " + translation + " ");
+      }
+    }
+
+    // --- 2. CHIEF CONCERN EXTRACTION (SMART SPLIT) ---
+    let ccText = "";
+    // Regex looks for "cc:", "chief concern:", or "chief complaint:" 
+    // It captures everything until it hits another standard medical header or the end of the text
+    const ccMatch = normalizedText.match(/(?:\bcc\b|chief concern|chief complaint)\s*:?\s*(.*?)(?=\b(?:hpi|pmh|vitals|hx|rx|tx|notes|objective|subjective|o|s)\b\s*:|$)/is);
+    if (ccMatch) {
+      ccText = ccMatch[1];
+    }
+
+    // --- 3. KEYWORD EXTRACTION ---
+    const extractedKeywords = new Set();
+    const ccKeywords = new Set(); // Special bucket for Chief Concerns
+    
+    if (typeof TCM_KEYWORDS !== 'undefined') {
+      TCM_KEYWORDS.forEach(kw => {
+        const regex = buildFlexibleRegex(kw);
+        
+        // Scan the whole text
+        if (regex.test(normalizedText)) {
+          extractedKeywords.add(kw.toLowerCase());
+        }
+        
+        // Scan the isolated CC text specifically
+        regex.lastIndex = 0; // Reset regex state
+        if (ccText && regex.test(ccText)) {
+          ccKeywords.add(kw.toLowerCase());
+        }
+      });
+    }
+    
+    const activeKeywords = Array.from(extractedKeywords);
+    
+    if (activeKeywords.length === 0) {
+      resultsEl.innerHTML = `<div style="text-align:center; padding: 20px; color: #888;">No standard clinical keywords found.</div>`;
+      resultsEl.style.display = "flex";
+      btn.textContent = originalBtnText;
+      return;
+    }
+
+    // --- 4. SCORING THE DATABASE (WITH CC MULTIPLIER) ---
+    const scoredRecords = [];
+    points.forEach(p => {
+      let score = 0;
+      let matchedTerms = [];
+
+      const tier2Text = stripBBCode(
+        (p["Clinical Manifestations"] || "") + " " + 
+        (p["Indications"] || "") + " " + 
+        (p["Actions"] || "") + " " +
+        (p["Patterns"] || "")
+      ).toLowerCase();
+
+      const tier3Text = stripBBCode(
+        (p["Aetiology"] || "") + " " +
+        (p["Analysis"] || "") + " " +
+        (p["Precursors of Pattern"] || "") + " " +
+        (p["Developments From Pattern"] || "") + " " +
+        (p["Treatment Principle"] || "") + " " +
+        (p["Explanation"] || "") + " " +
+        (p["Description"] || "") + " " +
+        (p["Summary of clinical application"] || "")
+      ).toLowerCase();
+
+      activeKeywords.forEach(kw => {
+        const regex = buildFlexibleRegex(kw);
+        let termScore = 0;
+        let matchedInHighTier = false;
+
+        // Apply a massive 3x bonus if this keyword was part of the Chief Concern
+        const multiplier = ccKeywords.has(kw) ? 3 : 1; 
+
+        const titleText = (p._shortNameLower + " " + (p._fullNameLower || "")).trim();
+        
+        // TIER 1: Identity / Title (+25)
+        const titleMatches = titleText.match(regex);
+        if (titleMatches) {
+          termScore += (titleMatches.length * 25);
+          matchedInHighTier = true;
+        } 
+        
+        // TIER 2: Primary Diagnostics (+10)
+        const tier2Matches = tier2Text.match(regex);
+        if (tier2Matches) {
+          termScore += (tier2Matches.length * 10);
+          matchedInHighTier = true;
+        } 
+
+        // TIER 3: Supporting Context (+4)
+        const tier3Matches = tier3Text.match(regex);
+        if (tier3Matches) {
+          termScore += (tier3Matches.length * 4);
+          matchedInHighTier = true;
+        }
+        
+        // TIER 4: General Text (+1, max 3)
+        if (!matchedInHighTier) {
+          const flatMatches = p._searchIndex.match(regex);
+          if (flatMatches) {
+             termScore += Math.min(flatMatches.length, 3);
+          }
+        }
+
+        if (termScore > 0) {
+          // Multiply the base score by the CC bonus
+          score += (termScore * multiplier);
+          
+          // Add a visual star if it was a chief concern match
+          matchedTerms.push(ccKeywords.has(kw) ? `⭐ ${kw}` : kw);
+        }
+      });
+
+      if (score > 0) {
+        scoredRecords.push({ point: p, score: score, matches: matchedTerms });
+      }
+    });
+
+    scoredRecords.sort((a, b) => {
+       if (b.score === a.score) return b.matches.length - a.matches.length;
+       return b.score - a.score;
+    });
+
+    // --- 5. DIFFERENTIAL DIAGNOSIS GROUPING ---
+    const topPatterns = [];
+    const topPoints = [];
+
+    scoredRecords.forEach(record => {
+      const isPoint = record.point["Location "] || record.point["Location"] || record.point["Needling"];
+      const isPattern = record.point["Clinical Manifestations"] || record.point["Aetiology"];
+      
+      if (isPoint) {
+        if (topPoints.length < 15) topPoints.push(record);
+      } else if (isPattern) {
+        if (topPatterns.length < 15) topPatterns.push(record);
+      }
+    });
+
+    // --- 6. BUILD THE CLINICAL DASHBOARD ---
+    
+    // Format the display keywords so CCs show up with a star at the top
+    const displayKeywords = activeKeywords.map(kw => ccKeywords.has(kw) ? `⭐ <strong>${kw}</strong>` : kw);
+    
+    let html = `<div style="font-size:13px; margin-bottom: 5px; color:#555; background: #e3e3e8; padding: 8px; border-radius: 6px; line-height: 1.4;"><strong>Identified Keywords:</strong><br>${displayKeywords.join(', ')}</div>`;
+
+    const buildCard = (record) => {
+      const name = record.point["Short Name"];
+      const matchStr = record.matches.join(', ');
+      
+      const safeName = name.replace(/'/g, "\\'"); 
+      const cleanName = stripBBCode(name);
+      
+      let chan = cleanName; let num = '';
+      const match = cleanName.match(/^([a-zA-Z]+)[-\s]*(\d+)$/);
+      if (match) { chan = match[1]; num = match[2]; }
+
+      const isCompared = typeof compareList !== 'undefined' && compareList.includes(name);
+
+      return `
+        <div style="background: white; border: 1px solid #d1d1d6; border-radius: 8px; padding: 10px; margin-bottom: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 16px; color: #cc5500;">${highlightText(name)}</strong>
+            <span style="font-size: 11px; font-weight: bold; background: #ffe0b2; padding: 2px 8px; border-radius: 12px; color: #cc5500;">Score: ${record.score}</span>
+          </div>
+          <div style="font-size: 12px; color: #555; line-height: 1.3;"><strong>Matches:</strong> ${matchStr}</div>
+          <div style="margin-top: 10px; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button onclick="event.stopPropagation(); openQuickPeekById('${safeName}')" style="background: rgba(0,122,255,0.1); color: #007aff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">View Record</button>
+            <button onclick="
+              event.stopPropagation(); 
+              toggleCompare('${safeName}'); 
+              const isAdded = compareList.includes('${safeName}');
+              this.style.background = isAdded ? '#cc5500' : '#007aff';
+              this.textContent = isAdded ? 'Added ✓' : '+ Compare';
+            " style="background: ${isCompared ? '#cc5500' : '#007aff'}; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">
+              ${isCompared ? 'Added ✓' : '+ Compare'}
+            </button>
+          </div>
+        </div>
+      `;
+    };
+
+    if (topPatterns.length > 0) {
+      html += `<div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #888; margin: 15px 0 8px 0; letter-spacing: 0.5px;">Top Pattern Matches</div>`;
+      topPatterns.forEach(r => html += buildCard(r));
+    }
+
+    if (topPoints.length > 0) {
+      html += `<div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #888; margin: 15px 0 8px 0; letter-spacing: 0.5px;">Top Point Matches</div>`;
+      topPoints.forEach(r => html += buildCard(r));
+    }
+
+    resultsEl.innerHTML = html;
+    resultsEl.style.display = "flex";
+    btn.textContent = originalBtnText;
+
+  }, 10); 
+}
+
 
 
 
