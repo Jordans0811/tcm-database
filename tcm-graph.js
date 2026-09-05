@@ -490,7 +490,14 @@ const TCM_CONCEPTS = {
   
     // --- FIVE ELEMENT COMPOUND PATTERNS (WOOD OVERACTING ON EARTH) ---
   "C_LIVER_INVADING_SPLEEN": { name: "Liver Invading the Spleen", category: "PATTERN" },
-  "C_LIVER_INVADING_STOMACH": { name: "Liver Invading the Stomach", category: "PATTERN" }
+  "C_LIVER_INVADING_STOMACH": { name: "Liver Invading the Stomach", category: "PATTERN" },
+  
+    // --- PHLEGM & HEADACHE SPECIFIC CONCEPTS ---
+  "C_PHLEGM_DAMPNESS": { name: "Phlegm-Dampness", category: "PATTERN" },
+  "C_MUZZY_HEAVY_HEAD": { name: "Heavy, Muzzy Feeling in the Head", category: "SYMPTOM" },
+  "C_BAND_AROUND_HEAD": { name: "Sensation of a Band Around the Head", category: "SYMPTOM" },
+  "C_SWOLLEN_TONGUE": { name: "Swollen Tongue", category: "TONGUE" }
+
 
   
 };
@@ -3235,5 +3242,114 @@ const TCM_INFERENCE_RULES = [
     type: "CLINICAL_INFERENCE",
     base_weight: 0.75, // Epigastric distress
     conditions: [{ concept: "C_EPIGASTRIC_DISCOMFORT", state: "PRESENT" }]
+  },
+    // -------------------------------------------------------------
+  // PATTERN: Liver-Yang Rising (Headache Focus)
+  // -------------------------------------------------------------
+  {
+    rule_id: "R_LYR_THROBBING_HA",
+    conclusion: "C_LIVER_YANG_RISING",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.85, // Cardinal indicator of Yang rushing upward
+    conditions: [{ concept: "C_THROBBING_HEADACHE", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_LYR_TEMPORAL_HA",
+    conclusion: "C_LIVER_YANG_RISING",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.8, // GB channel pathway
+    conditions: [{ concept: "C_TEMPORAL_HEADACHE", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_LYR_DIZZY",
+    conclusion: "C_LIVER_YANG_RISING",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.75, // Yang disrupting clear orifices
+    conditions: [{ concept: "C_DIZZINESS", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_LYR_TINNITUS",
+    conclusion: "C_LIVER_YANG_RISING",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.7, // High-pitched, sudden onset
+    conditions: [{ concept: "C_TINNITUS", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_LYR_ANGER",
+    conclusion: "C_LIVER_YANG_RISING",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.75,
+    conditions: [{ concept: "C_OUTBURSTS_OF_ANGER", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_LYR_TONGUE",
+    conclusion: "C_LIVER_YANG_RISING",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.7, // Often has red sides (Can be pale if stemming from Blood def)
+    conditions: [{ concept: "C_RED_SIDES_TONGUE", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_LYR_PULSE",
+    conclusion: "C_LIVER_YANG_RISING",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.8,
+    conditions: [{ concept: "C_WIRY_PULSE", state: "PRESENT" }]
+  },
+
+  // -------------------------------------------------------------
+  // PATTERN: Phlegm-Dampness (Headache Focus)
+  // -------------------------------------------------------------
+  {
+    rule_id: "R_PHLEGM_MUZZY",
+    conclusion: "C_PHLEGM_DAMPNESS",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.85, // Cardinal Phlegm sign in the head
+    conditions: [{ concept: "C_MUZZY_HEAVY_HEAD", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_PHLEGM_BAND",
+    conclusion: "C_PHLEGM_DAMPNESS",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.85, // Cardinal Damp/Phlegm headache description
+    conditions: [{ concept: "C_BAND_AROUND_HEAD", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_PHLEGM_DIZZY",
+    conclusion: "C_PHLEGM_DAMPNESS",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.8, // Phlegm obstructing Clear Yang
+    conditions: [{ concept: "C_DIZZINESS", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_PHLEGM_NAUSEA",
+    conclusion: "C_PHLEGM_DAMPNESS",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.75, // Phlegm in Middle Jiao
+    conditions: [{ concept: "C_NAUSEA_VOMITING", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_PHLEGM_HEAVY",
+    conclusion: "C_PHLEGM_DAMPNESS",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.7, // General dampness feeling
+    conditions: [{ concept: "C_FEELING_OF_HEAVINESS", state: "PRESENT" }]
+  },
+  {
+    rule_id: "R_PHLEGM_TONGUE",
+    conclusion: "C_PHLEGM_DAMPNESS",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.8, // Swollen with Sticky coating
+    conditions: [
+      { concept: "C_SWOLLEN_TONGUE", state: "PRESENT" },
+      { concept: "C_STICKY_COATING", state: "PRESENT" }
+    ]
+  },
+  {
+    rule_id: "R_PHLEGM_PULSE",
+    conclusion: "C_PHLEGM_DAMPNESS",
+    type: "CLINICAL_INFERENCE",
+    base_weight: 0.85, // Slippery pulse is the ultimate sign of Phlegm
+    conditions: [{ concept: "C_SLIPPERY_PULSE", state: "PRESENT" }]
   }
+
 ];

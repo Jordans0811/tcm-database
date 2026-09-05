@@ -1023,5 +1023,24 @@ const TCM_LEXICON = {
 
   "liver overacting on stomach": "C_LIVER_INVADING_STOMACH",
   "liver overacting stomach": "C_LIVER_INVADING_STOMACH",
-  "liver invading stomach": "C_LIVER_INVADING_STOMACH"
+  "liver invading stomach": "C_LIVER_INVADING_STOMACH",
+  
+    // --- PHLEGM & HEADACHE LEXICON ---
+  "muzzy head": "C_MUZZY_HEAVY_HEAD",
+  "cloudy head": "C_MUZZY_HEAVY_HEAD",
+  "foggy head": "C_MUZZY_HEAVY_HEAD",
+  "brain fog": "C_MUZZY_HEAVY_HEAD",
+  "head feels heavy": "C_MUZZY_HEAVY_HEAD",
+
+  "band around head": "C_BAND_AROUND_HEAD",
+  "tight band around head": "C_BAND_AROUND_HEAD",
+  "head feels wrapped": "C_BAND_AROUND_HEAD",
+  "towel wrapped around head": "C_BAND_AROUND_HEAD",
+
+  "swollen tongue": "C_SWOLLEN_TONGUE",
+  "fat tongue": "C_SWOLLEN_TONGUE",
+  "enlarged tongue": "C_SWOLLEN_TONGUE",
+  "teeth marks": "C_SWOLLEN_TONGUE", // Teeth marks heavily imply swelling
+  "scalloped edges": "C_SWOLLEN_TONGUE"
+
 };
