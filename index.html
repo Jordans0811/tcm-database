@@ -297,7 +297,7 @@
     .checkbox-label { display: flex; align-items: center; gap: 12px; font-size: 16px; color: #333; cursor: pointer; padding: 4px 0; }
     .checkbox-label input { width: 18px; height: 18px; cursor: pointer; }
 
-    #toast {
+            #toast {
       visibility: hidden; min-width: 200px; background-color: #333; color: #fff;
       text-align: center; border-radius: 20px; padding: 10px 20px;
       position: fixed; z-index: 10020; left: 50%; bottom: 30px;
@@ -305,6 +305,11 @@
       opacity: 0; transition: opacity 0.5s, bottom 0.5s;
     }
     #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+    
+    /* NEW: A dynamic class JS can apply when baskets are open */
+    #toast.show.lifted { bottom: 100px; }
+
+
 
     .help-icon {
       width: 28px; height: 28px; border-radius: 50%; background: #e3e3e8; color: #8e8e93;
@@ -882,7 +887,9 @@
   color: transparent !important;
   background-color: transparent !important;
   text-shadow: none !important;
+  pointer-events: none !important; /* Prevents invisible links from being clicked */
 }
+
 
 /* 2. STUDY MODE: Revealed State */
 .line-revealed {
@@ -1602,7 +1609,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "09.04.26.v1";
+const APP_VERSION = "09.16.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -1941,7 +1948,22 @@ const TCM_SECTIONS = [
   { key: "Remarks", label: "Remarks" },
   { key: "Flashcard View", label: "Flashcard View" },
   { key: "Notes", label: "Notes" },
-  { key: "CAM Notes", label: "CAM Notes" }
+  { key: "CAM Notes", label: "CAM Notes" },
+  { key: "Muscle", label: "Muscle" },
+  { key: "Cautions", label: "Cautions" },
+  { key: "Origin", label: "Origin" },
+  { key: "Insertion", label: "Insertion" },
+  { key: "Muscle Actions", label: "Muscle Actions" },
+  { key: "Antagonist", label: "Antagonist" },
+  { key: "Innervation", label: "Innervation" },
+  { key: "Artery", label: "Artery" },
+  { key: "Jing Jin", label: "Jing Jin" },
+  { key: "SS combo", label: "SS combo" },
+  { key: "HTJJ", label: "HTJJ" },
+  { key: "Primary Sx", label: "Primary Sx" },
+  { key: "Secondary Sx", label: "Secondary Sx" },
+  { key: "Referral Pattern", label: "Referral Pattern" }
+
 ];
 
 
@@ -3078,7 +3100,7 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
     return output;
   }
 
-    function linkifyPoints(htmlText) {
+      function linkifyPoints(htmlText) {
     if (!htmlText) return "";
     
     // 1. The standard Channel + Number links
@@ -3087,22 +3109,26 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
     // 2. The custom Named Points links (Handles optional spaces automatically!)
     const namedPointsRegex = /\b(Shi\s*Xuan|Si\s*Feng|Ba\s*Xie|Luo\s*Zhen|Yao\s*Tong\s*Xue|Er\s*Bai|Zhou\s*Jian|Jian\s*Qian|Bai\s*Chong\s*Wo|He\s*Ding|Xi\s*Yan|Lan\s*Wei\s*Xue|Dan\s*Nang\s*Xue|Ba\s*Feng|Si\s*Shen\s*Cong|Yin\s*Tang|Yu\s*Yao|Qiu\s*Hou|Tai\s*Yang|Er\s*Jian|Bi\s*Tong|Bai\s*Lao|An\s*Mian|Jia\s*Cheng\s*Jiang|Jin\s*Jin\s*Yu\s*Ye|Hai\s*Quan|Ding\s*Chuan|Huan\s*Men|Wei\s*Guan\s*Xia\s*Shu|Yao\s*Yan|Shi\s*Qi\s*Zhui\s*Xia|San\s*Jiao\s*Jiu|Zi\s*Gong|Ti\s*Tuo|Hua\s*Tuo\s*Jia\s*Ji|Pi\s*Gen)\b/gi;
     
+    // Automatically re-hide the parent line if clicked while revealed
+    const hideLineLogic = "const rl=this.closest('.line-revealed'); if(rl){rl.classList.remove('line-revealed');rl.classList.add('line-occluded');}";
+
     const parts = htmlText.split(/(<[^>]*>)/g);
     for (let i = 0; i < parts.length; i++) {
       if (!parts[i].startsWith("<")) {
         // Apply standard links
         parts[i] = parts[i].replace(regex, (match, chan, num) => {
-          return `<span class="point-link" onclick="event.stopPropagation(); openQuickPeek('${chan}', '${num}')">${match}</span>`;
+          return `<span class="point-link" onclick="event.stopPropagation(); ${hideLineLogic} openQuickPeek('${chan}', '${num}')">${match}</span>`;
         });
         
         // Apply named point links (passes the name as 'chan' and leaves 'num' blank)
         parts[i] = parts[i].replace(namedPointsRegex, (match) => {
-          return `<span class="point-link" onclick="event.stopPropagation(); openQuickPeek('${match}', '')">${match}</span>`;
+          return `<span class="point-link" onclick="event.stopPropagation(); ${hideLineLogic} openQuickPeek('${match}', '')">${match}</span>`;
         });
       }
     }
     return parts.join("");
   }
+
 
 
         function openQuickPeek(chan, num) {
@@ -3235,12 +3261,21 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
 
 
 
-  function showToast(msg) {
+    function showToast(msg) {
     let toast = document.getElementById("toast");
     toast.textContent = msg;
+    
+    // NEW: Check if either basket is holding items, and lift the toast if so!
+    if (compareList.length > 0 || printList.length > 0) {
+      toast.classList.add("lifted");
+    } else {
+      toast.classList.remove("lifted");
+    }
+
     toast.classList.add("show");
     setTimeout(() => toast.classList.remove("show"), 3000);
   }
+
 
   function debounce(fn, delay = 300) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn.apply(this, args), delay); }; }
 
@@ -3834,7 +3869,9 @@ if (namesBtn) {
       if (!hasDataInRow) return;
 
       html += `<div class="compare-section">`;
-      html += `<div class="compare-section-title">${f.label}</div>`;
+      // Wraps the label in a span that sticks 15px from the left edge of the screen
+      html += `<div class="compare-section-title"><span style="position: sticky; left: 15px;">${f.label}</span></div>`;
+
       
       // CSS Grid perfectly aligns headers and bodies in rows
       html += `<div class="compare-section-grid" style="grid-template-columns: repeat(${pts.length}, 1fr);">`;
@@ -4429,7 +4466,7 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-  // 1c. CLEAR SEARCH SHORTCUT (Cmd/Ctrl + Shift + X)
+    // 1c. CLEAR SEARCH SHORTCUT (Cmd/Ctrl + Shift + X)
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'x') {
     const activeEl = document.activeElement;
     if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA' && !activeEl.isContentEditable)) {
@@ -4440,6 +4477,39 @@ document.addEventListener('keydown', (e) => {
       return;
     }
   }
+
+  // 1d. IMAGE LIGHTBOX SHORTCUT (Cmd/Ctrl + Shift + I)
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'i') {
+    const activeEl = document.activeElement;
+    // Don't trigger if you are actively typing inside a text box
+    if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA' && !activeEl.isContentEditable)) {
+      e.preventDefault();
+      
+      // NEW: If the lightbox is already open, close it and stop here!
+      const lightbox = document.getElementById('lightbox');
+      if (lightbox && lightbox.style.display === 'flex') {
+        closeLightbox();
+        return;
+      }
+
+      // If the Quick Peek modal is open, trigger its image
+      const quickPeek = document.getElementById('quickPeekModal');
+      if (quickPeek && quickPeek.style.display === 'flex') {
+        const img = quickPeek.querySelector('.detail-header-info img');
+        if (img) img.click();
+        return;
+      }
+
+      // If the Bottom Sheet is open, trigger the main lightbox
+      const sheet = document.getElementById('bottomSheet');
+      if (sheet && sheet.classList.contains('open')) {
+        openLightbox(currentSheetIndex, sheetContextPoints, null);
+        return;
+      }
+    }
+  }
+
+
 
 
 
@@ -5912,11 +5982,12 @@ function processIntake() {
       }
     }
 
-    // 2. OPEN MODAL (Cmd + i)
-    if (isCmd && event.key.toLowerCase() === 'i') {
+        // 2. OPEN MODAL (Cmd + i) - Explicitly ignores Shift so it doesn't conflict with Lightbox
+    if (isCmd && !event.shiftKey && event.key.toLowerCase() === 'i') {
       event.preventDefault(); 
       
       if (intakeModal.style.display === 'none' || intakeModal.style.display === '') {
+
         intakeModal.style.display = 'flex'; 
         
         const textArea = intakeModal.querySelector('textarea'); 
