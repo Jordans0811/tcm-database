@@ -14,7 +14,7 @@ const INITIAL_CACHED_RESOURCES = [
   './tcm-inference-engine.js'
 ];
 
-// 1. Install Event: Lock the core files in the vault immediately
+// 1. Install Event: Lock the core files in the vault immediately 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(APP_CACHE).then(cache => cache.addAll(INITIAL_CACHED_RESOURCES))
