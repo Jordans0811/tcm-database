@@ -280,7 +280,7 @@
     mark { background-color: #ffd54f; color: black; padding: 0; border-radius: 2px; }
     
   #lightbox, #editModal, #channelModal, #quickPeekModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10010; justify-content: center; align-items: center; }
-#lightbox { background: rgba(0,0,0,0.9); z-index: 10015; flex-direction: column; }
+#lightbox { background: rgba(0,0,0,0.9); z-index: 10025; flex-direction: column; }
     #lightbox-title { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 16px; letter-spacing: 0.5px; }
     #lightbox img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 8px; }
     
@@ -1051,6 +1051,15 @@
       .occ-toggle-group button.active { background: #3a3a3c; color: #ff9f0a; }
    }
 
+    /* Phrase Staging Basket */
+    #phraseBasket {
+      position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%);
+      background: #2c2c2e; color: white; padding: 12px 20px; border-radius: 30px;
+      display: flex; align-items: center; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10030;
+      font-weight: 800; font-size: 14px; white-space: nowrap;
+    }
+    #phraseBasket.visible { bottom: 40px; }
 
 
 
@@ -1423,7 +1432,7 @@ display: flex; flex-direction: column;">
 
 
 
-  <div id="occlusionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;">
+<div id="occlusionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;">
     <div class="modal-content" style="max-height: 75vh;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h3 class="modal-title" style="margin-bottom: 0;">Study Controls</h3>
@@ -1450,21 +1459,34 @@ display: flex; flex-direction: column;">
         </div>
       </div>
 
-      <button class="clear-occ-btn" onclick="clearAllOcclusions()">🗑️ Clear All Marks for this Point</button>
+      <div class="occ-row">
+        <div class="occ-label">Phrase Occlusion</div>
+        <div class="occ-toggle-group">
+          <button id="btnPhraseOff" onclick="setPhraseOccState('off')">Off</button>
+          <button id="btnPhraseMark" onclick="setPhraseOccState('mark')">Mark</button>
+          <button id="btnPhraseHide" onclick="setPhraseOccState('hide')">Hide</button>
+        </div>
+      </div>
+
+      <div class="modal-buttons" style="margin-top: 15px;">
+        <button class="cancel-btn" style="color: #ff3b30; font-size: 14px;" onclick="clearAllOcclusions()">🗑️ Clear</button>
+        <button class="save-btn" onclick="closeOcclusionModal()">Apply</button>
+      </div>
     </div>
   </div>
 
-
-
-
-
+  <!-- THE PHRASE STAGING BASKET -->
+  <div id="phraseBasket">
+    <span id="phraseBasketText"></span>
+    <div style="display: flex; gap: 8px;" id="phraseBasketActions"></div>
+  </div>
 
   <div id="quickPeekModal" onclick="if(event.target===this) closeQuickPeek()">
     <div class="modal-content quick-peek-content" id="quickPeekContainer">
       </div>
   </div>
 
-     <div id="editModal">
+  <div id="editModal">
     <div class="modal-content">
       <h3 id="editTitle" class="modal-title">Edit Point Data</h3>
       
@@ -1488,7 +1510,6 @@ display: flex; flex-direction: column;">
     </div>
   </div>
 
-
   <div id="compareBasket" onclick="openCompareModal()">
     <span id="compareText">0 Points Selected</span>
     <button onclick="event.stopPropagation(); clearCompare()">Clear</button>
@@ -1499,15 +1520,14 @@ display: flex; flex-direction: column;">
     <button onclick="event.stopPropagation(); clearPrint()">Clear</button>
   </div>
 
-      <div id="printModal">
+  <div id="printModal">
     <div class="compare-content">
       <div class="compare-header">
         <h2>Print Queue</h2>
-                <div class="compare-actions">
+        <div class="compare-actions">
           <button class="save-btn" onclick="executeNativePrint()" style="padding: 8px 16px; font-size: 14px;">📤 Export</button>
           <button class="detail-nav-btn" onclick="closePrintQueue()" style="font-size:24px; color:#555; margin-left: 5px;">✕</button>
         </div>
-
       </div>
       <div id="printModalBody" style="flex: 1; overflow-y: auto; padding: 20px; background: white; -webkit-overflow-scrolling: touch;">
         </div>
@@ -1609,7 +1629,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "09.16.26.v1";
+const APP_VERSION = "09.23.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2236,27 +2256,7 @@ function toggleFlashcardMode() {
 let isOcclusionMode = false;
 let occlusionLevel = 30;
 
-function openOcclusionModal() {
-  document.getElementById("occlusionSlider").value = occlusionLevel;
-  document.getElementById("occPercentDisplay").textContent = occlusionLevel + "%";
-  
-  const toggleBtn = document.getElementById("occlusionToggleBtn");
-  if (isOcclusionMode) {
-    toggleBtn.textContent = "Turn Filter OFF";
-    toggleBtn.style.background = "#ff3b30";
-    toggleBtn.style.color = "white";
-  } else {
-    toggleBtn.textContent = "Turn OFF";
-    toggleBtn.style.background = "";
-    toggleBtn.style.color = "";
-  }
-  
-  document.getElementById("occlusionModal").style.display = "flex";
-}
 
-function closeOcclusionModal() {
-  document.getElementById("occlusionModal").style.display = "none";
-}
 
 function toggleOcclusion(enable) {
   if (enable) {
@@ -2816,7 +2816,8 @@ function renderSearchHistory() {
     const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
     const rawKeywords = query.match(tokenRegex) || [];
     
-        const headers = []; const fullNames = []; const exclude = []; const parsedIncludes = []; const strictImportance = []; 
+        const headers = []; const fullNamesGroups = []; const exclude = []; const parsedIncludes = []; const strictImportance = [];
+
 
     
     rawKeywords.forEach(token => {
@@ -2839,12 +2840,13 @@ function renderSearchHistory() {
           rangeTerms.forEach(rt => headers.push(...expandTCMPoint(rt)));
         });
       } else if (token.startsWith("#")) {
+  const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
+  const terms = cleanToken.split(",");
+  const orGroup = [];
+  terms.forEach(t => orGroup.push(...expandTCMPoint(t)));
+  if (orGroup.length > 0) fullNamesGroups.push(orGroup);
+}
 
-        // Strip the # AND any quotation marks so multi-word phrases parse cleanly
-        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
-        const terms = cleanToken.split(",");
-        terms.forEach(t => fullNames.push(...expandTCMPoint(t)));
-      }
         else {
         const parts = token.split("|").filter(Boolean);
         const orGroup = [];
@@ -2871,7 +2873,10 @@ function renderSearchHistory() {
 
     parsedIncludes.forEach(group => { group.forEach(item => { regexParts.push(item.regexString); activeTextTerms.push(item.text); }); });
     headers.forEach(h => { regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(h); });
-    fullNames.forEach(f => { regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(f); });
+    fullNamesGroups.forEach(group => { 
+  group.forEach(f => { regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(f); });
+});
+
 
     const validRegexParts = regexParts.filter(t => t.trim().length > 2).sort((a, b) => b.length - a.length);
     if (validRegexParts.length > 0) activeHighlightRegex = new RegExp("(" + validRegexParts.join("|") + ")", "gi");
@@ -2907,13 +2912,19 @@ function renderSearchHistory() {
       })) return false;
 
 
-            // 5. FULL NAMES & CHANNELS # (Fast Check)
-      if (fullNames.length > 0 && !fullNames.some(f => {
-        // Combine the fields so the # searches both at the same time
-        const hashTarget = (point["Full Name"] || point[" Full Name"] || "") + " " + 
-                           (point["Channel Short Name"] || point[" Channel Short Name"] || "");
-        return hashTarget.toLowerCase().includes(f);
-      })) return false;
+     // 5. FULL NAMES & CHANNELS # (Grouped AND/OR Logic)
+if (fullNamesGroups.length > 0) {
+  const hashTarget = ((point["Full Name"] || point[" Full Name"] || "") + " " + 
+                     (point["Channel Short Name"] || point[" Channel Short Name"] || "")).toLowerCase();
+  
+  // EVERY space-separated group (AND) must have at least one comma-separated match (OR)
+  const passesAllHashGroups = fullNamesGroups.every(group => {
+    return group.some(f => hashTarget.includes(f));
+  });
+  
+  if (!passesAllHashGroups) return false;
+}
+
 
       // 6. GENERAL SEARCH & PARAGRAPH LOGIC (Heavy Lifter)
       if (parsedIncludes.length > 0) {
@@ -3891,14 +3902,19 @@ pts.forEach((p, i) => {
 // ROW 2: Data Bodies
 pts.forEach((p, i) => {
    let rawVal = p[f.key] || p[f.altKey] || "";
-   let formatted = rawVal && String(rawVal).trim() !== "" 
-        ? linkifyPoints(formatTextWithTables(highlightText(rawVal))) 
-        : `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
-   
-   // --- NEW: Run the text through your occlusion engine before rendering ---
-   formatted = applyWordOcclusionToHTML(formatted, p["Short Name"]);
-   formatted = applyLineOcclusionToHTML(formatted, p["Short Name"]);
+   let formatted = "";
 
+   if (rawVal && String(rawVal).trim() !== "") {
+     // Re-ordered pipeline to protect unbroken text nodes
+     formatted = formatTextWithTables(highlightText(rawVal));
+     formatted = applyWordOcclusionToHTML(formatted, p["Short Name"]);
+     formatted = applyPhraseOcclusionToHTML(formatted, p["Short Name"]); 
+     formatted = linkifyPoints(formatted);
+     formatted = applyLineOcclusionToHTML(formatted, p["Short Name"]);
+   } else {
+     formatted = `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
+   }
+   
    // UPDATED: Added the onclick toggle for peak mode
    html += `<div class="compare-card-body" data-col="${i}" onclick="if(this.classList.contains('study-blur')) this.classList.toggle('study-peek');">${formatted}</div>`;
 });
@@ -4365,11 +4381,15 @@ async function completeSave(newValue) {
     sheetTouchStartY = e.changedTouches[0].screenY;
   }, {passive: true});
 
-  bottomSheetEl.addEventListener('touchend', (e) => {
+    bottomSheetEl.addEventListener('touchend', (e) => {
     if (sheetTouchStartX === null) return;
     
+    // NEW: Disable swiping globally whenever ANY mark mode is active
+    if (lineOccState === 'mark' || wordOccState === 'mark' || phraseOccState === 'mark') return;
+
     // Prevent swiping if they are scrolling the pill nav, interacting with a table, link, or action button
     if (e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button') || e.target.closest('.point-action-row') || e.target.closest('.pill-nav')) return;
+
 
     let touchEndX = e.changedTouches[0].screenX; 
     let touchEndY = e.changedTouches[0].screenY;
@@ -4915,8 +4935,8 @@ document.addEventListener('keyup', (e) => {
         <div class="action-icon" id="fcIcon" style="${isFlashcardMode ? 'background:#cc5500; color:white;' : ''}">🧠</div><div class="action-label">Study</div>
       </button>
       <button class="action-item" onclick="openOcclusionModal()">
-        <div class="action-icon" id="occIcon" style="${(lineOccState !== 'off' || wordOccState !== 'off') ? 'background:#cc5500; color:white;' : ''}">🌫️</div><div class="action-label">Occlude</div>
-      </button>
+  <div class="action-icon" id="occIcon" style="${(lineOccState !== 'off' || wordOccState !== 'off' || phraseOccState !== 'off') ? 'background:#cc5500; color:white;' : ''}">🌫️</div><div class="action-label">Occlude</div>
+</button>
     `;
 
 
@@ -4981,15 +5001,20 @@ div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed
         paras.forEach(p => matchingParas.push(p));
       }
 
-            // --- 1. CORE HTML PROCESSING ---
-      let fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
+                // --- 1. FORMATTING & TABLES ---
+      let fullHtml = formatTextWithTables(highlightText(value));
       
-      // --- 2. APPLY WORD OCCLUSION FIRST ---
+      // --- 2. APPLY TEXT OCCLUSIONS BEFORE LINKS ---
+      // This guarantees that phrases and words are unbroken text nodes when parsed
       fullHtml = applyWordOcclusionToHTML(fullHtml, point["Short Name"]);
+      fullHtml = applyPhraseOcclusionToHTML(fullHtml, point["Short Name"]);
 
-      // --- 3. APPLY LINE OCCLUSION SECOND ---
+      // --- 3. ADD INTERACTIVE POINT LINKS ---
+      // Converts ST36 into a link perfectly inside the newly created occlusion spans
+      fullHtml = linkifyPoints(fullHtml);
+
+      // --- 4. APPLY LINE OCCLUSION ---
       fullHtml = applyLineOcclusionToHTML(fullHtml, point["Short Name"]);
-
 
       const headerHtml = "<div class='section-label' onclick='if(isFlashcardMode) {this.parentElement.classList.toggle(\"revealed\"); event.stopPropagation();}'>" + label + editIcon + markAllIcon + "</div>";
 
@@ -5139,25 +5164,183 @@ div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed
 // --- UNIFIED 3-STATE OCCLUSION ENGINE ---
 let lineOccState = 'off'; // 'off', 'mark', 'hide'
 let wordOccState = 'off'; // 'off', 'mark', 'hide'
+let phraseOccState = 'off'; // 'off', 'mark', 'hide'
 
 function updateOccToggleUI() {
   ['Off', 'Mark', 'Hide'].forEach(s => {
     document.getElementById('btnLine' + s).classList.toggle('active', lineOccState === s.toLowerCase());
     document.getElementById('btnWord' + s).classList.toggle('active', wordOccState === s.toLowerCase());
+    document.getElementById('btnPhrase' + s).classList.toggle('active', phraseOccState === s.toLowerCase());
   });
-  // Prevent accidental link clicking while trying to mark things
-  if (lineOccState === 'mark' || wordOccState === 'mark') {
+  if (lineOccState === 'mark' || wordOccState === 'mark' || phraseOccState === 'mark') {
     document.body.classList.add('mark-mode-active');
   } else {
     document.body.classList.remove('mark-mode-active');
+    updatePhraseBasketUI(); // Hide basket if toggled off
   }
 }
 
 function setLineOccState(state) { lineOccState = state; updateOccToggleUI(); updateSheetUI(false, true); }
 function setWordOccState(state) { wordOccState = state; updateOccToggleUI(); updateSheetUI(false, true); }
+function setPhraseOccState(state) { phraseOccState = state; updateOccToggleUI(); updateSheetUI(false, true); }
 
+// Paste these two lines right here:
 function openOcclusionModal() { updateOccToggleUI(); document.getElementById("occlusionModal").style.display = "flex"; }
 function closeOcclusionModal() { document.getElementById("occlusionModal").style.display = "none"; }
+
+
+// --- PHRASE STAGING POOL LOGIC ---
+let pendingPhraseMarks = [];
+let currentSelection = "";
+
+document.addEventListener("selectionchange", () => {
+  if (phraseOccState !== 'mark') return;
+  const text = window.getSelection().toString().trim();
+  currentSelection = text;
+  updatePhraseBasketUI();
+});
+
+function updatePhraseBasketUI() {
+  const basket = document.getElementById("phraseBasket");
+  const textEl = document.getElementById("phraseBasketText");
+  const actionsEl = document.getElementById("phraseBasketActions");
+
+  if (phraseOccState !== 'mark') {
+    basket.classList.remove("visible");
+    return;
+  }
+
+  if (currentSelection.length > 0) {
+    let displayStr = currentSelection.length > 15 ? currentSelection.substring(0, 15) + "..." : currentSelection;
+    textEl.innerHTML = `<strong>Mark:</strong> "${displayStr}"`;
+    actionsEl.innerHTML = `<button style="background: #0a84ff; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="addPhraseToPool()">+ Add</button>`;
+    basket.classList.add("visible");
+  } else if (pendingPhraseMarks.length > 0) {
+    textEl.innerHTML = `<strong>${pendingPhraseMarks.length} Phrase${pendingPhraseMarks.length > 1 ? 's' : ''}</strong> Pending`;
+    actionsEl.innerHTML = `
+      <button style="background: #34c759; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="savePhrasePool()">Save</button>
+      <button style="background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="clearPhrasePool()">Clear</button>
+    `;
+    basket.classList.add("visible");
+  } else {
+    basket.classList.remove("visible");
+  }
+}
+
+window.addPhraseToPool = function() {
+  if (!currentSelection) return;
+  pendingPhraseMarks.push(currentSelection);
+  window.getSelection().removeAllRanges(); // Deselect text so iOS menu drops
+  currentSelection = "";
+  updatePhraseBasketUI();
+  updateSheetUI(false, true); // Force UI redraw to show the pending blue underline
+};
+
+window.clearPhrasePool = function() {
+  pendingPhraseMarks = [];
+  updatePhraseBasketUI();
+  updateSheetUI(false, true);
+};
+
+window.savePhrasePool = async function() {
+  if (pendingPhraseMarks.length === 0) return;
+  const pointId = sheetContextPoints[currentSheetIndex]["Short Name"];
+  let p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+
+  let savedPhrases = getOcclusionArray(p, "Phrase Occlusions");
+  pendingPhraseMarks.forEach(phrase => {
+    if (!savedPhrases.includes(phrase)) savedPhrases.push(phrase);
+  });
+
+  p["Phrase Occlusions"] = JSON.stringify(savedPhrases);
+  await saveSinglePointToVault(p);
+
+  if (navigator.onLine) {
+    const payload = { id: pointId, field: "Phrase Occlusions", value: p["Phrase Occlusions"] };
+    fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+  }
+
+  pendingPhraseMarks = [];
+  updatePhraseBasketUI();
+  updateSheetUI(false, true);
+  showToast("Phrases saved to database.");
+};
+
+window.toggleMarkedPhrase = async function(event, element, passedPointId) {
+  event.stopPropagation();
+  const phrase = element.getAttribute('data-phrase');
+  const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
+  let p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+
+  let savedPhrases = getOcclusionArray(p, "Phrase Occlusions");
+  const index = savedPhrases.indexOf(phrase);
+
+  if (index > -1) { 
+    savedPhrases.splice(index, 1); 
+    element.classList.remove('is-word-marked'); 
+    p["Phrase Occlusions"] = JSON.stringify(savedPhrases);
+    await saveSinglePointToVault(p);
+
+    clearTimeout(occlusionSyncTimers[pointId + '_phrase']);
+    occlusionSyncTimers[pointId + '_phrase'] = setTimeout(() => {
+      if (!navigator.onLine) return;
+      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Phrase Occlusions", value: p["Phrase Occlusions"] }) });
+    }, 1500);
+  }
+};
+
+window.applyPhraseOcclusionToHTML = function(html, pointId) {
+  if (phraseOccState === 'off') return html;
+
+  let p = points.find(x => x["Short Name"] === pointId);
+  let savedPhrases = p ? getOcclusionArray(p, "Phrase Occlusions") : [];
+  let activePhrases = [...savedPhrases];
+
+  if (phraseOccState === 'mark' && sheetContextPoints && sheetContextPoints[currentSheetIndex] && sheetContextPoints[currentSheetIndex]["Short Name"] === pointId) {
+    activePhrases.push(...pendingPhraseMarks);
+  }
+
+  if (activePhrases.length === 0) return html;
+
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+
+  const escapedPhrases = activePhrases.sort((a, b) => b.length - a.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const phraseRegex = new RegExp("(" + escapedPhrases.join("|") + ")", "gi");
+
+  const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
+  let textNodes = [];
+  let currentNode;
+  while (currentNode = walker.nextNode()) { textNodes.push(currentNode); }
+
+  textNodes.forEach(node => {
+    if (!node.nodeValue.trim()) return;
+
+    let replacedHTML = null;
+    if (phraseOccState === 'mark') {
+      replacedHTML = node.nodeValue.replace(phraseRegex, (match) => {
+        let lowerMatch = match.toLowerCase();
+        let isPending = pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? " style='border-bottom: 2px solid #007aff;'" : "";
+        let isMarked = savedPhrases.some(p => p.toLowerCase() === lowerMatch) ? " is-word-marked" : "";
+        return `<span class="word-mark-target${isMarked}" ${isPending} data-phrase="${lowerMatch}" onclick="window.toggleMarkedPhrase(event, this, '${pointId}')">${match}</span>`;
+      });
+    } else if (phraseOccState === 'hide') {
+      replacedHTML = node.nodeValue.replace(phraseRegex, (match) => {
+        return `<span class="line-occluded" onclick="if(this.classList.contains('line-occluded')) { event.stopPropagation(); this.classList.remove('line-occluded'); this.classList.add('line-revealed'); } else { this.classList.remove('line-revealed'); this.classList.add('line-occluded'); }">${match}</span>`;
+      });
+    }
+
+    if (replacedHTML !== null && replacedHTML !== node.nodeValue) {
+      let wrapper = document.createElement('div');
+      wrapper.innerHTML = replacedHTML;
+      while (wrapper.firstChild) { node.parentNode.insertBefore(wrapper.firstChild, node); }
+      node.parentNode.removeChild(node);
+    }
+  });
+  return tempDiv.innerHTML;
+}
 
 
 
@@ -5302,21 +5485,23 @@ window.clearAllOcclusions = async function() {
   if (!p) return;
 
   let changed = false;
-  let oldLines = getOcclusionArray(p, "Line Occlusions");
+    let oldLines = getOcclusionArray(p, "Line Occlusions");
   let oldWords = getOcclusionArray(p, "Word Occlusions");
+  let oldPhrases = getOcclusionArray(p, "Phrase Occlusions");
 
   if (oldLines.length > 0) { p["Line Occlusions"] = "[]"; changed = true; }
   if (oldWords.length > 0) { p["Word Occlusions"] = "[]"; changed = true; }
+  if (oldPhrases.length > 0) { p["Phrase Occlusions"] = "[]"; changed = true; }
 
   if (changed) {
-    await saveSinglePointToVault(p); // Save to local IndexedDB instantly
+    await saveSinglePointToVault(p);
     showToast("All marks cleared for this point.");
     updateSheetUI(false, true); 
 
-    // Sync to Google Sheets in the background
     if (navigator.onLine) {
       fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: "[]" }) });
       fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Word Occlusions", value: "[]" }) });
+      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Phrase Occlusions", value: "[]" }) });
     }
   } else { 
     showToast("No marks to clear."); 
