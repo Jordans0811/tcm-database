@@ -3919,8 +3919,6 @@ pts.forEach((p, i) => {
    html += `<div class="compare-card-body" data-col="${i}" onclick="if(this.classList.contains('study-blur')) this.classList.toggle('study-peek');">${formatted}</div>`;
 });
 
-
-
       
       html += `</div></div>`; // Close grid and section
     });
@@ -5001,7 +4999,7 @@ div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed
         paras.forEach(p => matchingParas.push(p));
       }
 
-                // --- 1. FORMATTING & TABLES ---
+      // --- 1. FORMATTING & TABLES ---
       let fullHtml = formatTextWithTables(highlightText(value));
       
       // --- 2. APPLY TEXT OCCLUSIONS BEFORE LINKS ---
@@ -5046,13 +5044,23 @@ div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed
           div.className = "point-notes hidden-section";
           div.innerHTML = headerHtml + "<div class='section-content'><div class='full-view'>" + fullHtml + "</div></div>";
         } else {
-          let filteredHtml = linkifyPoints(formatTextWithTables(matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n")));
-          filteredHtml = applyLineOcclusionToHTML(filteredHtml, point["Short Name"]);
-          if (isOcclusionMode) filteredHtml = applyOcclusionToHTML(filteredHtml, occlusionLevel);
+  // 1. Join and format the filtered paragraphs
+  let joinedFilteredText = matchingParas.map(p => highlightText(p)).join("\n\n<span style='color:#999; font-size:11px;'>[...]</span>\n\n");
+  let filteredHtml = formatTextWithTables(joinedFilteredText);
+  
+  // 2. Apply Word & Phrase occlusions BEFORE linkifying
+  filteredHtml = applyWordOcclusionToHTML(filteredHtml, point["Short Name"]);
+  filteredHtml = applyPhraseOcclusionToHTML(filteredHtml, point["Short Name"]);
+  
+  // 3. Add Point Links
+  filteredHtml = linkifyPoints(filteredHtml);
+  
+  // 4. Apply Line occlusion
+  filteredHtml = applyLineOcclusionToHTML(filteredHtml, point["Short Name"]);
 
-          div.className = "point-notes";
-          div.innerHTML = headerHtml + "<div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
-        }
+  div.className = "point-notes";
+  div.innerHTML = headerHtml + "<div class='section-content'><div class='filtered-view'>" + filteredHtml + "</div><div class='full-view'>" + fullHtml + "</div></div>";
+}
       } else {
         // NORMAL UNBROKEN VIEW:
         div.className = "point-notes";
