@@ -1628,8 +1628,8 @@ display: flex; flex-direction: column;">
 
 
 
-// --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "09.23.26.v1";
+// --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
+const APP_VERSION = "09.26.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -4764,11 +4764,15 @@ document.addEventListener('keyup', (e) => {
 
 
     function closeBottomSheet() {
-    const sheet = document.getElementById('bottomSheet');
-    if (!sheet.classList.contains('open')) return; // Safety check
+  const sheet = document.getElementById('bottomSheet');
+  if (!sheet.classList.contains('open')) return; // Safety check
 
-    // 1. Start the curtain-drop animation
-    sheet.classList.remove('open');
+  // NEW: Wipe the staging pool when closing the sheet so the basket doesn't float on the home screen!
+  if (typeof clearOcclusionPool === 'function') clearOcclusionPool(false);
+
+  // 1. Start the curtain-drop animation
+  sheet.classList.remove('open');
+
     document.getElementById('sheetBackdrop').classList.remove('show'); // NEW: Hide Backdrop
 
     // 2. Smart Background Sync
@@ -4831,22 +4835,29 @@ document.addEventListener('keyup', (e) => {
 
 
       function updateSheetUI(isInitialOpen = false, preserveScroll = false) {
-    const sheetContent = document.getElementById("sheetContent");
-    
-    // Capture the exact pixel position before we wipe the old data
-    const currentScroll = sheetContent.scrollTop; 
-
-    const point = sheetContextPoints[currentSheetIndex];
-    renderPills(isInitialOpen);
-    renderSheetContent(point);
-    
-    // If saving an edit, hold the position. If swiping/tapping a new point, snap to top.
-    if (preserveScroll) {
-      sheetContent.scrollTop = currentScroll; 
-    } else {
-      sheetContent.scrollTop = 0; 
-    }
+  // NEW: Wipe the staging pool when navigating to prevent cross-card data corruption
+  const incomingPointId = sheetContextPoints[currentSheetIndex]["Short Name"];
+  if (window.lastSheetPointId && window.lastSheetPointId !== incomingPointId) {
+    if (typeof clearOcclusionPool === 'function') clearOcclusionPool(false);
   }
+  window.lastSheetPointId = incomingPointId;
+
+  const sheetContent = document.getElementById("sheetContent");
+  
+  // Capture the exact pixel position before we wipe the old data
+  const currentScroll = sheetContent.scrollTop; 
+
+  const point = sheetContextPoints[currentSheetIndex];
+  renderPills(isInitialOpen);
+  renderSheetContent(point);
+  
+  // If saving an edit, hold the position. If swiping/tapping a new point, snap to top.
+  if (preserveScroll) {
+    sheetContent.scrollTop = currentScroll; 
+  } else {
+    sheetContent.scrollTop = 0; 
+  }
+}
 
 
 
@@ -5184,98 +5195,76 @@ function updateOccToggleUI() {
     document.body.classList.add('mark-mode-active');
   } else {
     document.body.classList.remove('mark-mode-active');
-    updatePhraseBasketUI(); // Hide basket if toggled off
   }
+  updateOcclusionBasketUI(); 
 }
 
-function setLineOccState(state) { lineOccState = state; updateOccToggleUI(); updateSheetUI(false, true); }
-function setWordOccState(state) { wordOccState = state; updateOccToggleUI(); updateSheetUI(false, true); }
-function setPhraseOccState(state) { phraseOccState = state; updateOccToggleUI(); updateSheetUI(false, true); }
+function setLineOccState(state) { if (lineOccState !== state) clearOcclusionPool(false); lineOccState = state; updateOccToggleUI(); updateSheetUI(false, true); }
+function setWordOccState(state) { if (wordOccState !== state) clearOcclusionPool(false); wordOccState = state; updateOccToggleUI(); updateSheetUI(false, true); }
+function setPhraseOccState(state) { if (phraseOccState !== state) clearOcclusionPool(false); phraseOccState = state; updateOccToggleUI(); updateSheetUI(false, true); }
 
-// Paste these two lines right here:
 function openOcclusionModal() { updateOccToggleUI(); document.getElementById("occlusionModal").style.display = "flex"; }
 function closeOcclusionModal() { document.getElementById("occlusionModal").style.display = "none"; }
 
-
-// --- PHRASE STAGING POOL LOGIC ---
+// --- UNIFIED OCCLUSION STAGING POOL ---
+let pendingLineMarks = [];
+let pendingLineUnmarks = [];
+let pendingWordMarks = [];
+let pendingWordUnmarks = [];
 let pendingPhraseMarks = [];
+let pendingPhraseUnmarks = [];
 let currentSelection = "";
 
 document.addEventListener("selectionchange", () => {
   if (phraseOccState !== 'mark') return;
   const text = window.getSelection().toString().trim();
   currentSelection = text;
-  updatePhraseBasketUI();
+  updateOcclusionBasketUI();
 });
 
-function updatePhraseBasketUI() {
+window.updateOcclusionBasketUI = function() {
   const basket = document.getElementById("phraseBasket");
   const textEl = document.getElementById("phraseBasketText");
   const actionsEl = document.getElementById("phraseBasketActions");
 
-  if (phraseOccState !== 'mark') {
+  const isMarking = (lineOccState === 'mark' || wordOccState === 'mark' || phraseOccState === 'mark');
+  if (!isMarking) {
     basket.classList.remove("visible");
     return;
   }
 
-  if (currentSelection.length > 0) {
+  let pendingCount = pendingLineMarks.length + pendingLineUnmarks.length +
+                     pendingWordMarks.length + pendingWordUnmarks.length +
+                     pendingPhraseMarks.length + pendingPhraseUnmarks.length;
+
+  if (currentSelection.length > 0 && phraseOccState === 'mark') {
     let displayStr = currentSelection.length > 15 ? currentSelection.substring(0, 15) + "..." : currentSelection;
     textEl.innerHTML = `<strong>Mark:</strong> "${displayStr}"`;
     actionsEl.innerHTML = `<button style="background: #0a84ff; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="addPhraseToPool()">+ Add</button>`;
     basket.classList.add("visible");
-  } else if (pendingPhraseMarks.length > 0) {
-    textEl.innerHTML = `<strong>${pendingPhraseMarks.length} Phrase${pendingPhraseMarks.length > 1 ? 's' : ''}</strong> Pending`;
+  } else if (pendingCount > 0) {
+    textEl.innerHTML = `<strong>${pendingCount} Edit${pendingCount > 1 ? 's' : ''}</strong> Pending`;
     actionsEl.innerHTML = `
-      <button style="background: #34c759; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="savePhrasePool()">Save</button>
-      <button style="background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="clearPhrasePool()">Clear</button>
+      <button style="background: #34c759; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="saveOcclusionPool()">Save</button>
+      <button style="background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="clearOcclusionPool()">Clear</button>
     `;
     basket.classList.add("visible");
   } else {
     basket.classList.remove("visible");
   }
-}
+};
+
 
 window.addPhraseToPool = function() {
   if (!currentSelection) return;
   pendingPhraseMarks.push(currentSelection);
-  window.getSelection().removeAllRanges(); // Deselect text so iOS menu drops
+  window.getSelection().removeAllRanges(); 
   currentSelection = "";
-  updatePhraseBasketUI();
-  updateSheetUI(false, true); // Force UI redraw to show the pending blue underline
+  updateOcclusionBasketUI();
+  updateSheetUI(false, true); 
 };
 
-window.clearPhrasePool = function() {
-  pendingPhraseMarks = [];
-  updatePhraseBasketUI();
-  updateSheetUI(false, true);
-};
-
-window.savePhrasePool = async function() {
-  if (pendingPhraseMarks.length === 0) return;
-  const pointId = sheetContextPoints[currentSheetIndex]["Short Name"];
-  let p = points.find(x => x["Short Name"] === pointId);
-  if (!p) return;
-
-  let savedPhrases = getOcclusionArray(p, "Phrase Occlusions");
-  pendingPhraseMarks.forEach(phrase => {
-    if (!savedPhrases.includes(phrase)) savedPhrases.push(phrase);
-  });
-
-  p["Phrase Occlusions"] = JSON.stringify(savedPhrases);
-  await saveSinglePointToVault(p);
-
-  if (navigator.onLine) {
-    const payload = { id: pointId, field: "Phrase Occlusions", value: p["Phrase Occlusions"] };
-    fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
-  }
-
-  pendingPhraseMarks = [];
-  updatePhraseBasketUI();
-  updateSheetUI(false, true);
-  showToast("Phrases saved to database.");
-};
-
-window.toggleMarkedPhrase = async function(event, element, passedPointId) {
+window.toggleMarkedPhrase = function(event, element, passedPointId) {
   event.stopPropagation();
   const phrase = element.getAttribute('data-phrase');
   const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
@@ -5283,21 +5272,89 @@ window.toggleMarkedPhrase = async function(event, element, passedPointId) {
   if (!p) return;
 
   let savedPhrases = getOcclusionArray(p, "Phrase Occlusions");
-  const index = savedPhrases.indexOf(phrase);
+  const isSaved = savedPhrases.includes(phrase);
 
-  if (index > -1) { 
-    savedPhrases.splice(index, 1); 
-    element.classList.remove('is-word-marked'); 
-    p["Phrase Occlusions"] = JSON.stringify(savedPhrases);
-    await saveSinglePointToVault(p);
+  if (isSaved) {
+    const idx = pendingPhraseUnmarks.indexOf(phrase);
+    if (idx > -1) {
+      pendingPhraseUnmarks.splice(idx, 1);
+      element.classList.add('is-word-marked');
+      element.style.opacity = '1';
+    } else {
+      pendingPhraseUnmarks.push(phrase);
+      element.classList.remove('is-word-marked');
+      element.style.opacity = '0.4';
+    }
+  } else {
+    const idx = pendingPhraseMarks.indexOf(phrase);
+    if (idx > -1) {
+      pendingPhraseMarks.splice(idx, 1);
+      element.classList.remove('is-word-marked');
+      element.style.borderBottom = '';
+    } else {
+      pendingPhraseMarks.push(phrase);
+      element.classList.add('is-word-marked');
+      element.style.borderBottom = '2px solid #0a84ff';
+    }
+  }
+  updateOcclusionBasketUI();
+};
 
-    clearTimeout(occlusionSyncTimers[pointId + '_phrase']);
-    occlusionSyncTimers[pointId + '_phrase'] = setTimeout(() => {
-      if (!navigator.onLine) return;
-      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Phrase Occlusions", value: p["Phrase Occlusions"] }) });
-    }, 1500);
+window.saveOcclusionPool = async function() {
+  const pointId = sheetContextPoints[currentSheetIndex]["Short Name"];
+  let p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+
+  let savedLines = getOcclusionArray(p, "Line Occlusions");
+  let savedWords = getOcclusionArray(p, "Word Occlusions");
+  let savedPhrases = getOcclusionArray(p, "Phrase Occlusions");
+
+  // Apply Additions
+  pendingLineMarks.forEach(l => { if (!savedLines.includes(l)) savedLines.push(l); });
+  pendingWordMarks.forEach(w => { if (!savedWords.includes(w)) savedWords.push(w); });
+  pendingPhraseMarks.forEach(ph => { if (!savedPhrases.includes(ph)) savedPhrases.push(ph); });
+
+  // Apply Removals
+  pendingLineUnmarks.forEach(l => { const i = savedLines.indexOf(l); if (i > -1) savedLines.splice(i, 1); });
+  pendingWordUnmarks.forEach(w => { const i = savedWords.indexOf(w); if (i > -1) savedWords.splice(i, 1); });
+  pendingPhraseUnmarks.forEach(ph => { const i = savedPhrases.indexOf(ph); if (i > -1) savedPhrases.splice(i, 1); });
+
+  p["Line Occlusions"] = JSON.stringify(savedLines);
+  p["Word Occlusions"] = JSON.stringify(savedWords);
+  p["Phrase Occlusions"] = JSON.stringify(savedPhrases);
+
+  await saveSinglePointToVault(p);
+
+  // Package batch saves to Google Sheets
+  if (navigator.onLine) {
+    if (pendingLineMarks.length > 0 || pendingLineUnmarks.length > 0) {
+        fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: p["Line Occlusions"] }) });
+    }
+    if (pendingWordMarks.length > 0 || pendingWordUnmarks.length > 0) {
+        fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Word Occlusions", value: p["Word Occlusions"] }) });
+    }
+    if (pendingPhraseMarks.length > 0 || pendingPhraseUnmarks.length > 0) {
+        fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Phrase Occlusions", value: p["Phrase Occlusions"] }) });
+    }
+  }
+
+  clearOcclusionPool(false); 
+  updateOcclusionBasketUI();
+  updateSheetUI(false, true); // Re-renders the card completely to remove styling overrides
+  showToast("Occlusions saved to database.");
+};
+
+window.clearOcclusionPool = function(redraw = true) {
+  pendingLineMarks = []; pendingLineUnmarks = [];
+  pendingWordMarks = []; pendingWordUnmarks = [];
+  pendingPhraseMarks = []; pendingPhraseUnmarks = [];
+  
+  if (redraw) {
+    updateOcclusionBasketUI();
+    updateSheetUI(false, true); // Returns the UI to its saved state
   }
 };
+
 
 window.applyPhraseOcclusionToHTML = function(html, pointId) {
   if (phraseOccState === 'off') return html;
@@ -5330,9 +5387,14 @@ window.applyPhraseOcclusionToHTML = function(html, pointId) {
     if (phraseOccState === 'mark') {
       replacedHTML = node.nodeValue.replace(phraseRegex, (match) => {
         let lowerMatch = match.toLowerCase();
-        let isPending = pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? " style='border-bottom: 2px solid #007aff;'" : "";
-        let isMarked = savedPhrases.some(p => p.toLowerCase() === lowerMatch) ? " is-word-marked" : "";
-        return `<span class="word-mark-target${isMarked}" ${isPending} data-phrase="${lowerMatch}" onclick="window.toggleMarkedPhrase(event, this, '${pointId}')">${match}</span>`;
+        let isSaved = savedPhrases.some(p => p.toLowerCase() === lowerMatch);
+        
+        // NEW: Check pending arrays during redraw (Parity with Word/Line logic)
+        let isMarkedClass = (isSaved && !pendingPhraseUnmarks.some(p => p.toLowerCase() === lowerMatch)) || pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? " is-word-marked" : "";
+        let pendingStyle = pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? " style='border-bottom: 2px solid #0a84ff;'" : 
+                           (isSaved && pendingPhraseUnmarks.some(p => p.toLowerCase() === lowerMatch) ? " style='opacity: 0.4;'" : "");
+
+        return `<span class="word-mark-target${isMarkedClass}"${pendingStyle} data-phrase="${lowerMatch}" onclick="window.toggleMarkedPhrase(event, this, '${pointId}')">${match}</span>`;
       });
     } else if (phraseOccState === 'hide') {
       replacedHTML = node.nodeValue.replace(phraseRegex, (match) => {
@@ -5377,7 +5439,6 @@ window.applyWordOcclusionToHTML = function(html, pointId) {
 
   let hideRegex = null;
   if (wordOccState === 'hide') {
-    // SAFE CLONE BEFORE SORTING
     const escapedWords = [...savedWords].sort((a,b) => b.length - a.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     hideRegex = new RegExp("\\b(" + escapedWords.join("|") + ")\\b", "gi");
   }
@@ -5391,9 +5452,14 @@ window.applyWordOcclusionToHTML = function(html, pointId) {
     if (wordOccState === 'mark') {
       replacedHTML = node.nodeValue.replace(markRegex, (match) => {
         let lowerMatch = match.toLowerCase();
-        let isMarked = savedWords.includes(lowerMatch) ? " is-word-marked" : "";
-        // PASS POINT ID EXPLICITLY
-        return `<span class="word-mark-target${isMarked}" data-word="${lowerMatch}" onclick="window.toggleMarkedWord(event, this, '${pointId}')">${match}</span>`;
+        let isSaved = savedWords.includes(lowerMatch);
+        
+        // NEW: Check pending arrays during redraw
+        let isMarkedClass = (isSaved && !pendingWordUnmarks.includes(lowerMatch)) || pendingWordMarks.includes(lowerMatch) ? " is-word-marked" : "";
+        let pendingStyle = pendingWordMarks.includes(lowerMatch) ? " style='border-bottom: 2px solid #0a84ff;'" : 
+                           (isSaved && pendingWordUnmarks.includes(lowerMatch) ? " style='opacity: 0.4;'" : "");
+        
+        return `<span class="word-mark-target${isMarkedClass}"${pendingStyle} data-word="${lowerMatch}" onclick="window.toggleMarkedWord(event, this, '${pointId}')">${match}</span>`;
       });
     } else if (wordOccState === 'hide') {
       replacedHTML = node.nodeValue.replace(hideRegex, (match) => {
@@ -5434,8 +5500,18 @@ window.applyLineOcclusionToHTML = function(html, pointId, forceWrapAll = false) 
     if (lineOccState === 'mark') {
       shouldWrap = true;
       span.className = 'mark-target';
-      if (savedLines.includes(rawText)) span.classList.add('is-marked');
-      // PASS POINT ID EXPLICITLY
+      
+      // NEW: Check pending arrays during redraw
+      let isSaved = savedLines.includes(rawText);
+      if ((isSaved && !pendingLineUnmarks.includes(rawText)) || pendingLineMarks.includes(rawText)) {
+          span.classList.add('is-marked');
+      }
+      if (pendingLineMarks.includes(rawText)) {
+          span.style.borderBottom = '2px solid #0a84ff';
+      } else if (isSaved && pendingLineUnmarks.includes(rawText)) {
+          span.style.opacity = '0.4';
+      }
+
       span.setAttribute('onclick', `window.toggleMarkedLine(event, this, '${pointId}')`);
     } else if (lineOccState === 'hide' && savedLines.includes(rawText)) {
       shouldWrap = true;
@@ -5472,9 +5548,8 @@ window.applyLineOcclusionToHTML = function(html, pointId, forceWrapAll = false) 
 }
 
 
-
 // --- NEW CLOUD-SYNC OCCLUSION ENGINE ---
-let occlusionSyncTimers = {};
+
 
 // Helper to safely read stringified arrays from Google Sheets
 window.getOcclusionArray = function(point, field) {
@@ -5502,9 +5577,12 @@ window.clearAllOcclusions = async function() {
   if (oldPhrases.length > 0) { p["Phrase Occlusions"] = "[]"; changed = true; }
 
   if (changed) {
+    // NEW: Flush the staging pool so pending marks don't get accidentally re-saved!
+    if (typeof clearOcclusionPool === 'function') clearOcclusionPool(false);
+    
     await saveSinglePointToVault(p);
     showToast("All marks cleared for this point.");
-    updateSheetUI(false, true); 
+    updateSheetUI(false, true);
 
     if (navigator.onLine) {
       fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: "[]" }) });
@@ -5517,7 +5595,7 @@ window.clearAllOcclusions = async function() {
   closeOcclusionModal();
 };
 
-window.markAllLinesInSection = async function(buttonEl, pointId) {
+window.markAllLinesInSection = function(buttonEl, pointId) {
   const sectionDiv = buttonEl.closest('.point-notes');
   if (!sectionDiv) return;
 
@@ -5528,95 +5606,108 @@ window.markAllLinesInSection = async function(buttonEl, pointId) {
   if (!p) return;
 
   let savedLines = getOcclusionArray(p, "Line Occlusions");
-  let changed = false;
+  let addedCount = 0;
 
   targets.forEach(target => {
     const text = target.getAttribute('data-original-text');
-    if (text && !savedLines.includes(text)) {
-      savedLines.push(text);
-      changed = true;
+    if (!text) return;
+
+    // 1. If it was pending removal, cancel the removal!
+    const unmarkIdx = pendingLineUnmarks.indexOf(text);
+    if (unmarkIdx > -1) {
+      pendingLineUnmarks.splice(unmarkIdx, 1);
+      target.classList.add('is-marked');
+      target.style.opacity = '1';
+      addedCount++;
+    }
+    // 2. If it's not saved and not already pending addition, stage it!
+    else if (!savedLines.includes(text) && !pendingLineMarks.includes(text)) {
+      pendingLineMarks.push(text);
+      target.classList.add('is-marked');
+      target.style.borderBottom = '2px solid #0a84ff';
+      addedCount++;
     }
   });
 
-  if (changed) {
-    p["Line Occlusions"] = JSON.stringify(savedLines);
-    await saveSinglePointToVault(p);
-    updateSheetUI(false, true); 
-
-    // Smart Background Sync
-    clearTimeout(occlusionSyncTimers[pointId + '_line']);
-    occlusionSyncTimers[pointId + '_line'] = setTimeout(() => {
-      if (!navigator.onLine) return;
-      const payload = { id: pointId, field: "Line Occlusions", value: p["Line Occlusions"] };
-      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
-    }, 1500);
-
+  if (addedCount > 0) {
+    updateOcclusionBasketUI();
   } else {
-    showToast("All lines in this section are already marked.");
+    showToast("All lines are already marked or pending.");
   }
 };
 
-window.toggleMarkedLine = async function(event, element, passedPointId) {
+window.toggleMarkedLine = function(event, element, passedPointId) {
   event.stopPropagation();
   const text = element.getAttribute('data-original-text');
   const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
-  
   let p = points.find(x => x["Short Name"] === pointId);
   if (!p) return;
 
   let savedLines = getOcclusionArray(p, "Line Occlusions");
-  const index = savedLines.indexOf(text);
-  
-  if (index > -1) { 
-    savedLines.splice(index, 1); 
-    element.classList.remove('is-marked'); 
-  } else { 
-    savedLines.push(text); 
-    element.classList.add('is-marked'); 
-  }
-  
-  p["Line Occlusions"] = JSON.stringify(savedLines);
-  await saveSinglePointToVault(p);
+  const isSaved = savedLines.includes(text);
 
-  // Smart Background Sync
-  clearTimeout(occlusionSyncTimers[pointId + '_line']);
-  occlusionSyncTimers[pointId + '_line'] = setTimeout(() => {
-    if (!navigator.onLine) return;
-    const payload = { id: pointId, field: "Line Occlusions", value: p["Line Occlusions"] };
-    fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
-  }, 1500);
+  if (isSaved) {
+    const idx = pendingLineUnmarks.indexOf(text);
+    if (idx > -1) {
+      pendingLineUnmarks.splice(idx, 1);
+      element.classList.add('is-marked');
+      element.style.opacity = '1';
+    } else {
+      pendingLineUnmarks.push(text);
+      element.classList.remove('is-marked');
+      element.style.opacity = '0.4';
+    }
+  } else {
+    const idx = pendingLineMarks.indexOf(text);
+    if (idx > -1) {
+      pendingLineMarks.splice(idx, 1);
+      element.classList.remove('is-marked');
+      element.style.borderBottom = '';
+    } else {
+      pendingLineMarks.push(text);
+      element.classList.add('is-marked');
+      element.style.borderBottom = '2px solid #0a84ff';
+    }
+  }
+  updateOcclusionBasketUI();
 };
 
-window.toggleMarkedWord = async function(event, element, passedPointId) {
+window.toggleMarkedWord = function(event, element, passedPointId) {
   event.stopPropagation();
   const word = element.getAttribute('data-word');
   const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
-  
   let p = points.find(x => x["Short Name"] === pointId);
   if (!p) return;
 
   let savedWords = getOcclusionArray(p, "Word Occlusions");
-  const index = savedWords.indexOf(word);
-  
-  if (index > -1) { 
-    savedWords.splice(index, 1); 
-    element.classList.remove('is-word-marked'); 
-  } else { 
-    savedWords.push(word); 
-    element.classList.add('is-word-marked'); 
-  }
-  
-  p["Word Occlusions"] = JSON.stringify(savedWords);
-  await saveSinglePointToVault(p);
+  const isSaved = savedWords.includes(word);
 
-  // Smart Background Sync
-  clearTimeout(occlusionSyncTimers[pointId + '_word']);
-  occlusionSyncTimers[pointId + '_word'] = setTimeout(() => {
-    if (!navigator.onLine) return;
-    const payload = { id: pointId, field: "Word Occlusions", value: p["Word Occlusions"] };
-    fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
-  }, 1500);
+  if (isSaved) {
+    const idx = pendingWordUnmarks.indexOf(word);
+    if (idx > -1) {
+      pendingWordUnmarks.splice(idx, 1);
+      element.classList.add('is-word-marked');
+      element.style.opacity = '1';
+    } else {
+      pendingWordUnmarks.push(word);
+      element.classList.remove('is-word-marked');
+      element.style.opacity = '0.4';
+    }
+  } else {
+    const idx = pendingWordMarks.indexOf(word);
+    if (idx > -1) {
+      pendingWordMarks.splice(idx, 1);
+      element.classList.remove('is-word-marked');
+      element.style.borderBottom = '';
+    } else {
+      pendingWordMarks.push(word);
+      element.classList.add('is-word-marked');
+      element.style.borderBottom = '2px solid #0a84ff';
+    }
+  }
+  updateOcclusionBasketUI();
 };
+
 
 
 // --- WIPE KEYBOARD CURSOR ON TOUCH ---
