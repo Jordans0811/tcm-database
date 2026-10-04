@@ -1709,52 +1709,45 @@ display: flex; flex-direction: column;">
 
 
 <!-- FULL SCREEN STUDY MODAL -->
-  <div id="studyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f0f5; z-index: 10019; flex-direction: column;">
-    
-    <div class="compare-header">
-      <h2>Study Session</h2>
-      <div class="compare-actions">
-        <select id="studyOrderSelect" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #333; border: none; cursor: pointer;">
-          <option value="order">⬇️ In Order</option>
-          <option value="random">🔀 Random</option>
-        </select>
-        <button onclick="closeStudyModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
-      </div>
-    </div>
-
-    <!-- Progress Track -->
-    <div style="width: 100%; height: 6px; background: #e3e3e8;">
-      <div id="studyProgressBar" style="width: 0%; height: 100%; background: #34c759; transition: width 0.3s ease-out;"></div>
-    </div>
-
-    <div style="text-align: center; font-size: 13px; color: #888; padding: 10px 0 0 0; font-weight: bold;" id="studyCounterDisplay">
-      Card 0 of 0
-    </div>
-
-    <!-- The 3D Card Canvas -->
-    <div id="studyCardContainer" style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; perspective: 1000px; overflow: hidden; touch-action: none;">
-      <!-- Card injected via JS -->
-    </div>
-
-    <!-- Desktop Keyboard Hint Bar -->
-    <div style="display: flex; justify-content: space-around; padding: 15px; background: white; border-top: 1px solid #d1d1d6; font-size: 11px; font-weight: bold; color: #888;">
-      <span>← Correct</span>
-      <span>↑ Strong Correct</span>
-      <span>↓ Wrong</span>
-      <span>→ Go Back</span>
-      <span>[Space] Flip</span>
+<div id="studyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f0f5; z-index: 10019; flex-direction: column;">
+  
+  <div class="compare-header">
+    <h2>Study Session</h2>
+    <div class="compare-actions">
+      <!-- NEW SYNC BUTTON IN HEADER -->
+      <button id="studySyncBtnTop" onclick="syncSRSData()" style="display: none; background: #34c759; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Sync (0)</button>
+      
+      <select id="studyOrderSelect" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #333; border: none; cursor: pointer;">
+        <option value="order">⬇️ In Order</option>
+        <option value="random">🔀 Random</option>
+      </select>
+      <button onclick="closeStudyModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
     </div>
   </div>
 
-  <!-- THE SRS STAGING BASKET -->
-  <div id="srsBasket" class="phraseBasket" style="position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); background: #2c2c2e; color: white; padding: 12px 20px; border-radius: 30px; display: flex; align-items: center; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10030; font-weight: 800; font-size: 14px; white-space: nowrap;">
-    <span id="srsBasketText">0 Reviews Pending</span>
-    <div style="display: flex; gap: 8px;">
-      <button style="background: #34c759; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="syncSRSData()">Save & Sync</button>
-    </div>
+  <!-- Progress Track -->
+  <div style="width: 100%; height: 6px; background: #e3e3e8;">
+    <div id="studyProgressBar" style="width: 0%; height: 100%; background: #34c759; transition: width 0.3s ease-out;"></div>
   </div>
 
+  <div style="text-align: center; font-size: 13px; color: #888; padding: 10px 0 0 0; font-weight: bold;" id="studyCounterDisplay">
+    Card 0 of 0
+  </div>
 
+  <!-- The 3D Card Canvas -->
+  <div id="studyCardContainer" style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; perspective: 1000px; overflow: hidden; touch-action: none;">
+    <!-- Card injected via JS -->
+  </div>
+
+  <!-- Desktop Keyboard Hint Bar -->
+  <div style="display: flex; justify-content: space-around; padding: 15px; background: white; border-top: 1px solid #d1d1d6; font-size: 11px; font-weight: bold; color: #888;">
+    <span>← Correct</span>
+    <span>↑ Strong Correct</span>
+    <span>↓ Wrong</span>
+    <span>→ Go Back</span>
+    <span>[Space] Flip</span>
+  </div>
+</div>
 
 
   <div id="appContainer">
@@ -6488,27 +6481,25 @@ let studyDeck = [];
 let currentStudyIndex = 0;
 let studyHistory = []; 
 
+// NEW: Chunking, Pooling, and Stat Variables
+let cardsReviewedInChunk = 0;
+let pendingSRSUpdates = [];
+let studySessionStats = { strong: 0, correct: 0, wrong: 0 };
+
 function openStudyModal() {
 if (!sheetContextPoints || sheetContextPoints.length === 0) return;
   
   studyDeck = [];
   
-  // 1. Respect the Section Filter!
   const sectionsToUse = (isSectionFilterActive && activeSections.length > 0) 
     ? TCM_SECTIONS.filter(s => activeSections.includes(s.label))
     : TCM_SECTIONS;
 
-  // 2. Build the Atomic Deck
   sheetContextPoints.forEach(p => {
     sectionsToUse.forEach(sec => {
       let val = p[sec.key] || p[sec.altKey] || "";
       if (val && String(val).trim() !== "") {
-        studyDeck.push({
-          point: p,
-          sectionLabel: sec.label,
-          content: val,
-          cardId: p["Short Name"] + "::" + sec.label
-        });
+        studyDeck.push({ point: p, sectionLabel: sec.label, content: val, cardId: p["Short Name"] + "::" + sec.label });
       }
     });
   });
@@ -6518,16 +6509,14 @@ if (!sheetContextPoints || sheetContextPoints.length === 0) return;
     return;
   }
 
-  // 3. Apply Ordering
   const order = document.getElementById("studyOrderSelect").value;
-  if (order === "random") {
-    studyDeck.sort(() => Math.random() - 0.5);
-  }
+  if (order === "random") studyDeck.sort(() => Math.random() - 0.5);
 
   currentStudyIndex = 0;
   studyHistory = [];
+  studySessionStats = { strong: 0, correct: 0, wrong: 0 };
+  cardsReviewedInChunk = 0; // NEW: Reset the chunk counter
   
-  // Lock Viewport
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
   document.getElementById("studyModal").style.display = "flex";
   
@@ -6539,26 +6528,98 @@ function closeStudyModal() {
   document.getElementById("studyModal").style.display = "none";
 }
 
+// --- NEW HELPER FUNCTIONS ---
+function updateStudySyncBadge() {
+  const btn = document.getElementById("studySyncBtnTop");
+  if (!btn) return;
+  if (pendingSRSUpdates.length > 0) {
+    btn.style.display = "inline-block";
+    btn.textContent = `Sync (${pendingSRSUpdates.length})`;
+  } else {
+    btn.style.display = "none";
+  }
+}
+
+function continueChunk() {
+  cardsReviewedInChunk = 0;
+  renderCurrentStudyCard();
+}
+
+function keepStudying() {
+  cardsReviewedInChunk = 0;
+  currentStudyIndex = 0;
+  const order = document.getElementById("studyOrderSelect").value;
+  if (order === "random") studyDeck.sort(() => Math.random() - 0.5);
+  renderCurrentStudyCard();
+}
+
+// --- RENDER & ROUTING ---
+
+// Generates the iOS-style stats widget
+function generateStudyStatsHTML() {
+  let total = studySessionStats.strong + studySessionStats.correct + studySessionStats.wrong;
+  if (total === 0) return "";
+  
+  let accuracy = Math.round(((studySessionStats.strong + studySessionStats.correct) / total) * 100);
+  let accColor = accuracy >= 80 ? '#34c759' : (accuracy >= 60 ? '#ff9f0a' : '#ff3b30');
+
+  return `
+    <div style="background: white; border: 1px solid #d1d1d6; border-radius: 12px; padding: 15px; margin: 20px auto; width: 90%; max-width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div style="font-size: 28px; font-weight: 900; color: ${accColor}; margin-bottom: 5px;">${accuracy}% <span style="font-size: 14px; font-weight: bold; color: #888; text-transform: uppercase;">Accuracy</span></div>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: #555; font-weight: bold; margin-top: 15px;">
+        <div style="text-align: center; flex: 1;"><span style="display: block; font-size: 20px; color: #007aff;">${studySessionStats.strong}</span> Strong</div>
+        <div style="text-align: center; flex: 1; border-left: 1px solid #eee; border-right: 1px solid #eee;"><span style="display: block; font-size: 20px; color: #34c759;">${studySessionStats.correct}</span> Correct</div>
+        <div style="text-align: center; flex: 1;"><span style="display: block; font-size: 20px; color: #ff3b30;">${studySessionStats.wrong}</span> Wrong</div>
+      </div>
+      <div style="margin-top: 15px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Total Session Reviews: ${total}</div>
+    </div>
+  `;
+}
+
 function renderCurrentStudyCard() {
   const container = document.getElementById("studyCardContainer");
   const progress = document.getElementById("studyProgressBar");
   const counter = document.getElementById("studyCounterDisplay");
 
-  // Update Top Bar
   progress.style.width = ((currentStudyIndex / studyDeck.length) * 100) + "%";
   counter.textContent = `Card ${Math.min(currentStudyIndex + 1, studyDeck.length)} of ${studyDeck.length}`;
 
+  // 1. END OF DECK LOOP SCREEN
   if (currentStudyIndex >= studyDeck.length) {
-    container.innerHTML = `<div style="text-align: center; color: #888;">
-      <h2 style="color: #34c759;">Session Complete!</h2>
-      <p>You have reviewed all cards in this filter.</p>
-    </div>`;
+    container.innerHTML = `
+      <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
+        <h2 style="color: #34c759; margin-bottom: 5px;">Deck Complete!</h2>
+        <p style="margin-top: 0;">You have reviewed all cards in this filter.</p>
+        ${generateStudyStatsHTML()}
+        <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+          <button onclick="keepStudying()" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Keep Studying</button>
+          ${pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
+        </div>
+      </div>`;
     return;
   }
 
+  // 2. CHUNK INTERMISSION SCREEN (Every 10 cards)
+  if (cardsReviewedInChunk >= 10) {
+    container.innerHTML = `
+      <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
+        <h2 style="color: #cc5500; font-size: 28px; margin-bottom: 5px;">Great job!</h2>
+        <p style="font-size: 16px; margin-top: 0;">Take a breath. 10 cards completed.</p>
+        ${generateStudyStatsHTML()}
+        <p style="font-size: 12px; color: #aaa; margin-top: 5px;">You have ${pendingSRSUpdates.length} pending updates in the queue.</p>
+        <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+          <button onclick="continueChunk()" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Continue Deck</button>
+          ${pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
+        </div>
+      </div>`;
+    return;
+  }
+
+
+
+  // 3. RENDER NORMAL CARD
   const cardData = studyDeck[currentStudyIndex];
   
-  // Parse content using your exact pipeline so tables/links work
   let formattedBack = formatTextWithTables(highlightText(cardData.content));
   formattedBack = applyWordOcclusionToHTML(formattedBack, cardData.point["Short Name"]);
   formattedBack = applyPhraseOcclusionToHTML(formattedBack, cardData.point["Short Name"]);
@@ -6573,7 +6634,6 @@ function renderCurrentStudyCard() {
         <div class="study-section-title">${cardData.sectionLabel}</div>
         <div style="margin-top: 20px; font-size: 12px; color: #ccc;">Tap or Press Space to Flip</div>
       </div>
-      
       <!-- BACK -->
       <div class="study-face study-face-back">
         <div class="study-back-header">
@@ -6588,25 +6648,21 @@ function renderCurrentStudyCard() {
     </div>
   `;
   
-  // Quickly check if the text is long enough to need a scroll arrow
   setTimeout(() => {
     const wrapper = document.querySelector('.study-back-content-wrapper');
     if (wrapper) checkStudyScroll(wrapper);
   }, 50);
 }
 
-// Global helper to show/hide the arrow as you scroll
 window.checkStudyScroll = function(el) {
   const arrow = document.getElementById('studyScrollArrow');
   if (!arrow) return;
-  // If there is more than 15px left to scroll, show the arrow
   if (el.scrollHeight - el.scrollTop > el.clientHeight + 15) {
     arrow.classList.add('visible');
   } else {
     arrow.classList.remove('visible');
   }
 };
-
 
 // --- CARD GRADING & NAVIGATION ---
 function rateCard(ratingClass) {
@@ -6615,19 +6671,27 @@ function rateCard(ratingClass) {
   const cardEl = document.getElementById("activeStudyCard");
   if (!cardEl) return;
 
-  // Flash the border color based on the rating
   cardEl.classList.add(ratingClass);
   
-  // Cut the wait time down to 120ms so it snaps to the next card instantly!
   setTimeout(() => {
-    // Save history for undo
     studyHistory.push(currentStudyIndex);
     
-    // Move to next card
-    currentStudyIndex++;
-    renderCurrentStudyCard();
+    // Stage the rating in the pool
+    pendingSRSUpdates.push({
+      cardId: studyDeck[currentStudyIndex].cardId,
+      rating: ratingClass 
+    });
     
-    // (Future Step: Push to SRS Staging Pool here)
+    // Update Session Stats
+    if (ratingClass === 'swipe-strong') studySessionStats.strong++;
+    else if (ratingClass === 'swipe-correct') studySessionStats.correct++;
+    else if (ratingClass === 'swipe-wrong') studySessionStats.wrong++;
+
+    updateStudySyncBadge();
+
+    currentStudyIndex++;
+    cardsReviewedInChunk++; 
+    renderCurrentStudyCard();
   }, 120);
 }
 
@@ -6636,7 +6700,22 @@ function undoLastStudyCard() {
     showToast("No cards to undo.");
     return;
   }
+  
+  // Revert UI index
   currentStudyIndex = studyHistory.pop();
+  
+  // Revert Chunk Logic
+  if (cardsReviewedInChunk > 0) cardsReviewedInChunk--;
+  
+  // Rip the mistaken rating out of the staging pool AND update stats
+  const undoneUpdate = pendingSRSUpdates.pop();
+  if (undoneUpdate) {
+    if (undoneUpdate.rating === 'swipe-strong') studySessionStats.strong--;
+    else if (undoneUpdate.rating === 'swipe-correct') studySessionStats.correct--;
+    else if (undoneUpdate.rating === 'swipe-wrong') studySessionStats.wrong--;
+  }
+  
+  updateStudySyncBadge();
   renderCurrentStudyCard();
 }
 
@@ -6718,6 +6797,8 @@ document.getElementById("studyOrderSelect").addEventListener("change", () => {
   openStudyModal(); // Rebuilds and reshuffles the deck
 });
 
+
+function syncSRSData() { showToast("Sync ready! Pending updates: " + pendingSRSUpdates.length); }
 
 
   
