@@ -1062,6 +1062,152 @@
     #phraseBasket.visible { bottom: 40px; }
 
 
+/* --- SRS STUDY MODAL STYLES --- */
+  /* --- SRS STUDY MODAL STYLES --- */
+    .study-card {
+      width: 100%;
+      height: 75vh; /* Taller card */
+      max-width: 500px;
+      min-height: 450px; /* Locks the front from collapsing */
+      max-height: 700px; /* Expands maximum height */
+      margin: 0 auto; 
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Faster flip */
+      cursor: pointer;
+      will-change: transform;
+    }
+
+    .study-card.is-flipped {
+      transform: rotateY(180deg);
+    }
+
+    .study-face {
+      position: absolute;
+      top: 0;      
+      left: 0;     
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box; 
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+      border: 1px solid #d1d1d6;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* NEW: Invisible overlay that draws the flash perfectly over the sticky header */
+    .study-face::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border-radius: 16px;
+      pointer-events: none; /* Lets you tap through it */
+      z-index: 100; /* Stays above the sticky header */
+      box-shadow: inset 0 0 0 0 transparent; 
+      transition: box-shadow 0.15s;
+    }
+
+    .study-face-front {
+      justify-content: center;
+      align-items: center;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .study-face-back {
+      transform: rotateY(180deg);
+      padding: 0;
+    }
+
+    .study-point-title {
+      font-size: 32px;
+      font-weight: 900;
+      color: #cc5500;
+      margin-bottom: 10px;
+    }
+
+    .study-section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .study-back-header {
+      background: #f8f8f8;
+      padding: 12px 15px;
+      border-bottom: 1px solid #e0e0e0;
+      font-weight: 800;
+      color: #333;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .study-back-content {
+      font-size: 16px;
+      line-height: 1.5;
+      color: #2c2c2e;
+    }
+
+    /* Scroll Indicator Arrow */
+    .study-scroll-arrow {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(227, 227, 232, 0.95);
+      color: #555;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-size: 12px;
+      font-weight: bold;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      z-index: 95;
+    }
+    .study-scroll-arrow.visible {
+      opacity: 1;
+      animation: arrowBounce 1.5s infinite;
+    }
+    @keyframes arrowBounce {
+      0%, 100% { transform: translate(-50%, 0); }
+      50% { transform: translate(-50%, 4px); }
+    }
+
+    /* Action feedback flash classes applied to the invisible overlay */
+    .study-card.swipe-correct .study-face::after { box-shadow: inset 0 0 0 6px #34c759; }
+    .study-card.swipe-strong .study-face::after { box-shadow: inset 0 0 0 6px #007aff; }
+    .study-card.swipe-wrong .study-face::after { box-shadow: inset 0 0 0 6px #ff3b30; }
+
+    @media (prefers-color-scheme: dark) {
+      #studyModal { background: #000000; }
+      .study-face { background: #1c1c1e; border-color: #38383a; }
+      .study-point-title { color: #ff9f0a; }
+      .study-section-title { color: #aaa; }
+      .study-back-header { background: #2c2c2e; border-color: #38383a; color: white; }
+      .study-back-content { color: #eee; }
+      #studyOrderSelect { background: #2c2c2e; color: white; }
+    }
+
+
+
+
+
+
 
 
 
@@ -1562,6 +1708,52 @@ display: flex; flex-direction: column;">
   </div>
 
 
+<!-- FULL SCREEN STUDY MODAL -->
+  <div id="studyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f0f5; z-index: 10019; flex-direction: column;">
+    
+    <div class="compare-header">
+      <h2>Study Session</h2>
+      <div class="compare-actions">
+        <select id="studyOrderSelect" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #333; border: none; cursor: pointer;">
+          <option value="order">⬇️ In Order</option>
+          <option value="random">🔀 Random</option>
+        </select>
+        <button onclick="closeStudyModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+      </div>
+    </div>
+
+    <!-- Progress Track -->
+    <div style="width: 100%; height: 6px; background: #e3e3e8;">
+      <div id="studyProgressBar" style="width: 0%; height: 100%; background: #34c759; transition: width 0.3s ease-out;"></div>
+    </div>
+
+    <div style="text-align: center; font-size: 13px; color: #888; padding: 10px 0 0 0; font-weight: bold;" id="studyCounterDisplay">
+      Card 0 of 0
+    </div>
+
+    <!-- The 3D Card Canvas -->
+    <div id="studyCardContainer" style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; perspective: 1000px; overflow: hidden; touch-action: none;">
+      <!-- Card injected via JS -->
+    </div>
+
+    <!-- Desktop Keyboard Hint Bar -->
+    <div style="display: flex; justify-content: space-around; padding: 15px; background: white; border-top: 1px solid #d1d1d6; font-size: 11px; font-weight: bold; color: #888;">
+      <span>← Correct</span>
+      <span>↑ Strong Correct</span>
+      <span>↓ Wrong</span>
+      <span>→ Go Back</span>
+      <span>[Space] Flip</span>
+    </div>
+  </div>
+
+  <!-- THE SRS STAGING BASKET -->
+  <div id="srsBasket" class="phraseBasket" style="position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); background: #2c2c2e; color: white; padding: 12px 20px; border-radius: 30px; display: flex; align-items: center; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10030; font-weight: 800; font-size: 14px; white-space: nowrap;">
+    <span id="srsBasketText">0 Reviews Pending</span>
+    <div style="display: flex; gap: 8px;">
+      <button style="background: #34c759; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="syncSRSData()">Save & Sync</button>
+    </div>
+  </div>
+
 
 
 
@@ -1573,7 +1765,9 @@ display: flex; flex-direction: column;">
 <div style="display: flex; align-items: center; gap: 10px;">
 <p id="resultsCounter" style="margin: 0;">Search Results: 0 of 0</p>
 <button id="addAllCompareBtn" onclick="addAllToCompare()" style="display: none; background: #e3e3e8; color: #007aff; border: none; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; cursor: pointer;">+ Compare All</button>
+
 </div>
+
           <p id="searchQueryDisplay"></p>
         </div>
         <div class="header-actions">
@@ -2964,6 +3158,8 @@ if (fullNamesGroups.length > 0) {
     resultsCounter.textContent = "Search Results: " + filteredPoints.length + " of " + points.length; 
 
 // Show "+ Compare All" button ONLY if results are manageable (40 or fewer)
+// Show buttons ONLY if results are manageable
+// Show "+ Compare All" button ONLY if results are manageable (40 or fewer)
 const addAllBtn = document.getElementById("addAllCompareBtn");
 if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
   addAllBtn.style.display = "inline-block";
@@ -3059,7 +3255,7 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
         }
       }
 
-      let html = '<table class="tcm-table"><tbody>';
+      let html = '<div class="table-scroll-wrapper" style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; margin: 12px 0;"><table class="tcm-table" style="margin: 0; min-width: 100%; box-sizing: border-box;"><tbody>';
       for (let r = 0; r < grid.length; r++) {
         html += '<tr>';
         let tag = isHeaderRow[r] ? 'th' : 'td';
@@ -3074,7 +3270,7 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
         }
         html += '</tr>';
       }
-      html += '</tbody></table>';
+      html += '</tbody></table></div>';
       return html;
     }
 
@@ -4425,7 +4621,7 @@ function handleGlobalEnter(e) {
   if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
 
   // Don't fire if a modal is open
-  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal', 'channelModal', 'sectionModal', 'occlusionModal', 'devModal'].some(id => document.getElementById(id).style.display === 'flex');
+  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal', 'channelModal', 'sectionModal', 'occlusionModal', 'devModal', 'studyModal'].some(id => document.getElementById(id).style.display === 'flex');
   if (isOverlayActive) return;
 
   // Don't fire if the bottom sheet is already open
@@ -4591,6 +4787,7 @@ document.addEventListener('keydown', (e) => {
 
     // --- NEW: The Final Escape Hatch ---
     if (document.getElementById('searchInput').value.trim().length > 0) { clearAndCloseSearch(); return; }
+    if (document.getElementById('studyModal').style.display === 'flex') { closeStudyModal(); return; }
     
     return;
   }
@@ -4624,7 +4821,7 @@ document.getElementById("lightbox-img").src = getImagePath(point);
 
   // 7. BOTTOM SHEET NAVIGATION
   const sheet = document.getElementById('bottomSheet');
-  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal'].some(id => document.getElementById(id).style.display === 'flex');
+  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal', 'studyModal'].some(id => document.getElementById(id).style.display === 'flex');
   
   if (sheet && sheet.classList.contains('open') && !isOverlayActive) {
     const sheetContent = document.getElementById('sheetContent');
@@ -4940,9 +5137,9 @@ document.addEventListener('keyup', (e) => {
       <button class="action-item" onclick="openSectionFilterModal()">
         <div class="action-icon" style="${isSectionFilterActive ? 'background:#ff3b30; color:white;' : ''}">📑</div><div class="action-label">Sections</div>
       </button>
-      <button class="action-item" onclick="toggleFlashcardMode()">
-        <div class="action-icon" id="fcIcon" style="${isFlashcardMode ? 'background:#cc5500; color:white;' : ''}">🧠</div><div class="action-label">Study</div>
-      </button>
+      <button class="action-item" onclick="openStudyModal()">
+  <div class="action-icon">🧠</div><div class="action-label">Study Deck</div>
+</button>
       <button class="action-item" onclick="openOcclusionModal()">
   <div class="action-icon" id="occIcon" style="${(lineOccState !== 'off' || wordOccState !== 'off' || phraseOccState !== 'off') ? 'background:#cc5500; color:white;' : ''}">🌫️</div><div class="action-label">Occlude</div>
 </button>
@@ -6285,6 +6482,241 @@ function processIntake() {
   });
 
 
+
+// --- SRS FLASHCARD ENGINE ---
+let studyDeck = [];
+let currentStudyIndex = 0;
+let studyHistory = []; 
+
+function openStudyModal() {
+if (!sheetContextPoints || sheetContextPoints.length === 0) return;
+  
+  studyDeck = [];
+  
+  // 1. Respect the Section Filter!
+  const sectionsToUse = (isSectionFilterActive && activeSections.length > 0) 
+    ? TCM_SECTIONS.filter(s => activeSections.includes(s.label))
+    : TCM_SECTIONS;
+
+  // 2. Build the Atomic Deck
+  sheetContextPoints.forEach(p => {
+    sectionsToUse.forEach(sec => {
+      let val = p[sec.key] || p[sec.altKey] || "";
+      if (val && String(val).trim() !== "") {
+        studyDeck.push({
+          point: p,
+          sectionLabel: sec.label,
+          content: val,
+          cardId: p["Short Name"] + "::" + sec.label
+        });
+      }
+    });
+  });
+
+  if (studyDeck.length === 0) {
+    showToast("No cards available for the current section filters.");
+    return;
+  }
+
+  // 3. Apply Ordering
+  const order = document.getElementById("studyOrderSelect").value;
+  if (order === "random") {
+    studyDeck.sort(() => Math.random() - 0.5);
+  }
+
+  currentStudyIndex = 0;
+  studyHistory = [];
+  
+  // Lock Viewport
+  viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
+  document.getElementById("studyModal").style.display = "flex";
+  
+  renderCurrentStudyCard();
+}
+
+function closeStudyModal() {
+  viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
+  document.getElementById("studyModal").style.display = "none";
+}
+
+function renderCurrentStudyCard() {
+  const container = document.getElementById("studyCardContainer");
+  const progress = document.getElementById("studyProgressBar");
+  const counter = document.getElementById("studyCounterDisplay");
+
+  // Update Top Bar
+  progress.style.width = ((currentStudyIndex / studyDeck.length) * 100) + "%";
+  counter.textContent = `Card ${Math.min(currentStudyIndex + 1, studyDeck.length)} of ${studyDeck.length}`;
+
+  if (currentStudyIndex >= studyDeck.length) {
+    container.innerHTML = `<div style="text-align: center; color: #888;">
+      <h2 style="color: #34c759;">Session Complete!</h2>
+      <p>You have reviewed all cards in this filter.</p>
+    </div>`;
+    return;
+  }
+
+  const cardData = studyDeck[currentStudyIndex];
+  
+  // Parse content using your exact pipeline so tables/links work
+  let formattedBack = formatTextWithTables(highlightText(cardData.content));
+  formattedBack = applyWordOcclusionToHTML(formattedBack, cardData.point["Short Name"]);
+  formattedBack = applyPhraseOcclusionToHTML(formattedBack, cardData.point["Short Name"]);
+  formattedBack = linkifyPoints(formattedBack);
+  formattedBack = applyLineOcclusionToHTML(formattedBack, cardData.point["Short Name"]);
+
+  container.innerHTML = `
+    <div class="study-card" id="activeStudyCard" onclick="this.classList.toggle('is-flipped')">
+      <!-- FRONT -->
+      <div class="study-face study-face-front">
+        <div class="study-point-title">${cardData.point["Short Name"]}</div>
+        <div class="study-section-title">${cardData.sectionLabel}</div>
+        <div style="margin-top: 20px; font-size: 12px; color: #ccc;">Tap or Press Space to Flip</div>
+      </div>
+      
+      <!-- BACK -->
+      <div class="study-face study-face-back">
+        <div class="study-back-header">
+          <span>${cardData.point["Short Name"]}</span>
+          <span style="color:#cc5500;">${cardData.sectionLabel}</span>
+        </div>
+        <div class="study-back-content-wrapper" onscroll="checkStudyScroll(this)" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 15px;">
+          <div class="study-back-content">${formattedBack}</div>
+        </div>
+        <div class="study-scroll-arrow" id="studyScrollArrow">▼</div>
+      </div>
+    </div>
+  `;
+  
+  // Quickly check if the text is long enough to need a scroll arrow
+  setTimeout(() => {
+    const wrapper = document.querySelector('.study-back-content-wrapper');
+    if (wrapper) checkStudyScroll(wrapper);
+  }, 50);
+}
+
+// Global helper to show/hide the arrow as you scroll
+window.checkStudyScroll = function(el) {
+  const arrow = document.getElementById('studyScrollArrow');
+  if (!arrow) return;
+  // If there is more than 15px left to scroll, show the arrow
+  if (el.scrollHeight - el.scrollTop > el.clientHeight + 15) {
+    arrow.classList.add('visible');
+  } else {
+    arrow.classList.remove('visible');
+  }
+};
+
+
+// --- CARD GRADING & NAVIGATION ---
+function rateCard(ratingClass) {
+  if (currentStudyIndex >= studyDeck.length) return;
+  
+  const cardEl = document.getElementById("activeStudyCard");
+  if (!cardEl) return;
+
+  // Flash the border color based on the rating
+  cardEl.classList.add(ratingClass);
+  
+  // Cut the wait time down to 120ms so it snaps to the next card instantly!
+  setTimeout(() => {
+    // Save history for undo
+    studyHistory.push(currentStudyIndex);
+    
+    // Move to next card
+    currentStudyIndex++;
+    renderCurrentStudyCard();
+    
+    // (Future Step: Push to SRS Staging Pool here)
+  }, 120);
+}
+
+function undoLastStudyCard() {
+  if (studyHistory.length === 0) {
+    showToast("No cards to undo.");
+    return;
+  }
+  currentStudyIndex = studyHistory.pop();
+  renderCurrentStudyCard();
+}
+
+// --- KEYBOARD CONTROLS ---
+document.addEventListener('keydown', (e) => {
+  const modal = document.getElementById("studyModal");
+  if (modal.style.display !== "flex") return;
+  
+  const cardEl = document.getElementById("activeStudyCard");
+  
+  if (e.key === " " || e.code === "Space") {
+    e.preventDefault();
+    if (cardEl) cardEl.classList.toggle("is-flipped");
+  } else if (e.key === "ArrowLeft") {
+    e.preventDefault(); rateCard('swipe-correct');
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault(); rateCard('swipe-strong');
+  } else if (e.key === "ArrowDown") {
+    e.preventDefault(); rateCard('swipe-wrong');
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault(); undoLastStudyCard();
+  }
+});
+
+// --- SWIPE PHYSICS ---
+// --- SWIPE PHYSICS ---
+let studyTouchStartX = null;
+let studyTouchStartY = null;
+
+document.getElementById("studyCardContainer").addEventListener('touchstart', (e) => {
+  if (e.touches.length > 1) return;
+  studyTouchStartX = e.changedTouches[0].screenX;
+  studyTouchStartY = e.changedTouches[0].screenY;
+}, { passive: true });
+
+document.getElementById("studyCardContainer").addEventListener('touchend', (e) => {
+  if (studyTouchStartX === null) return;
+
+  let deltaX = e.changedTouches[0].screenX - studyTouchStartX;
+  let deltaY = e.changedTouches[0].screenY - studyTouchStartY;
+  
+  const isBack = e.target.closest('.study-face-back');
+
+  // 1. Tap Threshold: If it was just a tap (<10px movement), ignore the swipe engine and let the card flip!
+  if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
+    studyTouchStartX = null;
+    studyTouchStartY = null;
+    return;
+  }
+
+  // 2. Table Protection: Prevent horizontal swiping if the user is scrolling a wide table
+  if (isBack && e.target.closest('.table-scroll-wrapper')) {
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      studyTouchStartX = null;
+      studyTouchStartY = null;
+      return; 
+    }
+  }
+
+  // 3. Grading Engine
+  if (Math.abs(deltaX) > Math.abs(deltaY)) {
+    // Horizontal Swipes (Requires 60px of movement)
+    if (deltaX < -60) rateCard('swipe-correct'); 
+    else if (deltaX > 60) undoLastStudyCard();   
+  } else {
+    // Vertical Swipes (Requires a massive 180px swipe on the back to avoid scroll collisions!)
+    const threshold = isBack ? 180 : 60; 
+    
+    if (deltaY < -threshold) rateCard('swipe-strong');  
+    else if (deltaY > threshold) rateCard('swipe-wrong'); 
+  }
+  
+  studyTouchStartX = null;
+  studyTouchStartY = null;
+}, { passive: true });
+
+// Listen for Random/Order toggle changes
+document.getElementById("studyOrderSelect").addEventListener("change", () => {
+  openStudyModal(); // Rebuilds and reshuffles the deck
+});
 
 
 
