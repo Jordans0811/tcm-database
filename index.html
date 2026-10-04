@@ -1194,7 +1194,8 @@
     .study-card.swipe-wrong .study-face::after { box-shadow: inset 0 0 0 6px #ff3b30; }
 
     @media (prefers-color-scheme: dark) {
-      #studyModal { background: #000000; }
+      #studyModal { background: #000000 !important; }
+      #studyHintBar { background: #1c1c1e !important; border-top-color: #38383a !important; }
       .study-face { background: #1c1c1e; border-color: #38383a; }
       .study-point-title { color: #ff9f0a; }
       .study-section-title { color: #aaa; }
@@ -1713,13 +1714,14 @@ display: flex; flex-direction: column;">
   
   <div class="compare-header">
     <h2>Study Session</h2>
-    <div class="compare-actions">
+  <div class="compare-actions">
       <!-- NEW SYNC BUTTON IN HEADER -->
       <button id="studySyncBtnTop" onclick="syncSRSData()" style="display: none; background: #34c759; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Sync (0)</button>
       
       <select id="studyOrderSelect" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #333; border: none; cursor: pointer;">
         <option value="order">⬇️ In Order</option>
         <option value="random">🔀 Random</option>
+        <option value="browse">👀 Browse</option> <!-- NEW BROWSE OPTION -->
       </select>
       <button onclick="closeStudyModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
     </div>
@@ -1739,8 +1741,8 @@ display: flex; flex-direction: column;">
     <!-- Card injected via JS -->
   </div>
 
-  <!-- Desktop Keyboard Hint Bar -->
-  <div style="display: flex; justify-content: space-around; padding: 15px; background: white; border-top: 1px solid #d1d1d6; font-size: 11px; font-weight: bold; color: #888;">
+ <!-- Desktop Keyboard Hint Bar -->
+  <div id="studyHintBar" style="display: flex; justify-content: space-around; padding: 15px; background: white; border-top: 1px solid #d1d1d6; font-size: 11px; font-weight: bold; color: #888;">
     <span>← Correct</span>
     <span>↑ Strong Correct</span>
     <span>↓ Wrong</span>
@@ -1816,7 +1818,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "10.04.26.v1";
+const APP_VERSION = "10.04.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -6480,11 +6482,47 @@ function processIntake() {
 let studyDeck = [];
 let currentStudyIndex = 0;
 let studyHistory = []; 
+let isSyncing = false; // Prevents data loss during cloud uploads
 
-// NEW: Chunking, Pooling, and Stat Variables
+// Chunking, Pooling, and Stat Variables
 let cardsReviewedInChunk = 0;
 let pendingSRSUpdates = [];
 let studySessionStats = { strong: 0, correct: 0, wrong: 0 };
+
+// --- SRS ALGORITHM & VIRTUAL STATE ---
+const SRS_INTERVALS = [0, 1, 3, 7, 14, 30, 60]; // Days
+
+function calculateNextSRS(currentState, rating) {
+  let box = currentState ? currentState[0] : 0;
+  let val = currentState ? currentState[1] : 3;
+
+  if (rating === 'swipe-wrong') return [0, 3]; 
+
+  if (box === 0) {
+    if (rating === 'swipe-strong') return [1, Date.now() + (SRS_INTERVALS[1] * 86400000)];
+    if (val > 1) return [0, val - 1]; 
+    return [1, Date.now() + (SRS_INTERVALS[1] * 86400000)];
+  } else {
+    if (rating === 'swipe-strong') box = Math.min(box + 2, SRS_INTERVALS.length - 1);
+    else box = Math.min(box + 1, SRS_INTERVALS.length - 1);
+    return [box, Date.now() + (SRS_INTERVALS[box] * 86400000)];
+  }
+}
+
+// Projects pending swipes onto local RAM so cards drop out instantly during a session!
+function getVirtualSRS(p, section) {
+  let srsData = {};
+  try { srsData = JSON.parse(p["SRS Data"] || "{}"); } catch(e) {}
+  let currentState = srsData[section];
+  let cardId = p["Short Name"] + "::" + section;
+  
+  pendingSRSUpdates.forEach(update => {
+    if (update.cardId === cardId) {
+      currentState = calculateNextSRS(currentState, update.rating);
+    }
+  });
+  return currentState;
+}
 
 function openStudyModal(forceCram = false) {
   if (!sheetContextPoints || sheetContextPoints.length === 0) return;
@@ -6492,48 +6530,32 @@ function openStudyModal(forceCram = false) {
   let dueDeck = [];
   let allDeck = [];
   
-  // 1. Respect the Section Filter
   const sectionsToUse = (isSectionFilterActive && activeSections.length > 0) 
     ? TCM_SECTIONS.filter(s => activeSections.includes(s.label))
     : TCM_SECTIONS;
 
   const now = Date.now();
+  const order = document.getElementById("studyOrderSelect").value;
+  const isBrowseMode = (order === "browse");
 
-  // 2. Build the Atomic Deck and check Due Dates
   sheetContextPoints.forEach(p => {
-    // Safely parse the SRS Data column
-    let srsData = {};
-    try { srsData = JSON.parse(p["SRS Data"] || "{}"); } catch(e) {}
-
     sectionsToUse.forEach(sec => {
       let val = p[sec.key] || p[sec.altKey] || "";
       if (val && String(val).trim() !== "") {
-        
         let cardObj = {
-          point: p,
-          sectionLabel: sec.label,
-          content: val,
-          cardId: p["Short Name"] + "::" + sec.label
+          point: p, sectionLabel: sec.label, content: val, cardId: p["Short Name"] + "::" + sec.label
         };
-
         allDeck.push(cardObj);
 
-        // Check if the card is due
         let isDue = true;
-        let cardSrs = srsData[sec.label];
+        let cardSrs = getVirtualSRS(p, sec.label); 
         
         if (cardSrs) {
            let box = cardSrs[0];
            let dueDateOrReps = cardSrs[1];
-           // If it has graduated (Box 1+) AND the due date is in the future, it is NOT due.
-           if (box > 0 && dueDateOrReps > now) {
-              isDue = false; 
-           }
+           if (box > 0 && dueDateOrReps > now) isDue = false; 
         }
-
-        if (isDue) {
-           dueDeck.push(cardObj);
-        }
+        if (isDue) dueDeck.push(cardObj);
       }
     });
   });
@@ -6543,9 +6565,8 @@ function openStudyModal(forceCram = false) {
     return;
   }
 
-  // 3. The "Cram Mode" Interceptor
-  // If nothing is due (but cards exist), halt and ask the user what to do.
-  if (dueDeck.length === 0 && !forceCram) {
+  // Intercept if nothing is due (Bypassed if Cramming or Browsing)
+  if (dueDeck.length === 0 && !forceCram && !isBrowseMode) {
     document.getElementById("studyCardContainer").innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: #007aff; margin-bottom: 5px;">All Caught Up!</h2>
@@ -6556,35 +6577,35 @@ function openStudyModal(forceCram = false) {
         </div>
       </div>
     `;
-    
     document.getElementById("studyProgressBar").style.width = "0%";
     document.getElementById("studyCounterDisplay").textContent = "Review Ahead";
-    
     viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
     document.getElementById("studyModal").style.display = "flex";
-    
     closeBottomSheet();
     return;
   }
 
-  // 4. Load the deck (Cram mode loads everything, normal mode loads only Due)
-  studyDeck = forceCram ? allDeck : dueDeck;
+  // Load the deck
+  studyDeck = (forceCram || isBrowseMode) ? allDeck : dueDeck;
 
-  // 5. Apply Ordering
-  const order = document.getElementById("studyOrderSelect").value;
-  if (order === "random") {
-    studyDeck.sort(() => Math.random() - 0.5);
-  }
+  if (order === "random") studyDeck.sort(() => Math.random() - 0.5);
 
-  // 6. Reset State
   currentStudyIndex = 0;
   studyHistory = [];
   cardsReviewedInChunk = 0; 
   studySessionStats = { strong: 0, correct: 0, wrong: 0 }; 
   
+  // Update Keyboard Hint Bar for Browse Mode
+  const hintBar = document.getElementById("studyHintBar");
+  if (hintBar) {
+    if (isBrowseMode) {
+      hintBar.innerHTML = `<span>← Prev Card</span><span>[Space] Flip</span><span>Next Card →</span>`;
+    } else {
+      hintBar.innerHTML = `<span>← Correct</span><span>↑ Strong Correct</span><span>↓ Wrong</span><span>→ Go Back</span><span>[Space] Flip</span>`;
+    }
+  }
+
   updateStudySyncBadge(); 
-  
-  // Lock Viewport and launch!
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
   document.getElementById("studyModal").style.display = "flex";
   
@@ -6597,7 +6618,7 @@ function closeStudyModal() {
   document.getElementById("studyModal").style.display = "none";
 }
 
-// --- NEW HELPER FUNCTIONS ---
+// --- LOCAL PERSISTENCE HELPERS ---
 function saveSRSQueueLocal() {
   localStorage.setItem('tcm_srs_pending', JSON.stringify(pendingSRSUpdates));
 }
@@ -6605,9 +6626,7 @@ function saveSRSQueueLocal() {
 function loadSRSQueueLocal() {
   try {
     const saved = localStorage.getItem('tcm_srs_pending');
-    if (saved) {
-      pendingSRSUpdates = JSON.parse(saved);
-    }
+    if (saved) pendingSRSUpdates = JSON.parse(saved);
   } catch(e) {}
 }
 
@@ -6617,14 +6636,13 @@ function updateStudySyncBadge() {
   if (pendingSRSUpdates.length > 0) {
     btn.style.display = "inline-block";
     btn.textContent = `Sync (${pendingSRSUpdates.length})`;
-    btn.style.background = "#ff3b30"; // Turns RED to warn you data is unsynced!
+    btn.style.background = "#ff3b30"; 
   } else {
     btn.style.display = "none";
-    btn.style.background = "#34c759"; // Resets to green
+    btn.style.background = "#34c759"; 
   }
 }
 
-// Call this immediately so if the app reloads, it grabs any stranded data
 loadSRSQueueLocal();
 
 function continueChunk() {
@@ -6632,17 +6650,51 @@ function continueChunk() {
   renderCurrentStudyCard();
 }
 
+// The "Keep Studying" Loop Logic
 function keepStudying() {
+  const now = Date.now();
+  let nextDeck = [];
+  
+  studyDeck.forEach(cardData => {
+     let currentState = getVirtualSRS(cardData.point, cardData.sectionLabel);
+     let isDue = true;
+     if (currentState) {
+         let box = currentState[0];
+         let dueDateOrReps = currentState[1];
+         if (box > 0 && dueDateOrReps > now) isDue = false;
+     }
+     if (isDue) nextDeck.push(cardData);
+  });
+
+  // THE NEW CRAM OPTION IN THE KEEP STUDYING SCREEN
+  if (nextDeck.length === 0) {
+    const container = document.getElementById("studyCardContainer");
+    container.innerHTML = `
+      <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
+        <h2 style="color: #007aff; margin-bottom: 5px;">All Caught Up!</h2>
+        <p style="margin-top: 0;">You have successfully finished this deck.</p>
+        ${generateStudyStatsHTML()}
+        <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+          ${pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
+          <button onclick="openStudyModal(true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
+          <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  studyDeck = nextDeck;
   cardsReviewedInChunk = 0;
   currentStudyIndex = 0;
+  studyHistory = []; 
+  
   const order = document.getElementById("studyOrderSelect").value;
   if (order === "random") studyDeck.sort(() => Math.random() - 0.5);
+  
   renderCurrentStudyCard();
 }
 
 // --- RENDER & ROUTING ---
-
-// Generates the iOS-style stats widget
 function generateStudyStatsHTML() {
   let total = studySessionStats.strong + studySessionStats.correct + studySessionStats.wrong;
   if (total === 0) return "";
@@ -6667,27 +6719,33 @@ function renderCurrentStudyCard() {
   const container = document.getElementById("studyCardContainer");
   const progress = document.getElementById("studyProgressBar");
   const counter = document.getElementById("studyCounterDisplay");
+  const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
 
   progress.style.width = ((currentStudyIndex / studyDeck.length) * 100) + "%";
   counter.textContent = `Card ${Math.min(currentStudyIndex + 1, studyDeck.length)} of ${studyDeck.length}`;
 
-  // 1. END OF DECK LOOP SCREEN
+// 1. END OF DECK SCREEN
   if (currentStudyIndex >= studyDeck.length) {
     container.innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
-        <h2 style="color: #34c759; margin-bottom: 5px;">Deck Complete!</h2>
-        <p style="margin-top: 0;">You have reviewed all cards in this filter.</p>
-        ${generateStudyStatsHTML()}
+        <h2 style="color: ${isBrowseMode ? '#007aff' : '#34c759'}; margin-bottom: 5px;">${isBrowseMode ? 'End of Deck' : 'Deck Complete!'}</h2>
+        <p style="margin-top: 0;">You have reviewed all cards in this loop.</p>
+        ${!isBrowseMode ? generateStudyStatsHTML() : ''}
         <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
-          <button onclick="keepStudying()" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Keep Studying</button>
-          ${pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
+          
+          <!-- NEW: Browse Again Button -->
+          ${isBrowseMode ? `<button onclick="currentStudyIndex = 0; renderCurrentStudyCard();" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Browse Again</button>` : ''}
+          
+          ${!isBrowseMode ? `<button onclick="keepStudying()" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Keep Studying</button>` : ''}
+          ${!isBrowseMode && pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
+          <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
         </div>
       </div>`;
     return;
   }
 
-  // 2. CHUNK INTERMISSION SCREEN (Every 10 cards)
-  if (cardsReviewedInChunk >= 10) {
+  // 2. CHUNK INTERMISSION SCREEN (Disabled in Browse Mode)
+  if (cardsReviewedInChunk >= 10 && !isBrowseMode) {
     container.innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: #cc5500; font-size: 28px; margin-bottom: 5px;">Great job!</h2>
@@ -6701,8 +6759,6 @@ function renderCurrentStudyCard() {
       </div>`;
     return;
   }
-
-
 
   // 3. RENDER NORMAL CARD
   const cardData = studyDeck[currentStudyIndex];
@@ -6751,8 +6807,24 @@ window.checkStudyScroll = function(el) {
   }
 };
 
+// --- BROWSE MODE NAVIGATION ---
+function nextBrowseCard() {
+  if (currentStudyIndex < studyDeck.length) {
+    currentStudyIndex++;
+    renderCurrentStudyCard();
+  }
+}
+
+function prevBrowseCard() {
+  if (currentStudyIndex > 0) {
+    currentStudyIndex--;
+    renderCurrentStudyCard();
+  }
+}
+
 // --- CARD GRADING & NAVIGATION ---
 function rateCard(ratingClass) {
+  if (isSyncing) { showToast("Syncing... please wait."); return; }
   if (currentStudyIndex >= studyDeck.length) return;
   
   const cardEl = document.getElementById("activeStudyCard");
@@ -6763,15 +6835,13 @@ function rateCard(ratingClass) {
   setTimeout(() => {
     studyHistory.push(currentStudyIndex);
     
-    // Stage the rating in the pool
     pendingSRSUpdates.push({
       cardId: studyDeck[currentStudyIndex].cardId,
       rating: ratingClass 
     });
     
-    saveSRSQueueLocal(); // <--- NEW: SAVES INSTANTLY TO LOCAL STORAGE
+    saveSRSQueueLocal(); 
     
-    // Update Session Stats
     if (ratingClass === 'swipe-strong') studySessionStats.strong++;
     else if (ratingClass === 'swipe-correct') studySessionStats.correct++;
     else if (ratingClass === 'swipe-wrong') studySessionStats.wrong++;
@@ -6785,21 +6855,17 @@ function rateCard(ratingClass) {
 }
 
 function undoLastStudyCard() {
+  if (isSyncing) { showToast("Syncing... please wait."); return; }
   if (studyHistory.length === 0) {
     showToast("No cards to undo.");
     return;
   }
   
-  // Revert UI index
   currentStudyIndex = studyHistory.pop();
-  
-  // Revert Chunk Logic
   if (cardsReviewedInChunk > 0) cardsReviewedInChunk--;
   
-  // Rip the mistaken rating out of the staging pool AND update stats
   const undoneUpdate = pendingSRSUpdates.pop();
-  
-  saveSRSQueueLocal(); // <--- NEW: REMOVES THE MISTAKE FROM LOCAL STORAGE
+  saveSRSQueueLocal(); 
   
   if (undoneUpdate) {
     if (undoneUpdate.rating === 'swipe-strong') studySessionStats.strong--;
@@ -6811,58 +6877,20 @@ function undoLastStudyCard() {
   renderCurrentStudyCard();
 }
 
-
-// --- SRS ALGORITHM & SYNC ENGINE ---
-const SRS_INTERVALS = [0, 1, 3, 7, 14, 30, 60]; // Days
-
-function calculateNextSRS(currentState, rating) {
-  // currentState format: [Box Number, Due Date Epoch OR Corrects Remaining]
-  // Box 0: Value is 'corrects remaining' (starts at 3)
-  // Box 1+: Value is 'due date epoch'
-  let box = currentState ? currentState[0] : 0;
-  let val = currentState ? currentState[1] : 3;
-
-  // The Drop: Instantly falls back to Box 0, requiring 3 correct hits
-  if (rating === 'swipe-wrong') {
-    return [0, 3]; 
-  }
-
-  if (box === 0) {
-    if (rating === 'swipe-strong') {
-      // Instant Graduation
-      return [1, Date.now() + (SRS_INTERVALS[1] * 86400000)];
-    }
-    // Normal correct
-    if (val > 1) {
-      return [0, val - 1]; // Still Box 0, but closer to graduating
-    } else {
-      return [1, Date.now() + (SRS_INTERVALS[1] * 86400000)]; // Graduated!
-    }
-  } else {
-    // Already Graduated (Box 1+)
-    if (rating === 'swipe-strong') {
-      box = Math.min(box + 2, SRS_INTERVALS.length - 1); // Skip a box
-    } else {
-      box = Math.min(box + 1, SRS_INTERVALS.length - 1); // Move up normally
-    }
-    return [box, Date.now() + (SRS_INTERVALS[box] * 86400000)];
-  }
-}
-
+// --- CLOUD SYNC ---
 async function syncSRSData() {
-  if (pendingSRSUpdates.length === 0) return;
+  if (pendingSRSUpdates.length === 0 || isSyncing) return;
   if (!navigator.onLine) {
     showToast("Offline. Cannot sync right now.");
     return;
   }
 
+  isSyncing = true; // LOCK THE ENGINE
   const btn = document.getElementById("studySyncBtnTop");
   const origText = btn.textContent;
   btn.textContent = "Syncing...";
   btn.disabled = true;
 
-  // 1. Group multiple reviews of the SAME card into the final state,
-  // and safely merge them with the existing point data.
   let pointsToSave = {}; 
 
   pendingSRSUpdates.forEach(update => {
@@ -6870,32 +6898,23 @@ async function syncSRSData() {
     let p = points.find(x => x["Short Name"] === pointId);
     if (!p) return;
 
-    // Safely parse existing SRS data so we don't wipe out other sections!
     let srsData = {};
     try { srsData = JSON.parse(p["SRS Data"] || "{}"); } catch(e) {}
 
-    // Calculate new state
     srsData[section] = calculateNextSRS(srsData[section], update.rating);
-
-    // Apply back to the local point in RAM
     p["SRS Data"] = JSON.stringify(srsData);
-    
-    // Track it for the Cloud Batch
     pointsToSave[pointId] = p["SRS Data"];
   });
 
-  // 2. Save locally first (so the UI is instantly updated offline)
   for (let pointId in pointsToSave) {
     let p = points.find(x => x["Short Name"] === pointId);
     await saveSinglePointToVault(p);
   }
 
-  // 3. Prepare Batch Cloud Payload
   let cloudPayload = Object.keys(pointsToSave).map(id => {
     return { id: id, field: "SRS Data", value: pointsToSave[id] };
   });
 
-  // 4. Send the massive array to Google Sheets in ONE shot
   try {
     await fetch(writeUrl, {
       method: "POST",
@@ -6905,14 +6924,18 @@ async function syncSRSData() {
 
     showToast(`✅ Successfully synced ${pendingSRSUpdates.length} reviews.`);
     pendingSRSUpdates = [];
-    localStorage.removeItem('tcm_srs_pending'); // <--- NEW: WIPES THE BACKUP AFTER
+    localStorage.removeItem('tcm_srs_pending'); 
     updateStudySyncBadge();
+
+    const catchupBtn = document.querySelector("#studyCardContainer button[onclick='syncSRSData()']");
+    if (catchupBtn) catchupBtn.style.display = "none";
 
   } catch (err) {
     showToast("⚠️ Cloud Sync failed. Data saved locally.");
   } finally {
     btn.textContent = origText;
     btn.disabled = false;
+    isSyncing = false; // UNLOCK THE ENGINE
   }
 }
 
@@ -6922,22 +6945,22 @@ document.addEventListener('keydown', (e) => {
   if (modal.style.display !== "flex") return;
   
   const cardEl = document.getElementById("activeStudyCard");
+  const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
   
   if (e.key === " " || e.code === "Space") {
     e.preventDefault();
     if (cardEl) cardEl.classList.toggle("is-flipped");
-  } else if (e.key === "ArrowLeft") {
-    e.preventDefault(); rateCard('swipe-correct');
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault(); rateCard('swipe-strong');
-  } else if (e.key === "ArrowDown") {
-    e.preventDefault(); rateCard('swipe-wrong');
-  } else if (e.key === "ArrowRight") {
-    e.preventDefault(); undoLastStudyCard();
+  } else if (isBrowseMode) {
+    if (e.key === "ArrowRight") { e.preventDefault(); nextBrowseCard(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); prevBrowseCard(); }
+  } else {
+    if (e.key === "ArrowLeft") { e.preventDefault(); rateCard('swipe-correct'); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); rateCard('swipe-strong'); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); rateCard('swipe-wrong'); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); undoLastStudyCard(); }
   }
 });
 
-// --- SWIPE PHYSICS ---
 // --- SWIPE PHYSICS ---
 let studyTouchStartX = null;
 let studyTouchStartY = null;
@@ -6955,15 +6978,14 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
   let deltaY = e.changedTouches[0].screenY - studyTouchStartY;
   
   const isBack = e.target.closest('.study-face-back');
+  const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
 
-  // 1. Tap Threshold: If it was just a tap (<10px movement), ignore the swipe engine and let the card flip!
   if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
     studyTouchStartX = null;
     studyTouchStartY = null;
     return;
   }
 
-  // 2. Table Protection: Prevent horizontal swiping if the user is scrolling a wide table
   if (isBack && e.target.closest('.table-scroll-wrapper')) {
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
       studyTouchStartX = null;
@@ -6972,15 +6994,15 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
     }
   }
 
-  // 3. Grading Engine
   if (Math.abs(deltaX) > Math.abs(deltaY)) {
-    // Horizontal Swipes (Requires 60px of movement)
-    if (deltaX < -60) rateCard('swipe-correct'); 
-    else if (deltaX > 60) undoLastStudyCard();   
-  } else {
-    // Vertical Swipes (Requires a massive 180px swipe on the back to avoid scroll collisions!)
+    if (deltaX < -60) {
+      if (isBrowseMode) nextBrowseCard(); else rateCard('swipe-correct');
+    } else if (deltaX > 60) {
+      if (isBrowseMode) prevBrowseCard(); else undoLastStudyCard();
+    }
+  } else if (!isBrowseMode) {
+    // Vertical Swipes disabled entirely in Browse Mode
     const threshold = isBack ? 180 : 60; 
-    
     if (deltaY < -threshold) rateCard('swipe-strong');  
     else if (deltaY > threshold) rateCard('swipe-wrong'); 
   }
@@ -6989,11 +7011,9 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
   studyTouchStartY = null;
 }, { passive: true });
 
-// Listen for Random/Order toggle changes
 document.getElementById("studyOrderSelect").addEventListener("change", () => {
-  openStudyModal(); // Rebuilds and reshuffles the deck
+  openStudyModal(); 
 });
-
 
 
 
