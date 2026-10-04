@@ -1816,7 +1816,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "09.26.26.v1";
+const APP_VERSION = "10.04.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2165,7 +2165,7 @@ const TCM_SECTIONS = [
   { key: "Innervation", label: "Innervation" },
   { key: "Artery", label: "Artery" },
   { key: "Jing Jin", label: "Jing Jin" },
-  { key: "SS combo", label: "SS combo" },
+  { key: "SS Combo", label: "SS Combo" },
   { key: "HTJJ", label: "HTJJ" },
   { key: "Primary Sx", label: "Primary Sx" },
   { key: "Secondary Sx", label: "Secondary Sx" },
@@ -6486,40 +6486,109 @@ let cardsReviewedInChunk = 0;
 let pendingSRSUpdates = [];
 let studySessionStats = { strong: 0, correct: 0, wrong: 0 };
 
-function openStudyModal() {
-if (!sheetContextPoints || sheetContextPoints.length === 0) return;
+function openStudyModal(forceCram = false) {
+  if (!sheetContextPoints || sheetContextPoints.length === 0) return;
   
-  studyDeck = [];
+  let dueDeck = [];
+  let allDeck = [];
   
+  // 1. Respect the Section Filter
   const sectionsToUse = (isSectionFilterActive && activeSections.length > 0) 
     ? TCM_SECTIONS.filter(s => activeSections.includes(s.label))
     : TCM_SECTIONS;
 
+  const now = Date.now();
+
+  // 2. Build the Atomic Deck and check Due Dates
   sheetContextPoints.forEach(p => {
+    // Safely parse the SRS Data column
+    let srsData = {};
+    try { srsData = JSON.parse(p["SRS Data"] || "{}"); } catch(e) {}
+
     sectionsToUse.forEach(sec => {
       let val = p[sec.key] || p[sec.altKey] || "";
       if (val && String(val).trim() !== "") {
-        studyDeck.push({ point: p, sectionLabel: sec.label, content: val, cardId: p["Short Name"] + "::" + sec.label });
+        
+        let cardObj = {
+          point: p,
+          sectionLabel: sec.label,
+          content: val,
+          cardId: p["Short Name"] + "::" + sec.label
+        };
+
+        allDeck.push(cardObj);
+
+        // Check if the card is due
+        let isDue = true;
+        let cardSrs = srsData[sec.label];
+        
+        if (cardSrs) {
+           let box = cardSrs[0];
+           let dueDateOrReps = cardSrs[1];
+           // If it has graduated (Box 1+) AND the due date is in the future, it is NOT due.
+           if (box > 0 && dueDateOrReps > now) {
+              isDue = false; 
+           }
+        }
+
+        if (isDue) {
+           dueDeck.push(cardObj);
+        }
       }
     });
   });
 
-  if (studyDeck.length === 0) {
+  if (allDeck.length === 0) {
     showToast("No cards available for the current section filters.");
     return;
   }
 
-  const order = document.getElementById("studyOrderSelect").value;
-  if (order === "random") studyDeck.sort(() => Math.random() - 0.5);
+  // 3. The "Cram Mode" Interceptor
+  // If nothing is due (but cards exist), halt and ask the user what to do.
+  if (dueDeck.length === 0 && !forceCram) {
+    document.getElementById("studyCardContainer").innerHTML = `
+      <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
+        <h2 style="color: #007aff; margin-bottom: 5px;">All Caught Up!</h2>
+        <p style="margin-top: 0; font-size: 16px;">0 cards due out of ${allDeck.length} selected.</p>
+        <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+          <button onclick="openStudyModal(true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
+          <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
+        </div>
+      </div>
+    `;
+    
+    document.getElementById("studyProgressBar").style.width = "0%";
+    document.getElementById("studyCounterDisplay").textContent = "Review Ahead";
+    
+    viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
+    document.getElementById("studyModal").style.display = "flex";
+    
+    closeBottomSheet();
+    return;
+  }
 
+  // 4. Load the deck (Cram mode loads everything, normal mode loads only Due)
+  studyDeck = forceCram ? allDeck : dueDeck;
+
+  // 5. Apply Ordering
+  const order = document.getElementById("studyOrderSelect").value;
+  if (order === "random") {
+    studyDeck.sort(() => Math.random() - 0.5);
+  }
+
+  // 6. Reset State
   currentStudyIndex = 0;
   studyHistory = [];
-  studySessionStats = { strong: 0, correct: 0, wrong: 0 };
-  cardsReviewedInChunk = 0; // NEW: Reset the chunk counter
+  cardsReviewedInChunk = 0; 
+  studySessionStats = { strong: 0, correct: 0, wrong: 0 }; 
   
+  updateStudySyncBadge(); 
+  
+  // Lock Viewport and launch!
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
   document.getElementById("studyModal").style.display = "flex";
   
+  closeBottomSheet();
   renderCurrentStudyCard();
 }
 
@@ -6529,16 +6598,34 @@ function closeStudyModal() {
 }
 
 // --- NEW HELPER FUNCTIONS ---
+function saveSRSQueueLocal() {
+  localStorage.setItem('tcm_srs_pending', JSON.stringify(pendingSRSUpdates));
+}
+
+function loadSRSQueueLocal() {
+  try {
+    const saved = localStorage.getItem('tcm_srs_pending');
+    if (saved) {
+      pendingSRSUpdates = JSON.parse(saved);
+    }
+  } catch(e) {}
+}
+
 function updateStudySyncBadge() {
   const btn = document.getElementById("studySyncBtnTop");
   if (!btn) return;
   if (pendingSRSUpdates.length > 0) {
     btn.style.display = "inline-block";
     btn.textContent = `Sync (${pendingSRSUpdates.length})`;
+    btn.style.background = "#ff3b30"; // Turns RED to warn you data is unsynced!
   } else {
     btn.style.display = "none";
+    btn.style.background = "#34c759"; // Resets to green
   }
 }
+
+// Call this immediately so if the app reloads, it grabs any stranded data
+loadSRSQueueLocal();
 
 function continueChunk() {
   cardsReviewedInChunk = 0;
@@ -6682,6 +6769,8 @@ function rateCard(ratingClass) {
       rating: ratingClass 
     });
     
+    saveSRSQueueLocal(); // <--- NEW: SAVES INSTANTLY TO LOCAL STORAGE
+    
     // Update Session Stats
     if (ratingClass === 'swipe-strong') studySessionStats.strong++;
     else if (ratingClass === 'swipe-correct') studySessionStats.correct++;
@@ -6709,6 +6798,9 @@ function undoLastStudyCard() {
   
   // Rip the mistaken rating out of the staging pool AND update stats
   const undoneUpdate = pendingSRSUpdates.pop();
+  
+  saveSRSQueueLocal(); // <--- NEW: REMOVES THE MISTAKE FROM LOCAL STORAGE
+  
   if (undoneUpdate) {
     if (undoneUpdate.rating === 'swipe-strong') studySessionStats.strong--;
     else if (undoneUpdate.rating === 'swipe-correct') studySessionStats.correct--;
@@ -6717,6 +6809,111 @@ function undoLastStudyCard() {
   
   updateStudySyncBadge();
   renderCurrentStudyCard();
+}
+
+
+// --- SRS ALGORITHM & SYNC ENGINE ---
+const SRS_INTERVALS = [0, 1, 3, 7, 14, 30, 60]; // Days
+
+function calculateNextSRS(currentState, rating) {
+  // currentState format: [Box Number, Due Date Epoch OR Corrects Remaining]
+  // Box 0: Value is 'corrects remaining' (starts at 3)
+  // Box 1+: Value is 'due date epoch'
+  let box = currentState ? currentState[0] : 0;
+  let val = currentState ? currentState[1] : 3;
+
+  // The Drop: Instantly falls back to Box 0, requiring 3 correct hits
+  if (rating === 'swipe-wrong') {
+    return [0, 3]; 
+  }
+
+  if (box === 0) {
+    if (rating === 'swipe-strong') {
+      // Instant Graduation
+      return [1, Date.now() + (SRS_INTERVALS[1] * 86400000)];
+    }
+    // Normal correct
+    if (val > 1) {
+      return [0, val - 1]; // Still Box 0, but closer to graduating
+    } else {
+      return [1, Date.now() + (SRS_INTERVALS[1] * 86400000)]; // Graduated!
+    }
+  } else {
+    // Already Graduated (Box 1+)
+    if (rating === 'swipe-strong') {
+      box = Math.min(box + 2, SRS_INTERVALS.length - 1); // Skip a box
+    } else {
+      box = Math.min(box + 1, SRS_INTERVALS.length - 1); // Move up normally
+    }
+    return [box, Date.now() + (SRS_INTERVALS[box] * 86400000)];
+  }
+}
+
+async function syncSRSData() {
+  if (pendingSRSUpdates.length === 0) return;
+  if (!navigator.onLine) {
+    showToast("Offline. Cannot sync right now.");
+    return;
+  }
+
+  const btn = document.getElementById("studySyncBtnTop");
+  const origText = btn.textContent;
+  btn.textContent = "Syncing...";
+  btn.disabled = true;
+
+  // 1. Group multiple reviews of the SAME card into the final state,
+  // and safely merge them with the existing point data.
+  let pointsToSave = {}; 
+
+  pendingSRSUpdates.forEach(update => {
+    let [pointId, section] = update.cardId.split("::");
+    let p = points.find(x => x["Short Name"] === pointId);
+    if (!p) return;
+
+    // Safely parse existing SRS data so we don't wipe out other sections!
+    let srsData = {};
+    try { srsData = JSON.parse(p["SRS Data"] || "{}"); } catch(e) {}
+
+    // Calculate new state
+    srsData[section] = calculateNextSRS(srsData[section], update.rating);
+
+    // Apply back to the local point in RAM
+    p["SRS Data"] = JSON.stringify(srsData);
+    
+    // Track it for the Cloud Batch
+    pointsToSave[pointId] = p["SRS Data"];
+  });
+
+  // 2. Save locally first (so the UI is instantly updated offline)
+  for (let pointId in pointsToSave) {
+    let p = points.find(x => x["Short Name"] === pointId);
+    await saveSinglePointToVault(p);
+  }
+
+  // 3. Prepare Batch Cloud Payload
+  let cloudPayload = Object.keys(pointsToSave).map(id => {
+    return { id: id, field: "SRS Data", value: pointsToSave[id] };
+  });
+
+  // 4. Send the massive array to Google Sheets in ONE shot
+  try {
+    await fetch(writeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "batchUpdate", updates: cloudPayload })
+    });
+
+    showToast(`✅ Successfully synced ${pendingSRSUpdates.length} reviews.`);
+    pendingSRSUpdates = [];
+    localStorage.removeItem('tcm_srs_pending'); // <--- NEW: WIPES THE BACKUP AFTER
+    updateStudySyncBadge();
+
+  } catch (err) {
+    showToast("⚠️ Cloud Sync failed. Data saved locally.");
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
 }
 
 // --- KEYBOARD CONTROLS ---
@@ -6798,7 +6995,7 @@ document.getElementById("studyOrderSelect").addEventListener("change", () => {
 });
 
 
-function syncSRSData() { showToast("Sync ready! Pending updates: " + pendingSRSUpdates.length); }
+
 
 
   
