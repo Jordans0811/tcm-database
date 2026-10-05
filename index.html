@@ -1714,13 +1714,13 @@ display: flex; flex-direction: column;">
 
 <!-- FLASHCARD SETTINGS MODAL -->
 <div id="studySettingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;">
-  <div class="modal-content" style="max-height: 75vh;">
+  <div class="modal-content" style="max-height: 85vh; overflow-y: auto;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
       <h3 class="modal-title" style="margin-bottom: 0;">Study Settings</h3>
       <button onclick="closeStudySettingsModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
     </div>
 
-    <div style="margin-bottom: 20px;">
+    <div style="margin-bottom: 15px;">
       <label style="font-weight: 800; color: #888; font-size: 12px; text-transform: uppercase;">Cards Per Chunk:</label>
       <select id="chunkSizeSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; margin-top: 5px; font-weight: bold; background: #f8f8f8; color: #333;">
         <option value="10" selected>10 Cards</option>
@@ -1730,12 +1730,20 @@ display: flex; flex-direction: column;">
       </select>
     </div>
 
-    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 12px;">
-      <!-- Primary Blue Button for Current Context -->
-      <button id="btnStudyCurrent" class="save-btn" style="width: 100%; background: #007aff; box-shadow: 0 4px 10px rgba(0,122,255,0.3);" onclick="startStudyFromSettings(false)">Study Current Set (0 Due)</button>
+    <!-- NEW: Image First Toggle -->
+    <div style="margin-bottom: 20px;">
+      <label style="display: flex; align-items: center; padding: 12px; border-radius: 8px; border: 1px solid #d1d1d6; font-weight: bold; font-size: 14px; cursor: pointer; color: inherit;">
+        <input type="checkbox" id="imageFirstToggle" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
+        🖼️ Image-First Mode (Hides Name)
+      </label>
+    </div>
+
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 10px;">
+      <!-- NEW: Single Card Button -->
+      <button id="btnStudySingle" class="save-btn" style="width: 100%; background: #af52de; box-shadow: 0 4px 10px rgba(175,82,222,0.3);" onclick="startStudyFromSettings('single')">Study This Point (0 Due)</button>
       
-      <!-- Secondary Green Button for Global Review -->
-      <button id="btnStudyGlobal" class="save-btn" style="width: 100%; background: #34c759; box-shadow: 0 4px 10px rgba(52,199,89,0.3);" onclick="startStudyFromSettings(true)">Study Global Deck (0 Due)</button>
+      <button id="btnStudyCurrent" class="save-btn" style="width: 100%; background: #007aff; box-shadow: 0 4px 10px rgba(0,122,255,0.3);" onclick="startStudyFromSettings('current')">Study Current Set (0 Due)</button>
+      <button id="btnStudyGlobal" class="save-btn" style="width: 100%; background: #34c759; box-shadow: 0 4px 10px rgba(52,199,89,0.3);" onclick="startStudyFromSettings('global')">Study Global Deck (0 Due)</button>
     </div>
   </div>
 </div>
@@ -1850,7 +1858,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "10.05.26.v1";
+const APP_VERSION = "10.05.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -6517,9 +6525,10 @@ let studyHistory = [];
 let isSyncing = false; 
 
 // NEW: Advanced Engine Flags
-let isGlobalStudyMode = false;
+let studyDeckScope = 'current'; // 'current', 'global', or 'single'
 let isCramMode = false; 
-let studyChunkSize = 20;
+let isImageFirstMode = false;
+let studyChunkSize = 10;
 
 let cardsReviewedInChunk = 0;
 let pendingSRSUpdates = [];
@@ -6561,9 +6570,14 @@ function getVirtualSRS(p, section) {
 
 // --- NEW: SETTINGS MODAL LOGIC ---
 function openStudySettingsModal() {
+  // --- NEW: Sync the UI to remember your previous choices ---
+  document.getElementById('chunkSizeSelect').value = studyChunkSize;
+  document.getElementById('imageFirstToggle').checked = isImageFirstMode;
+  
   const now = Date.now();
   let globalDueCount = 0;
   let currentDueCount = 0;
+  let singleDueCount = 0;
 
   // 1. Calculate Global Due Count
   points.forEach(p => {
@@ -6577,23 +6591,30 @@ function openStudySettingsModal() {
     });
   });
 
-  // 2. Calculate Current Drawer Set Due Count
+  // 2. Calculate Current Drawer & Single Point Due Count
   if (sheetContextPoints && sheetContextPoints.length > 0) {
     const sectionsToUse = (isSectionFilterActive && activeSections.length > 0) 
       ? TCM_SECTIONS.filter(s => activeSections.includes(s.label)) : TCM_SECTIONS;
+      
+    const singlePointId = sheetContextPoints[currentSheetIndex]["Short Name"];
 
     sheetContextPoints.forEach(p => {
       sectionsToUse.forEach(sec => {
         let val = p[sec.key] || p[sec.altKey] || "";
         if (val && String(val).trim() !== "") {
           let cardSrs = getVirtualSRS(p, sec.label);
-          if (!cardSrs || cardSrs[0] === 0 || cardSrs[1] <= now) currentDueCount++;
+          let isDue = (!cardSrs || cardSrs[0] === 0 || cardSrs[1] <= now);
+          
+          if (isDue) {
+            currentDueCount++;
+            if (p["Short Name"] === singlePointId) singleDueCount++;
+          }
         }
       });
     });
   }
 
-  // Inject text into buttons
+  document.getElementById('btnStudySingle').textContent = `Study This Point (${singleDueCount} Due)`;
   document.getElementById('btnStudyCurrent').textContent = `Study Current Set (${currentDueCount} Due)`;
   document.getElementById('btnStudyGlobal').textContent = `Study Global Deck (${globalDueCount} Due)`;
   
@@ -6604,12 +6625,14 @@ function closeStudySettingsModal() {
   document.getElementById('studySettingsModal').style.display = 'none';
 }
 
-function startStudyFromSettings(isGlobal) {
+function startStudyFromSettings(scope) {
   studyChunkSize = parseInt(document.getElementById('chunkSizeSelect').value, 10);
+  isImageFirstMode = document.getElementById('imageFirstToggle').checked; // Locks in the image setting
+  studyDeckScope = scope; // 'single', 'current', or 'global'
   closeStudySettingsModal();
   
-  if (isGlobal) {
-    openGlobalReview();
+  if (scope === 'global') {
+    openGlobalReview(false);
   } else {
     openStudyModal(false); 
   }
@@ -6617,8 +6640,8 @@ function startStudyFromSettings(isGlobal) {
 
 // --- GLOBAL & CURRENT DECK BUILDERS ---
 function openGlobalReview(forceCram = false) {
-  isGlobalStudyMode = true; 
-  isCramMode = forceCram; // Remembers your cram state!
+  studyDeckScope = 'global'; 
+  isCramMode = forceCram;
   let dueDeck = [];
   let allDeck = [];
   const now = Date.now();
@@ -6680,7 +6703,7 @@ function openGlobalReview(forceCram = false) {
 }
 
 function openStudyModal(forceCram = false) {
-  isGlobalStudyMode = false;
+  if (studyDeckScope === 'global') studyDeckScope = 'current'; // Failsafe
   isCramMode = forceCram;
   if (!sheetContextPoints || sheetContextPoints.length === 0) return;
   
@@ -6694,7 +6717,10 @@ function openStudyModal(forceCram = false) {
   const order = document.getElementById("studyOrderSelect").value;
   const isBrowseMode = (order === "browse");
 
-  sheetContextPoints.forEach(p => {
+  // Filters to a single point if "Study This Point" was clicked!
+  let sourcePoints = (studyDeckScope === 'single') ? [sheetContextPoints[currentSheetIndex]] : sheetContextPoints;
+
+  sourcePoints.forEach(p => {
     sectionsToUse.forEach(sec => {
       let val = p[sec.key] || p[sec.altKey] || "";
       if (val && String(val).trim() !== "") {
@@ -6823,7 +6849,7 @@ function keepStudying() {
         ${generateStudyStatsHTML()}
         <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           ${pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
-          <button onclick="${isGlobalStudyMode ? 'openGlobalReview(true)' : 'openStudyModal(true)'}" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
+          <button onclick="${studyDeckScope === 'global' ? 'openGlobalReview(true)' : 'openStudyModal(true)'}" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
           <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
         </div>
       </div>`;
@@ -6914,20 +6940,19 @@ function renderCurrentStudyCard() {
   formattedBack = linkifyPoints(formattedBack);
   formattedBack = applyLineOcclusionToHTML(formattedBack, cardData.point["Short Name"]);
 
-  // --- NEW: FULL NAME LOGIC ---
   let fullName = cardData.point["Full Name"] || cardData.point[" Full Name"] || "";
 
-  // --- NEW: DYNAMIC IMAGE REVEAL LOGIC ---
+  // --- NEW: DYNAMIC IMAGE REVEAL & FRONT FACE LOGIC ---
   let imageId = cardData.point["Image ID"] ? String(cardData.point["Image ID"]).trim() : "";
+  let hasValidImage = (imageId && !imageId.toLowerCase().includes("yinyangph"));
   let imageHtml = "";
   
-  // Only build the image block if an ID exists AND it isn't the generic placeholder
-  if (imageId && imageId.toLowerCase() !== "yinyangph") {
+  if (hasValidImage) {
     let imgSrc = getImagePath(cardData.point);
     let safeName = cardData.point["Short Name"].replace(/'/g, "\\'");
     let safeImgId = imageId.replace(/'/g, "\\'");
     
-    // We use rgba(0,122,255,0.1) so the button looks native in both Light and Dark modes!
+    // The Back-Face Reveal Button
     imageHtml = `
       <div style="margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px; text-align: center;">
         <button onclick="event.stopPropagation(); document.getElementById('studyCardImg').style.display='block'; this.style.display='none'; setTimeout(() => checkStudyScroll(document.querySelector('.study-back-content-wrapper')), 100);" style="background: rgba(0, 122, 255, 0.1); color: #007aff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer;">🖼️ Reveal Image</button>
@@ -6936,14 +6961,28 @@ function renderCurrentStudyCard() {
     `;
   }
 
+  // Generate the dynamic front face!
+  let frontHtml = "";
+  if (isImageFirstMode && hasValidImage) {
+    let imgSrc = getImagePath(cardData.point);
+    frontHtml = `
+      <img src="${imgSrc}" style="max-width: 100%; max-height: 220px; border-radius: 8px; border: 1px solid #d1d1d6; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); object-fit: contain; pointer-events: none;">
+      <div class="study-section-title">${cardData.sectionLabel}</div>
+      <div style="margin-top: 15px; font-size: 14px; color: #888; font-weight: 600;">Tap or Press Space to Reveal</div>
+    `;
+  } else {
+    frontHtml = `
+      <div class="study-point-title">${cardData.point["Short Name"]}</div>
+      <div class="study-section-title">${cardData.sectionLabel}</div>
+      <div style="margin-top: 20px; font-size: 16px; color: #888; font-weight: 600;">${highlightText(fullName)}</div>
+    `;
+  }
+
   container.innerHTML = `
     <div class="study-card" id="activeStudyCard" onclick="this.classList.toggle('is-flipped')">
       <!-- FRONT -->
       <div class="study-face study-face-front">
-        <div class="study-point-title">${cardData.point["Short Name"]}</div>
-        <div class="study-section-title">${cardData.sectionLabel}</div>
-        <!-- Replaced the flip hint with the Full Name -->
-        <div style="margin-top: 20px; font-size: 16px; color: #888; font-weight: 600;">${highlightText(fullName)}</div>
+        ${frontHtml}
       </div>
       <!-- BACK -->
       <div class="study-face study-face-back">
@@ -7180,7 +7219,7 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
 }, { passive: true });
 
 document.getElementById("studyOrderSelect").addEventListener("change", () => {
-  if (isGlobalStudyMode) {
+  if (studyDeckScope === 'global') {
     openGlobalReview(isCramMode); 
   } else {
     openStudyModal(isCramMode); 
