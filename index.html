@@ -1091,6 +1091,12 @@
       box-sizing: border-box; 
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
+      
+      /* --- NEW: Forces iOS to paint the layer to the GPU, stopping flicker --- */
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      will-change: transform;
+      
       background: white;
       border-radius: 16px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.15);
@@ -1930,7 +1936,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "10.07.26.v1";
+const APP_VERSION = "10.09.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2230,17 +2236,19 @@ async function processAndSaveData(newArray, versionStr) {
 // The Visibility Tripwire
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
-    // NEW: Do not trigger background syncs if the hard drive is still booting!
     if (!isAppBooted) return; 
 
     console.log("App resumed. Silently checking for updates...");
     loadTCMData(points.length > 0);
     
-    // --- THE IOS STICKY JOLT ---
     if (appContainer && appContainer.scrollTop > 0) {
       appContainer.scrollTop += 1;
       appContainer.scrollTop -= 1;
     }
+  } 
+  else if (document.visibilityState === "hidden") {
+    // Save your exact study position offline. NO auto-syncs.
+    if (typeof saveSessionLocal === 'function') saveSessionLocal();
   }
 });
 
@@ -6596,6 +6604,10 @@ let currentStudyIndex = 0;
 let studyHistory = []; 
 let isSyncing = false; 
 
+// NEW: Rolling Queue Variables
+let pendingDeck = []; // Cards waiting to enter the active loop
+let activeChunk = []; // The rolling group of up to 10 cards
+
 // NEW: Advanced Engine Flags
 let globalActiveChannels = []; // Tracks your selected filters between sessions
 let studyDeckScope = 'current'; // 'current', 'global', or 'single'
@@ -6610,22 +6622,58 @@ let studySessionStats = { strong: 0, correct: 0, wrong: 0 };
 // --- SRS ALGORITHM & VIRTUAL STATE ---
 const SRS_INTERVALS = [0, 1, 3, 7, 14, 30, 60]; 
 
+
 function calculateNextSRS(currentState, rating) {
-  let box = currentState ? currentState[0] : 0;
-  let val = currentState ? currentState[1] : 3;
+  const now = Date.now();
+  const ONE_DAY = 86400000;
 
-  if (rating === 'swipe-wrong') return [0, 3]; 
+  // Support both old [interval, timestamp] and new [interval, timestamp, streak] arrays.
+  let currentInterval = currentState ? Number(currentState[0]) || 0 : 0;
+  let currentStreak = currentState && currentState.length > 2
+    ? Number(currentState[2]) || 0
+    : 0;
 
-  if (box === 0) {
-    if (rating === 'swipe-strong') return [1, Date.now() + (SRS_INTERVALS[1] * 86400000)];
-    if (val > 1) return [0, val - 1]; 
-    return [1, Date.now() + (SRS_INTERVALS[1] * 86400000)];
-  } else {
-    if (rating === 'swipe-strong') box = Math.min(box + 2, SRS_INTERVALS.length - 1);
-    else box = Math.min(box + 1, SRS_INTERVALS.length - 1);
-    return [box, Date.now() + (SRS_INTERVALS[box] * 86400000)];
+  let nextInterval = currentInterval;
+  let nextDue = currentState && currentState[1]
+    ? Number(currentState[1])
+    : now;
+
+ // WRONG: reset learning progress and return to learning immediately.
+  if (rating === 'swipe-wrong') {
+    return [0, now, 0];
   }
+
+  // Increment streak infinitely
+  if (rating === 'swipe-strong') {
+    currentStreak += 2;
+  } else if (rating === 'swipe-correct') {
+    currentStreak += 1;
+  }
+
+  // Still learning: no review interval until the streak reaches 3.
+  if (currentStreak < 3) {
+    return [0, now, currentStreak];
+  }
+
+ // Just graduated: start the review interval.
+  if (currentInterval === 0) {
+    nextInterval = 1;
+  } else {
+    // Already graduated: grow the existing interval.
+    if (rating === 'swipe-strong') {
+      nextInterval = Math.max(3, Math.round(currentInterval * 2));
+    } else {
+      nextInterval = Math.max(1, Math.round(currentInterval * 1.5));
+    }
+  }
+
+  // Cap the interval at 60 days.
+  nextInterval = Math.min(nextInterval, 60);
+  nextDue = now + (nextInterval * ONE_DAY);
+
+  return [nextInterval, nextDue, currentStreak];
 }
+
 
 function getVirtualSRS(p, section) {
   let srsData = {};
@@ -6765,7 +6813,6 @@ function startStudyFromSettings(scope) {
   isImageFirstMode = document.getElementById('imageFirstToggle').checked; 
   studyDeckScope = scope; 
 
-  // Capture the selected global filters before launching
   if (scope === 'global') {
     const cbs = document.querySelectorAll('.global-channel-cb');
     let selected = [];
@@ -6774,8 +6821,6 @@ function startStudyFromSettings(scope) {
       if (cb.checked) selected.push(cb.value);
       else allChecked = false;
     });
-    
-    // If they checked everything (or nothing to prevent a broken deck), clear the array to signify "All"
     if (allChecked || selected.length === 0) {
       globalActiveChannels = [];
     } else {
@@ -6783,29 +6828,49 @@ function startStudyFromSettings(scope) {
     }
   }
 
+  // --- NEW: RESUME PROMPT LOGIC ---
+  let forceRestart = false;
+  const saved = localStorage.getItem('tcm_saved_session');
+  if (saved) {
+     try {
+       const session = JSON.parse(saved);
+       if (session.scope === scope && (session.activeChunk.length > 0 || session.pendingDeck.length > 0)) {
+          if (!confirm("You have a paused study session for this deck.\n\nClick 'OK' to resume exactly where you left off.\nClick 'Cancel' to start a fresh deck.")) {
+             forceRestart = true;
+          }
+       }
+     } catch(e) {}
+  }
+
   closeStudySettingsModal();
   
   if (scope === 'global') {
-    openGlobalReview(false);
+    openGlobalReview(false, forceRestart);
   } else {
-    openStudyModal(false); 
+    openStudyModal(false, forceRestart); 
   }
 }
 
-// --- GLOBAL & CURRENT DECK BUILDERS ---
-function openGlobalReview(forceCram = false) {
+// --- GLOBAL DECK BUILDER (Strict: Only previously studied cards) ---
+function openGlobalReview(forceCram = false, forceRestart = false) {
   studyDeckScope = 'global'; 
   isCramMode = forceCram;
-  let dueDeck = [];
-  let allDeck = [];
+  
+  // --- ATTEMPT TO RESUME ---
+  if (!forceRestart && !forceCram && resumeSessionLocal('global')) {
+     finalizeDeckLaunch(document.getElementById("studyOrderSelect").value, document.getElementById("studyOrderSelect").value === "browse", true);
+     return;
+  }
+  
+  let dueDeck = []; let allDeck = [];
   const now = Date.now();
   const order = document.getElementById("studyOrderSelect").value;
   const isBrowseMode = (order === "browse");
 
   points.forEach(p => {
+    // THE LOCKOUT: If it has never been studied, completely ignore it for the Global Deck
     if (!p["SRS Data"] || p["SRS Data"] === "{}" || p["SRS Data"].trim() === "") return;
     
-    // FILTER INTERCEPTOR: Skip point if channel is excluded in the Global Deck Filter
     let cFull = p["Channel Full Name"] || p[" Channel Full Name"] || "Other";
     let cShort = p["Channel Short Name"] || p[" Channel Short Name"] || "";
     let cKey = cFull + "||" + cShort;
@@ -6814,6 +6879,7 @@ function openGlobalReview(forceCram = false) {
     let srsData = {};
     try { srsData = JSON.parse(p["SRS Data"]); } catch(e) { return; }
     
+    // Only iterate over sections that actually HAVE SRS data
     Object.keys(srsData).forEach(section => {
       let cardSrs = getVirtualSRS(p, section); 
       if (!cardSrs) return;
@@ -6823,21 +6889,25 @@ function openGlobalReview(forceCram = false) {
       let val = p[sectionConfig.key] || p[sectionConfig.altKey] || "";
       
       if (val && String(val).trim() !== "") {
-        let cardObj = { point: p, sectionLabel: section, content: val, cardId: p["Short Name"] + "::" + section };
+        // FIX: Extract the true streak from the SRS array so it doesn't default to 0
+        let cardObj = { 
+          point: p, 
+          sectionLabel: section, 
+          content: val, 
+          cardId: p["Short Name"] + "::" + section,
+          streak: cardSrs && cardSrs.length > 2 ? Number(cardSrs[2]) || 0 : 0
+        };
+        
         allDeck.push(cardObj);
 
         let isDue = true;
         if (cardSrs[0] > 0 && cardSrs[1] > now) isDue = false;
-        
         if (isDue) dueDeck.push(cardObj);
       }
     });
   });
 
-  if (allDeck.length === 0) {
-    showToast("No global cards found for these filters. Start studying to build your deck!");
-    return;
-  }
+  if (allDeck.length === 0) { showToast("No global cards found for these filters."); return; }
 
   if (dueDeck.length === 0 && !forceCram && !isBrowseMode) {
     document.getElementById("studyCardContainer").innerHTML = `
@@ -6845,7 +6915,7 @@ function openGlobalReview(forceCram = false) {
         <h2 style="color: #007aff; margin-bottom: 5px;">All Caught Up!</h2>
         <p style="margin-top: 0; font-size: 16px;">0 cards due in the selected channels.</p>
         <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
-          <button onclick="openGlobalReview(true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
+          <button onclick="openGlobalReview(true, true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
           <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
         </div>
       </div>
@@ -6859,56 +6929,65 @@ function openGlobalReview(forceCram = false) {
   }
 
   studyDeck = (forceCram || isBrowseMode) ? allDeck : dueDeck;
-  finalizeDeckLaunch(order, isBrowseMode);
+  finalizeDeckLaunch(order, isBrowseMode, false);
 }
 
-function openStudyModal(forceCram = false) {
-  if (studyDeckScope === 'global') studyDeckScope = 'current'; // Failsafe
+function openStudyModal(forceCram = false, forceRestart = false) {
+  if (studyDeckScope === 'global') studyDeckScope = 'current'; 
   isCramMode = forceCram;
   if (!sheetContextPoints || sheetContextPoints.length === 0) return;
   
-  let dueDeck = [];
-  let allDeck = [];
+  // --- ATTEMPT TO RESUME ---
+  if (!forceRestart && !forceCram && resumeSessionLocal(studyDeckScope)) {
+     finalizeDeckLaunch(document.getElementById("studyOrderSelect").value, document.getElementById("studyOrderSelect").value === "browse", true);
+     return;
+  }
   
-  const sectionsToUse = (isSectionFilterActive && activeSections.length > 0) 
-    ? TCM_SECTIONS.filter(s => activeSections.includes(s.label)) : TCM_SECTIONS;
-
+  let dueDeck = []; let allDeck = [];
+  const sectionsToUse = (isSectionFilterActive && activeSections.length > 0) ? TCM_SECTIONS.filter(s => activeSections.includes(s.label)) : TCM_SECTIONS;
   const now = Date.now();
   const order = document.getElementById("studyOrderSelect").value;
   const isBrowseMode = (order === "browse");
-
-  // Filters to a single point if "Study This Point" was clicked!
   let sourcePoints = (studyDeckScope === 'single') ? [sheetContextPoints[currentSheetIndex]] : sheetContextPoints;
 
   sourcePoints.forEach(p => {
     sectionsToUse.forEach(sec => {
       let val = p[sec.key] || p[sec.altKey] || "";
       if (val && String(val).trim() !== "") {
-        let cardObj = { point: p, sectionLabel: sec.label, content: val, cardId: p["Short Name"] + "::" + sec.label };
-        allDeck.push(cardObj);
-
-        let isDue = true;
-        let cardSrs = getVirtualSRS(p, sec.label); 
-        if (cardSrs && cardSrs[0] > 0 && cardSrs[1] > now) isDue = false; 
         
-        if (isDue) dueDeck.push(cardObj);
+let cardSrs = getVirtualSRS(p, sec.label);
+
+let cardObj = {
+  point: p,
+  sectionLabel: sec.label,
+  content: val,
+  cardId: p["Short Name"] + "::" + sec.label,
+  streak: cardSrs && cardSrs.length > 2
+    ? Number(cardSrs[2]) || 0
+    : 0
+};
+
+allDeck.push(cardObj);
+
+let isDue = true;
+if (cardSrs && cardSrs[0] > 0 && cardSrs[1] > now) {
+  isDue = false;
+}
+if (isDue) dueDeck.push(cardObj);
+
       }
     });
   });
 
-  if (allDeck.length === 0) {
-    showToast("No cards available for the current section filters.");
-    return;
-  }
+  if (allDeck.length === 0) { showToast("No cards available for the current section filters."); return; }
 
-  // Intercept if nothing is due
   if (dueDeck.length === 0 && !forceCram && !isBrowseMode) {
     document.getElementById("studyCardContainer").innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: #007aff; margin-bottom: 5px;">All Caught Up!</h2>
         <p style="margin-top: 0; font-size: 16px;">0 cards due out of ${allDeck.length} selected.</p>
         <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
-          <button onclick="openStudyModal(true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
+          <button onclick="openStudyModal(true, true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
           <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
         </div>
       </div>
@@ -6922,22 +7001,25 @@ function openStudyModal(forceCram = false) {
   }
 
   studyDeck = (forceCram || isBrowseMode) ? allDeck : dueDeck;
-  finalizeDeckLaunch(order, isBrowseMode);
+  finalizeDeckLaunch(order, isBrowseMode, false);
 }
 
-// Consolidated Deck Launcher
-function finalizeDeckLaunch(order, isBrowseMode) {
-  if (order === "random") studyDeck.sort(() => Math.random() - 0.5);
-
-  currentStudyIndex = 0;
-  studyHistory = [];
-  cardsReviewedInChunk = 0; 
-  studySessionStats = { strong: 0, correct: 0, wrong: 0 }; 
+function finalizeDeckLaunch(order, isBrowseMode, isResuming = false) {
+  if (!isResuming) {
+    if (order === "random") studyDeck.sort(() => Math.random() - 0.5);
+    pendingDeck = [...studyDeck]; 
+    activeChunk = pendingDeck.splice(0, studyChunkSize); 
+    currentStudyIndex = 0;
+    cardsReviewedInChunk = 0; 
+    studySessionStats = { strong: 0, correct: 0, wrong: 0 }; 
+  }
+  
+  studyHistory = []; 
   
   const hintBar = document.getElementById("studyHintBar");
   if (hintBar) {
     if (isBrowseMode) hintBar.innerHTML = `<span>← Prev Card</span><span>[Space] Flip</span><span>Next Card →</span>`;
-    else hintBar.innerHTML = `<span>← Correct</span><span>↑ Strong Correct</span><span>↓ Wrong</span><span>→ Go Back</span><span>[Space] Flip</span>`;
+    else hintBar.innerHTML = `<span>← Correct (Streak +1)</span><span>↑ Strong (Instant Pass)</span><span>↓ Wrong (Streak 0)</span><span>[Space] Flip</span>`;
   }
 
   updateStudySyncBadge(); 
@@ -6949,6 +7031,7 @@ function finalizeDeckLaunch(order, isBrowseMode) {
 }
 
 function closeStudyModal() {
+  saveSessionLocal(); // ONLY saves locally to the device
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
   document.getElementById("studyModal").style.display = "none";
 }
@@ -6964,6 +7047,87 @@ function loadSRSQueueLocal() {
     if (saved) pendingSRSUpdates = JSON.parse(saved);
   } catch(e) {}
 }
+
+// --- SESSION PERSISTENCE (LOCAL ONLY) ---
+function saveSessionLocal() {
+  // If the deck is completely empty, clear the save file
+  if (!activeChunk || (activeChunk.length === 0 && pendingDeck.length === 0)) {
+    localStorage.removeItem('tcm_saved_session');
+    return;
+  }
+  
+  const sessionData = {
+    scope: studyDeckScope,
+    isCramMode: isCramMode,
+    isImageFirstMode: isImageFirstMode,
+    studyChunkSize: studyChunkSize,
+    currentStudyIndex: currentStudyIndex,
+    cardsReviewedInChunk: cardsReviewedInChunk,
+    studySessionStats: studySessionStats,
+    activeChunk: activeChunk.map(c => ({ id: c.cardId, streak: c.streak })),
+    pendingDeck: pendingDeck.map(c => c.cardId),
+    studyDeck: studyDeck.map(c => c.cardId) 
+  };
+  localStorage.setItem('tcm_saved_session', JSON.stringify(sessionData));
+}
+
+function resumeSessionLocal(scopeToMatch) {
+  const saved = localStorage.getItem('tcm_saved_session');
+  if (!saved) return false;
+  
+  try {
+    const session = JSON.parse(saved);
+    if (session.scope !== scopeToMatch) return false; // Only resume if studying the same scope
+    
+   // Rebuild the card objects from the saved IDs
+    const rebuildCard = (savedCard) => {
+      let cardId = typeof savedCard === 'string' ? savedCard : savedCard.id;
+      let [pointId, sectionLabel] = cardId.split("::");
+      let p = points.find(x => x["Short Name"] === pointId);
+      if (!p) return null;
+      let sectionConfig = TCM_SECTIONS.find(s => s.label === sectionLabel);
+      if (!sectionConfig) return null;
+      let val = p[sectionConfig.key] || p[sectionConfig.altKey] || "";
+      if (!val || String(val).trim() === "") return null;
+      
+      let obj = { point: p, sectionLabel: sectionLabel, content: val, cardId: cardId };
+      
+      if (typeof savedCard === 'object' && 'streak' in savedCard) {
+        // Restore live, mid-session progress for cards currently in your active hand
+        obj.streak = savedCard.streak;
+      } else {
+        // Look up the true database state for cards waiting in the pending deck
+        let cardSrs = getVirtualSRS(p, sectionLabel);
+        obj.streak = cardSrs && cardSrs.length > 2 ? Number(cardSrs[2]) || 0 : 0;
+      }
+      
+      return obj;
+    };
+    
+    let rebuiltActive = session.activeChunk.map(rebuildCard).filter(Boolean);
+    let rebuiltPending = session.pendingDeck.map(rebuildCard).filter(Boolean);
+    let rebuiltStudy = session.studyDeck.map(rebuildCard).filter(Boolean);
+    
+    if (rebuiltStudy.length === 0) return false; 
+    
+    // Restore all Global Flags and positions
+    isCramMode = session.isCramMode;
+    isImageFirstMode = session.isImageFirstMode;
+    studyChunkSize = session.studyChunkSize;
+    currentStudyIndex = Math.min(session.currentStudyIndex, Math.max(0, rebuiltActive.length - 1));
+    cardsReviewedInChunk = session.cardsReviewedInChunk;
+    studySessionStats = session.studySessionStats;
+    
+    activeChunk = rebuiltActive;
+    pendingDeck = rebuiltPending;
+    studyDeck = rebuiltStudy;
+    
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
 
 function updateStudySyncBadge() {
   const btn = document.getElementById("studySyncBtnTop");
@@ -6983,21 +7147,35 @@ loadSRSQueueLocal();
 function continueChunk() {
   cardsReviewedInChunk = 0;
   renderCurrentStudyCard();
+  saveSessionLocal(); 
 }
 
 function keepStudying() {
   const now = Date.now();
   let nextDeck = [];
   
+  
   studyDeck.forEach(cardData => {
+     // Don't bring a Strong-passed card back during this continuation.
+     const lastAction = [...studyHistory].reverse().find(
+       action => action.card.cardId === cardData.cardId
+     );
+     if (lastAction && lastAction.rating === 'swipe-strong') return;
+
      let currentState = getVirtualSRS(cardData.point, cardData.sectionLabel);
+
      let isDue = true;
      if (currentState) {
          let box = currentState[0];
          let dueDateOrReps = currentState[1];
          if (box > 0 && dueDateOrReps > now) isDue = false;
      }
-     if (isDue) nextDeck.push(cardData);
+     
+     if (isDue) {
+         // FIX: Force the card to inherit its true virtual streak before entering the next lap
+         cardData.streak = currentState && currentState.length > 2 ? Number(currentState[2]) || 0 : 0;
+         nextDeck.push(cardData);
+     }
   });
 
   if (nextDeck.length === 0) {
@@ -7024,7 +7202,12 @@ function keepStudying() {
   const order = document.getElementById("studyOrderSelect").value;
   if (order === "random") studyDeck.sort(() => Math.random() - 0.5);
   
+  // Rebuild activeChunk and pendingDeck for the new loop!
+  pendingDeck = [...studyDeck];
+  activeChunk = pendingDeck.splice(0, studyChunkSize);
+  
   renderCurrentStudyCard();
+  saveSessionLocal(); // <--- ADD THIS
 }
 
 // --- RENDER & ROUTING ---
@@ -7054,15 +7237,26 @@ function renderCurrentStudyCard() {
   const counter = document.getElementById("studyCounterDisplay");
   const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
 
-  progress.style.width = ((currentStudyIndex / studyDeck.length) * 100) + "%";
-  counter.textContent = `Card ${Math.min(currentStudyIndex + 1, studyDeck.length)} of ${studyDeck.length}`;
+  let completedCards = studyDeck.length - (activeChunk.length + pendingDeck.length);
+  progress.style.width = ((completedCards / studyDeck.length) * 100) + "%";
+  
+  let activeCard = isBrowseMode ? studyDeck[currentStudyIndex] : activeChunk[currentStudyIndex];
+  let streakHtml = !isBrowseMode && activeCard ? `<span style="color:#34c759; margin-left: 10px;">Streak: ${activeCard.streak}/3</span>` : "";
+  
+// --- FIXED COUNTER LOGIC ---
+  if (isBrowseMode) {
+     counter.innerHTML = `Card ${currentStudyIndex + 1} of ${studyDeck.length}`;
+  } else {
+     let finishTerm = isCramMode ? "Crammed" : "Graduated";
+     counter.innerHTML = `Review ${cardsReviewedInChunk + 1} &bull; ${activeChunk.length} in Hand &bull; ${completedCards}/${studyDeck.length} ${finishTerm} ${streakHtml}`;
+  }
 
-  // 1. END OF DECK SCREEN (Repaired!)
-  if (currentStudyIndex >= studyDeck.length) {
+  // 1. END OF DECK SCREEN
+  if ((isBrowseMode && currentStudyIndex >= studyDeck.length) || (!isBrowseMode && activeChunk.length === 0)) {
     container.innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: ${isBrowseMode ? '#007aff' : '#34c759'}; margin-bottom: 5px;">${isBrowseMode ? 'End of Deck' : 'Deck Complete!'}</h2>
-        <p style="margin-top: 0;">You have reviewed all cards in this loop.</p>
+        <p style="margin-top: 0;">You have graduated all cards in this set.</p>
         ${!isBrowseMode ? generateStudyStatsHTML() : ''}
         <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           ${isBrowseMode ? `<button onclick="currentStudyIndex = 0; renderCurrentStudyCard();" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Browse Again</button>` : ''}
@@ -7074,24 +7268,26 @@ function renderCurrentStudyCard() {
     return;
   }
 
-  // 2. CHUNK INTERMISSION SCREEN
+// 2. CHUNK INTERMISSION SCREEN
   if (cardsReviewedInChunk >= studyChunkSize && !isBrowseMode) {
     container.innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
-        <h2 style="color: #cc5500; font-size: 28px; margin-bottom: 5px;">Great job!</h2>
-        <p style="font-size: 16px; margin-top: 0;">Take a breath. ${studyChunkSize} cards completed.</p>
+        <h2 style="color: #cc5500; font-size: 28px; margin-bottom: 5px;">Take a breath.</h2>
+        <p style="font-size: 16px; margin-top: 0;">You have done ${studyChunkSize} reviews.</p>
         ${generateStudyStatsHTML()}
         <p style="font-size: 12px; color: #aaa; margin-top: 5px;">You have ${pendingSRSUpdates.length} pending updates in the queue.</p>
         <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           <button onclick="continueChunk()" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Continue Deck</button>
-          ${pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
+          ${pendingSRSUpdates.length > 0 ? `<button id="intermissionSyncBtn" onclick="syncSRSData(); this.style.display='none';" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
         </div>
       </div>`;
     return;
   }
+  
+
 
   // 3. RENDER NORMAL CARD
-  const cardData = studyDeck[currentStudyIndex];
+  const cardData = isBrowseMode ? studyDeck[currentStudyIndex] : activeChunk[currentStudyIndex];
   
   let formattedBack = formatTextWithTables(highlightText(cardData.content));
   formattedBack = applyWordOcclusionToHTML(formattedBack, cardData.point["Short Name"]);
@@ -7101,7 +7297,6 @@ function renderCurrentStudyCard() {
 
   let fullName = cardData.point["Full Name"] || cardData.point[" Full Name"] || "";
 
-  // --- DYNAMIC IMAGE REVEAL & FRONT FACE LOGIC ---
   let imageId = cardData.point["Image ID"] ? String(cardData.point["Image ID"]).trim() : "";
   let hasValidImage = (imageId && !imageId.toLowerCase().includes("yinyangph"));
   let imageHtml = "";
@@ -7139,11 +7334,9 @@ function renderCurrentStudyCard() {
     <div class="study-card-wrapper" id="studyCardWrapper">
       <div class="study-feedback-icon" id="studyFeedbackIcon"></div>
       <div class="study-card" id="activeStudyCard" onclick="this.classList.toggle('is-flipped')">
-        <!-- FRONT -->
         <div class="study-face study-face-front">
           ${frontHtml}
         </div>
-        <!-- BACK -->
         <div class="study-face study-face-back">
           <div class="study-back-header">
             <span>${cardData.point["Short Name"]}</span>
@@ -7163,6 +7356,16 @@ function renderCurrentStudyCard() {
     const wrapper = document.querySelector('.study-back-content-wrapper');
     if (wrapper) checkStudyScroll(wrapper);
   }, 50);
+
+  // Silently preload the next image
+  if (!isBrowseMode && currentStudyIndex + 1 < activeChunk.length) {
+    const nextCard = activeChunk[currentStudyIndex + 1];
+    const nextImageId = nextCard.point["Image ID"] ? String(nextCard.point["Image ID"]).trim() : "";
+    if (nextImageId && !nextImageId.toLowerCase().includes("yinyangph")) {
+       const preloader = new Image();
+       preloader.src = getImagePath(nextCard.point);
+    }
+  }
 }
 
 window.checkStudyScroll = function(el) {
@@ -7193,47 +7396,88 @@ function prevBrowseCard() {
 // --- CARD GRADING & NAVIGATION ---
 function rateCard(ratingClass) {
   if (isSyncing) { showToast("Syncing... please wait."); return; }
-  if (currentStudyIndex >= studyDeck.length) return;
+  if (activeChunk.length === 0) return;
   
   const wrapperEl = document.getElementById("studyCardWrapper");
   const iconEl = document.getElementById("studyFeedbackIcon");
   if (!wrapperEl || !iconEl) return;
 
-  // Set the specific icon and border color
+  let currentCard = activeChunk[currentStudyIndex];
+  
+  let previousStreak = currentCard.streak || 0;
+  let snapshotIndex = currentStudyIndex;
+
   if (ratingClass === 'swipe-correct') {
-    iconEl.innerHTML = "✅";
-    iconEl.className = "study-feedback-icon feedback-correct";
+    iconEl.innerHTML = "✅"; iconEl.className = "study-feedback-icon feedback-correct";
   } else if (ratingClass === 'swipe-strong') {
-    iconEl.innerHTML = "✅✅";
-    iconEl.className = "study-feedback-icon feedback-strong";
+    iconEl.innerHTML = "✅✅"; iconEl.className = "study-feedback-icon feedback-strong";
   } else if (ratingClass === 'swipe-wrong') {
-    iconEl.innerHTML = "❌";
-    iconEl.className = "study-feedback-icon feedback-wrong";
+    iconEl.innerHTML = "❌"; iconEl.className = "study-feedback-icon feedback-wrong";
   }
 
-  // Trigger the physical fly-out and icon pop
   wrapperEl.classList.add(ratingClass);
   
-  // Wait 250ms for the exit animation to finish before snapping to the next card
   setTimeout(() => {
-    studyHistory.push(currentStudyIndex);
-    
-    pendingSRSUpdates.push({
-      cardId: studyDeck[currentStudyIndex].cardId,
-      rating: ratingClass 
-    });
-    
-    saveSRSQueueLocal(); 
-    
+    // --- UPDATE STATS ON EVERY SWIPE ---
     if (ratingClass === 'swipe-strong') studySessionStats.strong++;
     else if (ratingClass === 'swipe-correct') studySessionStats.correct++;
-    else if (ratingClass === 'swipe-wrong') studySessionStats.wrong++;
+    else if (ratingClass === 'swipe-wrong') studySessionStats.wrong++; 
+
+    
+   // --- UPDATE STREAK ---
+    if (ratingClass === 'swipe-wrong') {
+      currentCard.streak = 0;
+    } else if (ratingClass === 'swipe-correct') {
+      currentCard.streak = (currentCard.streak || 0) + 1;
+    } else if (ratingClass === 'swipe-strong') {
+      currentCard.streak = (currentCard.streak || 0) + 2;
+    }
+
+    // Enforce the strict 3-streak graduation rule
+    let graduated = (currentCard.streak >= 3);
+
+    let failed = (ratingClass === 'swipe-wrong');
+    let pulledNewCard = false;
+
+
+  // --- SYNC POOL LOGIC ---
+    // Push EVERY swipe type to the sync pool queue, preserving the exact review sequence
+    // ONLY if we are not in Cram mode! Cram is practice only.
+    if (!isCramMode) {
+      pendingSRSUpdates.push({ cardId: currentCard.cardId, rating: ratingClass });
+      saveSRSQueueLocal(); 
+    }
+
+    // --- CHUNK LOGIC ---
+    if (graduated) {
+      activeChunk.splice(currentStudyIndex, 1); 
+      if (pendingDeck.length > 0) {
+        // Push newly pulled cards to the END of the active pool
+        activeChunk.push(pendingDeck.shift());
+        pulledNewCard = true;
+      }
+      // Do not increment currentStudyIndex since the array shifted left
+    } else {
+      currentStudyIndex++;
+    }
+
+    if (activeChunk.length > 0 && currentStudyIndex >= activeChunk.length) {
+      currentStudyIndex = 0;
+    }
+
+    studyHistory.push({
+      card: currentCard,
+      previousStreak: previousStreak,
+      previousIndex: snapshotIndex,
+      graduated: graduated,
+      pulledNewCard: pulledNewCard,
+      rating: ratingClass
+    });
 
     updateStudySyncBadge();
-
-    currentStudyIndex++;
     cardsReviewedInChunk++; 
     renderCurrentStudyCard();
+    saveSessionLocal(); // <--- INSTANT LOCAL SAVE
   }, 250); 
 }
 
@@ -7244,20 +7488,48 @@ function undoLastStudyCard() {
     return;
   }
   
-  currentStudyIndex = studyHistory.pop();
-  if (cardsReviewedInChunk > 0) cardsReviewedInChunk--;
+  const lastAction = studyHistory[studyHistory.length - 1];
   
-  const undoneUpdate = pendingSRSUpdates.pop();
-  saveSRSQueueLocal(); 
-  
-  if (undoneUpdate) {
-    if (undoneUpdate.rating === 'swipe-strong') studySessionStats.strong--;
-    else if (undoneUpdate.rating === 'swipe-correct') studySessionStats.correct--;
-    else if (undoneUpdate.rating === 'swipe-wrong') studySessionStats.wrong--;
+// If the queue is empty (and we aren't in practice mode), the data has already synced
+  if (pendingSRSUpdates.length === 0 && !isCramMode) {
+    showToast("Cannot undo a card that has already synced to the cloud.");
+    return; 
   }
+
+  studyHistory.pop();
+
+  if (lastAction.rating === 'swipe-strong') studySessionStats.strong--;
+  else if (lastAction.rating === 'swipe-correct') studySessionStats.correct--;
+  else if (lastAction.rating === 'swipe-wrong') studySessionStats.wrong--;
+  
+  if (!isCramMode) {
+    // Safely find and remove the most recent entry for this card from the sync pool
+    for (let i = pendingSRSUpdates.length - 1; i >= 0; i--) {
+       if (pendingSRSUpdates[i].cardId === lastAction.card.cardId && pendingSRSUpdates[i].rating === lastAction.rating) {
+           pendingSRSUpdates.splice(i, 1);
+           break;
+       }
+    }
+    saveSRSQueueLocal(); 
+  }
+  
+  if (lastAction.graduated) {
+    if (lastAction.pulledNewCard) {
+       // Pop the new card from the end of the active chunk where it was added
+       let newCard = activeChunk.pop();
+       pendingDeck.unshift(newCard);
+    }
+    activeChunk.splice(lastAction.previousIndex, 0, lastAction.card);
+  }
+
+  lastAction.card.streak = lastAction.previousStreak;
+  currentStudyIndex = lastAction.previousIndex;
+  
+  if (cardsReviewedInChunk > 0) cardsReviewedInChunk--;
   
   updateStudySyncBadge();
   renderCurrentStudyCard();
+  saveSessionLocal(); // <--- INSTANT LOCAL SAVE
 }
 
 // --- CLOUD SYNC ---
@@ -7276,13 +7548,21 @@ async function syncSRSData() {
 
   let pointsToSave = {}; 
 
-  pendingSRSUpdates.forEach(update => {
+  // 1. SNAPSHOT the exact updates we are processing right now.
+  // This protects any new swipes that happen while we wait for Google to respond.
+  const updatesBeingProcessed = [...pendingSRSUpdates];
+
+  updatesBeingProcessed.forEach(update => {
     let [pointId, section] = update.cardId.split("::");
     let p = points.find(x => x["Short Name"] === pointId);
     if (!p) return;
 
     let srsData = {};
     try { srsData = JSON.parse(p["SRS Data"] || "{}"); } catch(e) {}
+    
+    if (pointsToSave[pointId]) {
+      try { srsData = JSON.parse(pointsToSave[pointId]); } catch(e) {}
+    }
 
     srsData[section] = calculateNextSRS(srsData[section], update.rating);
     p["SRS Data"] = JSON.stringify(srsData);
@@ -7305,9 +7585,11 @@ async function syncSRSData() {
       body: JSON.stringify({ action: "batchUpdate", updates: cloudPayload })
     });
 
-    showToast(`✅ Successfully synced ${pendingSRSUpdates.length} reviews.`);
-    pendingSRSUpdates = [];
-    localStorage.removeItem('tcm_srs_pending'); 
+    // 2. SAFELY FILTER out only the updates we just saved
+    pendingSRSUpdates = pendingSRSUpdates.filter(u => !updatesBeingProcessed.includes(u));
+    
+    showToast(`✅ Successfully synced ${updatesBeingProcessed.length} reviews.`);
+    saveSRSQueueLocal(); // Update the local storage file with the new pending list
     updateStudySyncBadge();
 
     const catchupBtn = document.querySelector("#studyCardContainer button[onclick='syncSRSData()']");
@@ -7361,19 +7643,18 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
   let deltaY = e.changedTouches[0].screenY - studyTouchStartY;
   
   const isBack = e.target.closest('.study-face-back');
+  const scrollWrapper = e.target.closest('.study-back-content-wrapper');
   const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
 
   if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
-    studyTouchStartX = null;
-    studyTouchStartY = null;
-    return;
+    studyTouchStartX = null; studyTouchStartY = null; return;
   }
 
-  if (isBack && e.target.closest('.table-scroll-wrapper')) {
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      studyTouchStartX = null;
-      studyTouchStartY = null;
-      return; 
+  // --- NEW: Abort vertical swipe grading if scrolling long text ---
+  const isVerticalSwipe = Math.abs(deltaY) > Math.abs(deltaX);
+  if (isVerticalSwipe && scrollWrapper) {
+    if (scrollWrapper.scrollHeight > scrollWrapper.clientHeight) {
+      studyTouchStartX = null; studyTouchStartY = null; return; 
     }
   }
 
