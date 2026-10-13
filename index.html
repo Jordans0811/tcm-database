@@ -1974,7 +1974,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "10.12.26.v1";
+const APP_VERSION = "10.13.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -5724,46 +5724,89 @@ window.applyPhraseOcclusionToHTML = function(html, pointId) {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
 
-  const escapedPhrases = activePhrases.sort((a, b) => b.length - a.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const escapedPhrases = activePhrases
+  .filter(w => w && w.trim().length > 0) // Prevents catastrophic zero-length matches
+  .sort((a, b) => b.length - a.length)
+  .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  
+  // ADD THIS LINE:
+  if (escapedPhrases.length === 0) return html; 
+
   const phraseRegex = new RegExp("(" + escapedPhrases.join("|") + ")", "gi");
 
+  // 1. Map all text nodes and their absolute start/end positions in the full text string
   const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
   let textNodes = [];
+  let fullText = "";
   let currentNode;
-  while (currentNode = walker.nextNode()) { textNodes.push(currentNode); }
+  
+  while (currentNode = walker.nextNode()) {
+    const text = currentNode.nodeValue;
+    textNodes.push({
+      node: currentNode,
+      start: fullText.length,
+      end: fullText.length + text.length
+    });
+    fullText += text;
+  }
 
-  textNodes.forEach(node => {
-    if (!node.nodeValue.trim()) return;
+  // 2. Find all phrase matches in the continuous text
+  let matches = [];
+  let match;
+  while ((match = phraseRegex.exec(fullText)) !== null) {
+    matches.push({
+      text: match[0],
+      start: match.index,
+      end: match.index + match[0].length
+    });
+  }
 
-    let replacedHTML = null;
-    if (phraseOccState === 'mark') {
-      replacedHTML = node.nodeValue.replace(phraseRegex, (match) => {
-        let lowerMatch = match.toLowerCase();
-        let isSaved = savedPhrases.some(p => p.toLowerCase() === lowerMatch);
+  // 3. Process matches in REVERSE order so structural DOM changes don't affect indices of earlier text
+  matches.sort((a, b) => b.start - a.start);
+
+  matches.forEach(m => {
+    const startBlock = textNodes.find(n => m.start >= n.start && m.start < n.end);
+    const endBlock = textNodes.find(n => m.end > n.start && m.end <= n.end);
+
+    if (startBlock && endBlock) {
+      try {
+        const range = document.createRange();
+        range.setStart(startBlock.node, m.start - startBlock.start);
+        range.setEnd(endBlock.node, m.end - endBlock.start);
+
+        const lowerMatch = m.text.toLowerCase();
+        const isSaved = savedPhrases.some(p => p.toLowerCase() === lowerMatch);
         
-        // NEW: Check pending arrays during redraw (Parity with Word/Line logic)
-        let isMarkedClass = (isSaved && !pendingPhraseUnmarks.some(p => p.toLowerCase() === lowerMatch)) || pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? " is-word-marked" : "";
-        let pendingStyle = pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? " style='border-bottom: 2px solid #0a84ff;'" : 
-                           (isSaved && pendingPhraseUnmarks.some(p => p.toLowerCase() === lowerMatch) ? " style='opacity: 0.4;'" : "");
+        const span = document.createElement('span');
+        
+        if (phraseOccState === 'mark') {
+          let isMarkedClass = (isSaved && !pendingPhraseUnmarks.some(p => p.toLowerCase() === lowerMatch)) || pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? " is-word-marked" : "";
+          let pendingStyle = pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? "border-bottom: 2px solid #0a84ff;" : 
+                             (isSaved && pendingPhraseUnmarks.some(p => p.toLowerCase() === lowerMatch) ? "opacity: 0.4;" : "");
 
-        return `<span class="word-mark-target${isMarkedClass}"${pendingStyle} data-phrase="${lowerMatch}" onclick="window.toggleMarkedPhrase(event, this, '${pointId}')">${match}</span>`;
-      });
-    } else if (phraseOccState === 'hide') {
-      replacedHTML = node.nodeValue.replace(phraseRegex, (match) => {
-        return `<span class="line-occluded" onclick="if(this.classList.contains('line-occluded')) { event.stopPropagation(); this.classList.remove('line-occluded'); this.classList.add('line-revealed'); } else { this.classList.remove('line-revealed'); this.classList.add('line-occluded'); }">${match}</span>`;
-      });
-    }
+          span.className = "word-mark-target" + isMarkedClass;
+          span.setAttribute("data-phrase", lowerMatch);
+          span.setAttribute("onclick", `window.toggleMarkedPhrase(event, this, '${pointId}')`);
+          if (pendingStyle) span.setAttribute("style", pendingStyle);
 
-    if (replacedHTML !== null && replacedHTML !== node.nodeValue) {
-      let wrapper = document.createElement('div');
-      wrapper.innerHTML = replacedHTML;
-      while (wrapper.firstChild) { node.parentNode.insertBefore(wrapper.firstChild, node); }
-      node.parentNode.removeChild(node);
+        } else if (phraseOccState === 'hide') {
+          span.className = "line-occluded";
+          span.setAttribute("onclick", "if(this.classList.contains('line-occluded')) { event.stopPropagation(); this.classList.remove('line-occluded'); this.classList.add('line-revealed'); } else { this.classList.remove('line-revealed'); this.classList.add('line-occluded'); }");
+        }
+
+        // Extract the nodes within the range and wrap them in the span, preserving HTML
+        const contents = range.extractContents();
+        span.appendChild(contents);
+        range.insertNode(span);
+        
+      } catch(e) {
+        console.error("Failed to wrap multi-node phrase", e);
+      }
     }
   });
+
   return tempDiv.innerHTML;
 }
-
 
 
 
@@ -5791,7 +5834,14 @@ window.applyWordOcclusionToHTML = function(html, pointId) {
 
   let hideRegex = null;
   if (wordOccState === 'hide') {
-    const escapedWords = [...savedWords].sort((a,b) => b.length - a.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const escapedWords = [...savedWords]
+      .filter(w => w && w.trim().length > 0) // <-- ADD THIS FILTER
+      .sort((a,b) => b.length - a.length)
+      .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      
+    // <-- ADD THIS BAILOUT
+    if (escapedWords.length === 0) return html; 
+    
     hideRegex = new RegExp("\\b(" + escapedWords.join("|") + ")\\b", "gi");
   }
   
