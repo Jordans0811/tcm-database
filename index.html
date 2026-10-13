@@ -1123,11 +1123,21 @@
       align-items: center;
       padding: 30px;
       text-align: center;
+      pointer-events: auto;
     }
 
     .study-face-back {
       transform: rotateY(180deg);
       padding: 0;
+      pointer-events: none;
+    }
+
+    .study-card.is-flipped .study-face-front {
+      pointer-events: none;
+    }
+
+    .study-card.is-flipped .study-face-back {
+      pointer-events: auto;
     }
 
     .study-point-title {
@@ -1251,7 +1261,14 @@
     .feedback-strong { color: #34c759; border: 3px solid #34c759; letter-spacing: -4px; padding-right: 18px; } 
     .feedback-wrong { color: #ff3b30; border: 3px solid #ff3b30; font-size: 20px; padding: 10px 14px; }
 
+  .study-setting-toggle {
+      display: flex; align-items: center; padding: 12px; border-radius: 8px;
+      border: 1px solid #d1d1d6; font-weight: bold; font-size: 14px;
+      cursor: pointer; color: #333; background: #f8f8f8;
+    }
+
     @media (prefers-color-scheme: dark) {
+      .study-setting-toggle { background: #1c1c1e !important; color: #ffffff !important; border-color: #38383a !important; }
       #chunkSizeSelect { background: #1c1c1e !important; color: #ffffff !important; border-color: #38383a !important; }
       #studyModal { background: #000000 !important; }
       #studyHintBar { background: #1c1c1e !important; border-top-color: #38383a !important; }
@@ -1801,9 +1818,13 @@ display: flex; flex-direction: column;">
       </select>
     </div>
 
-    <div style="margin-bottom: 20px;">
-      <label style="display: flex; align-items: center; padding: 12px; border-radius: 8px; border: 1px solid #d1d1d6; font-weight: bold; font-size: 14px; cursor: pointer; color: inherit;">
-        <input type="checkbox" id="imageFirstToggle" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
+  <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
+      <label class="study-setting-toggle">
+        <input type="checkbox" id="backToFrontToggle" onchange="if(this.checked) document.getElementById('imageFirstToggle').checked = false;" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
+        🔄 Back-to-Front Mode (Text First)
+      </label>
+      <label class="study-setting-toggle">
+        <input type="checkbox" id="imageFirstToggle" onchange="if(this.checked) document.getElementById('backToFrontToggle').checked = false;" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
         🖼️ Image-First Mode (Hides Name)
       </label>
     </div>
@@ -1826,6 +1847,23 @@ display: flex; flex-direction: column;">
     </div>
   </div>
 </div>
+
+<!-- RESUME OR NEW DECK PROMPT MODAL -->
+<div id="resumeSessionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10018; justify-content: center; align-items: center;" onclick="if(event.target===this) document.getElementById('resumeSessionModal').style.display='none'">
+  <div class="modal-content" style="max-width: 360px; text-align: center; padding: 24px 20px;">
+    <h3 class="modal-title" style="margin-bottom: 8px;">Paused Session Found</h3>
+    <p id="resumeSessionInfo" style="margin: 0 0 20px 0; font-size: 14px; color: #8e8e93; line-height: 1.4;">
+      You have an unfinished study session for this deck.
+    </p>
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 10px;">
+      <button class="save-btn" style="width: 100%; background: #007aff; box-shadow: 0 4px 10px rgba(0,122,255,0.3);" onclick="confirmStudyLaunch(false)">▶️ Resume Old Deck</button>
+      <button class="save-btn" style="width: 100%; background: #ff9f0a; box-shadow: 0 4px 10px rgba(255,159,10,0.3);" onclick="confirmStudyLaunch(true)">🔄 New Deck</button>
+      <button class="cancel-btn" style="width: 100%; margin-top: 4px;" onclick="document.getElementById('resumeSessionModal').style.display='none'">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
 
 <!-- FULL SCREEN STUDY MODAL -->
 <div id="studyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f0f5; z-index: 10019; flex-direction: column;">
@@ -1936,7 +1974,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "10.09.26.v1";
+const APP_VERSION = "10.12.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -4883,8 +4921,10 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-   // 5. GLOBAL ESCAPE KEY
+// 5. GLOBAL ESCAPE KEY
   if (e.key === 'Escape') {
+    if (document.getElementById('resumeSessionModal').style.display === 'flex') { document.getElementById('resumeSessionModal').style.display = 'none'; return; }
+    if (document.getElementById('studySettingsModal').style.display === 'flex') { closeStudySettingsModal(); return; }
     if (document.getElementById('lightbox').style.display === 'flex') { closeLightbox(); return; }
     if (document.getElementById('editModal').style.display === 'flex') { closeEditModal(); return; }
     if (document.getElementById('quickPeekModal').style.display === 'flex') { closeQuickPeek(); return; }
@@ -6613,6 +6653,7 @@ let globalActiveChannels = []; // Tracks your selected filters between sessions
 let studyDeckScope = 'current'; // 'current', 'global', or 'single'
 let isCramMode = false; 
 let isImageFirstMode = false;
+let isBackToFrontMode = false;
 let studyChunkSize = 10;
 
 let cardsReviewedInChunk = 0;
@@ -6693,6 +6734,7 @@ function getVirtualSRS(p, section) {
 function openStudySettingsModal() {
   document.getElementById('chunkSizeSelect').value = studyChunkSize;
   document.getElementById('imageFirstToggle').checked = isImageFirstMode;
+  document.getElementById('backToFrontToggle').checked = isBackToFrontMode;
   
   const now = Date.now();
   let currentDueCount = 0;
@@ -6811,6 +6853,7 @@ window.refreshGlobalButtonCount = function() {
 function startStudyFromSettings(scope) {
   studyChunkSize = parseInt(document.getElementById('chunkSizeSelect').value, 10);
   isImageFirstMode = document.getElementById('imageFirstToggle').checked; 
+  isBackToFrontMode = document.getElementById('backToFrontToggle').checked; 
   studyDeckScope = scope; 
 
   if (scope === 'global') {
@@ -6828,23 +6871,46 @@ function startStudyFromSettings(scope) {
     }
   }
 
-  // --- NEW: RESUME PROMPT LOGIC ---
-  let forceRestart = false;
+  // Check if a valid paused session exists for this scope
   const saved = localStorage.getItem('tcm_saved_session');
   if (saved) {
-     try {
-       const session = JSON.parse(saved);
-       if (session.scope === scope && (session.activeChunk.length > 0 || session.pendingDeck.length > 0)) {
-          if (!confirm("You have a paused study session for this deck.\n\nClick 'OK' to resume exactly where you left off.\nClick 'Cancel' to start a fresh deck.")) {
-             forceRestart = true;
-          }
-       }
-     } catch(e) {}
+    try {
+      const session = JSON.parse(saved);
+      const remaining = (session.activeChunk ? session.activeChunk.length : 0) + (session.pendingDeck ? session.pendingDeck.length : 0);
+      if (session.scope === scope && remaining > 0) {
+        let firstCardName = "";
+        if (session.activeChunk && session.activeChunk.length > 0) {
+          let firstItem = session.activeChunk[0];
+          let rawId = typeof firstItem === 'string' ? firstItem : firstItem.id;
+          if (rawId) firstCardName = ` (starting at ${rawId.split("::")[0]})`;
+        }
+        document.getElementById('resumeSessionInfo').textContent = 
+          `You have ${remaining} card${remaining === 1 ? '' : 's'} remaining in your paused session${firstCardName}.`;
+        closeStudySettingsModal();
+        document.getElementById('resumeSessionModal').style.display = 'flex';
+        return;
+      }
+    } catch(e) {}
   }
 
+  confirmStudyLaunch(true);
+}
+
+function confirmStudyLaunch(forceRestart) {
+  document.getElementById('resumeSessionModal').style.display = 'none';
   closeStudySettingsModal();
-  
-  if (scope === 'global') {
+
+  const orderSelect = document.getElementById("studyOrderSelect");
+  if (orderSelect && orderSelect.value === "browse") {
+    orderSelect.value = "order";
+  }
+
+  // Immediately wipe the old saved session if starting a New Deck
+  if (forceRestart) {
+    localStorage.removeItem('tcm_saved_session');
+  }
+
+  if (studyDeckScope === 'global') {
     openGlobalReview(false, forceRestart);
   } else {
     openStudyModal(false, forceRestart); 
@@ -6910,6 +6976,8 @@ function openGlobalReview(forceCram = false, forceRestart = false) {
   if (allDeck.length === 0) { showToast("No global cards found for these filters."); return; }
 
   if (dueDeck.length === 0 && !forceCram && !isBrowseMode) {
+    activeChunk = [];
+    pendingDeck = [];
     document.getElementById("studyCardContainer").innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: #007aff; margin-bottom: 5px;">All Caught Up!</h2>
@@ -6982,6 +7050,8 @@ if (isDue) dueDeck.push(cardObj);
   if (allDeck.length === 0) { showToast("No cards available for the current section filters."); return; }
 
   if (dueDeck.length === 0 && !forceCram && !isBrowseMode) {
+    activeChunk = [];
+    pendingDeck = [];
     document.getElementById("studyCardContainer").innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: #007aff; margin-bottom: 5px;">All Caught Up!</h2>
@@ -7028,6 +7098,7 @@ function finalizeDeckLaunch(order, isBrowseMode, isResuming = false) {
   
   closeBottomSheet();
   renderCurrentStudyCard();
+  if (!isBrowseMode) saveSessionLocal();
 }
 
 function closeStudyModal() {
@@ -7050,6 +7121,10 @@ function loadSRSQueueLocal() {
 
 // --- SESSION PERSISTENCE (LOCAL ONLY) ---
 function saveSessionLocal() {
+  // Do not overwrite saved SRS sessions when just Browsing
+  const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
+  if (isBrowseMode) return;
+
   // If the deck is completely empty, clear the save file
   if (!activeChunk || (activeChunk.length === 0 && pendingDeck.length === 0)) {
     localStorage.removeItem('tcm_saved_session');
@@ -7060,6 +7135,7 @@ function saveSessionLocal() {
     scope: studyDeckScope,
     isCramMode: isCramMode,
     isImageFirstMode: isImageFirstMode,
+    isBackToFrontMode: isBackToFrontMode,
     studyChunkSize: studyChunkSize,
     currentStudyIndex: currentStudyIndex,
     cardsReviewedInChunk: cardsReviewedInChunk,
@@ -7112,8 +7188,6 @@ function resumeSessionLocal(scopeToMatch) {
     
     // Restore all Global Flags and positions
     isCramMode = session.isCramMode;
-    isImageFirstMode = session.isImageFirstMode;
-    studyChunkSize = session.studyChunkSize;
     currentStudyIndex = Math.min(session.currentStudyIndex, Math.max(0, rebuiltActive.length - 1));
     cardsReviewedInChunk = session.cardsReviewedInChunk;
     studySessionStats = session.studySessionStats;
@@ -7297,6 +7371,37 @@ function renderCurrentStudyCard() {
 
   let fullName = cardData.point["Full Name"] || cardData.point[" Full Name"] || "";
 
+  // Mask self-spoilers on the front face in Back-to-Front mode
+  if (isBackToFrontMode) {
+    let spoilerTerms = expandTCMPoint(cardData.point["Short Name"].toLowerCase());
+    if (fullName) {
+      fullName.split(/[()]/).map(s => s.trim().toLowerCase()).forEach(part => {
+        if (part.length > 3) spoilerTerms.push(part);
+      });
+    }
+    const escapedSpoilers = spoilerTerms
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length)
+      .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '[\\s\\-]+'));
+
+    if (escapedSpoilers.length > 0) {
+      const spoilerRegex = new RegExp("\\b(" + escapedSpoilers.join("|") + ")\\b", "gi");
+      const maskBadge = `<span class="study-point-title" style="font-size:inherit;">[ ??? ]</span>`;
+
+      // 1. Replace self-links so the current point isn't a clickable blue link
+      formattedBack = formattedBack.replace(/<span class="point-link"[^>]*>([\s\S]*?)<\/span>/gi, (fullSpan, inner) => {
+        const cleanInner = inner.replace(/<[^>]+>/g, '');
+        spoilerRegex.lastIndex = 0;
+        return spoilerRegex.test(cleanInner) ? maskBadge : fullSpan;
+      });
+
+      // 2. Mask any remaining plain-text mentions (such as Pinyin/Full Name) outside HTML tags
+      formattedBack = formattedBack.split(/(<[^>]*>)/g).map(part => {
+        return part.startsWith("<") ? part : part.replace(spoilerRegex, maskBadge);
+      }).join("");
+    }
+  }
+
   let imageId = cardData.point["Image ID"] ? String(cardData.point["Image ID"]).trim() : "";
   let hasValidImage = (imageId && !imageId.toLowerCase().includes("yinyangph"));
   let imageHtml = "";
@@ -7314,19 +7419,60 @@ function renderCurrentStudyCard() {
     `;
   }
 
-  let frontHtml = "";
-  if (isImageFirstMode && hasValidImage) {
-    let imgSrc = getImagePath(cardData.point);
-    frontHtml = `
-      <img src="${imgSrc}" style="max-width: 100%; max-height: 220px; border-radius: 8px; border: 1px solid #d1d1d6; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); object-fit: contain; pointer-events: none;">
-      <div class="study-section-title">${cardData.sectionLabel}</div>
-      <div style="margin-top: 15px; font-size: 14px; color: #888; font-weight: 600;">Tap or Press Space to Reveal</div>
+  let frontFaceStyle = "";
+  let backFaceStyle = "";
+  let frontInnerHtml = "";
+  let backInnerHtml = "";
+
+  if (isBackToFrontMode) {
+    // BACK-TO-FRONT: Scrollable section text on Front, Point Name + Image on Back
+    frontFaceStyle = "padding: 0; justify-content: flex-start; align-items: stretch; text-align: left;";
+    backFaceStyle = "justify-content: center; align-items: center; padding: 30px; text-align: center; overflow-y: auto;";
+
+    frontInnerHtml = `
+      <div class="study-back-header">
+        <span style="color:#888;">Identify Point</span>
+        <span style="color:#cc5500;">${cardData.sectionLabel}</span>
+      </div>
+      <div class="study-back-content-wrapper" onscroll="checkStudyScroll(this)" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 15px;">
+        <div class="study-back-content">${formattedBack}</div>
+      </div>
+      <div class="study-scroll-arrow" id="studyScrollArrow">▼</div>
     `;
-  } else {
-    frontHtml = `
+
+    backInnerHtml = `
       <div class="study-point-title">${cardData.point["Short Name"]}</div>
       <div class="study-section-title">${cardData.sectionLabel}</div>
       <div style="margin-top: 20px; font-size: 16px; color: #888; font-weight: 600;">${highlightText(fullName)}</div>
+      ${imageHtml}
+    `;
+  } else {
+    // STANDARD OR IMAGE-FIRST: Prompt on Front, Scrollable section text on Back
+    if (isImageFirstMode && hasValidImage) {
+      let imgSrc = getImagePath(cardData.point);
+      frontInnerHtml = `
+        <img src="${imgSrc}" style="max-width: 100%; max-height: 220px; border-radius: 8px; border: 1px solid #d1d1d6; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); object-fit: contain; pointer-events: none;">
+        <div class="study-section-title">${cardData.sectionLabel}</div>
+        <div style="margin-top: 15px; font-size: 14px; color: #888; font-weight: 600;">Tap or Press Space to Reveal</div>
+      `;
+    } else {
+      frontInnerHtml = `
+        <div class="study-point-title">${cardData.point["Short Name"]}</div>
+        <div class="study-section-title">${cardData.sectionLabel}</div>
+        <div style="margin-top: 20px; font-size: 16px; color: #888; font-weight: 600;">${highlightText(fullName)}</div>
+      `;
+    }
+
+    backInnerHtml = `
+      <div class="study-back-header">
+        <span>${cardData.point["Short Name"]}</span>
+        <span style="color:#cc5500;">${cardData.sectionLabel}</span>
+      </div>
+      <div class="study-back-content-wrapper" onscroll="checkStudyScroll(this)" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 15px;">
+        <div class="study-back-content">${formattedBack}</div>
+        ${imageHtml}
+      </div>
+      <div class="study-scroll-arrow" id="studyScrollArrow">▼</div>
     `;
   }
 
@@ -7334,19 +7480,11 @@ function renderCurrentStudyCard() {
     <div class="study-card-wrapper" id="studyCardWrapper">
       <div class="study-feedback-icon" id="studyFeedbackIcon"></div>
       <div class="study-card" id="activeStudyCard" onclick="this.classList.toggle('is-flipped')">
-        <div class="study-face study-face-front">
-          ${frontHtml}
+        <div class="study-face study-face-front" style="${frontFaceStyle}">
+          ${frontInnerHtml}
         </div>
-        <div class="study-face study-face-back">
-          <div class="study-back-header">
-            <span>${cardData.point["Short Name"]}</span>
-            <span style="color:#cc5500;">${cardData.sectionLabel}</span>
-          </div>
-          <div class="study-back-content-wrapper" onscroll="checkStudyScroll(this)" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 15px;">
-            <div class="study-back-content">${formattedBack}</div>
-            ${imageHtml}
-          </div>
-          <div class="study-scroll-arrow" id="studyScrollArrow">▼</div>
+        <div class="study-face study-face-back" style="${backFaceStyle}">
+          ${backInnerHtml}
         </div>
       </div>
     </div>
@@ -7643,14 +7781,14 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
   let deltaY = e.changedTouches[0].screenY - studyTouchStartY;
   
   const isBack = e.target.closest('.study-face-back');
-  const scrollWrapper = e.target.closest('.study-back-content-wrapper');
+  const scrollWrapper = e.target.closest('.study-back-content-wrapper') || (isBackToFrontMode ? isBack : null);
   const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
 
   if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
     studyTouchStartX = null; studyTouchStartY = null; return;
   }
 
-  // --- NEW: Abort vertical swipe grading if scrolling long text ---
+  // --- Abort vertical swipe grading if scrolling overflowing content ---
   const isVerticalSwipe = Math.abs(deltaY) > Math.abs(deltaX);
   if (isVerticalSwipe && scrollWrapper) {
     if (scrollWrapper.scrollHeight > scrollWrapper.clientHeight) {
@@ -7665,7 +7803,8 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
       if (isBrowseMode) prevBrowseCard(); else undoLastStudyCard();
     }
   } else if (!isBrowseMode) {
-    const threshold = isBack ? 180 : 60; 
+    const isNotesSide = isBackToFrontMode ? !isBack : isBack;
+    const threshold = isNotesSide ? 180 : 60; 
     if (deltaY < -threshold) rateCard('swipe-strong');  
     else if (deltaY > threshold) rateCard('swipe-wrong'); 
   }
@@ -7676,9 +7815,9 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
 
 document.getElementById("studyOrderSelect").addEventListener("change", () => {
   if (studyDeckScope === 'global') {
-    openGlobalReview(isCramMode); 
+    openGlobalReview(isCramMode, true); 
   } else {
-    openStudyModal(isCramMode); 
+    openStudyModal(isCramMode, true); 
   }
 });
 
