@@ -480,7 +480,8 @@
     }
     @media (prefers-color-scheme: dark) {
       .qp-sticky-header { background: rgba(28, 28, 30, 0.98); border-color: #38383a; }
-      .qp-nav-btn, #qpAddAllCompareBtn { background: #2c2c2e !important; color: #0a84ff !important; }
+      .qp-nav-btn { background: #2c2c2e; color: #0a84ff; }
+      #qpAddAllCompareBtn { background: #2c2c2e !important; color: #0a84ff !important; }
       .qp-close-btn { background: rgba(255,255,255,0.15); color: #ccc; }
       .qp-point-info-row img { background: #1c1c1e; }
       .qp-result-card, .qp-history-box { background: #1c1c1e; border-color: #333; }
@@ -1125,6 +1126,62 @@
       font-weight: inherit; 
     }
     
+    /* --- OCCLUSION GROUP BADGES & PILL BAR --- */
+    .is-marked[data-occ-group]::after,
+    .is-word-marked[data-occ-group]::after {
+      content: "G" attr(data-occ-group);
+      font-size: 9px; font-weight: 900; padding: 1px 4px; border-radius: 4px;
+      margin-left: 3px; vertical-align: super; color: #fff; background: #cc5500;
+      display: inline-block; line-height: 1.1; pointer-events: none;
+    }
+    .is-marked[data-occ-group="2"], .is-word-marked[data-occ-group="2"] {
+      background: rgba(0, 122, 255, 0.18) !important; border-bottom-color: rgba(0, 122, 255, 0.7) !important;
+    }
+    .is-marked[data-occ-group="2"]::after, .is-word-marked[data-occ-group="2"]::after { background: #007aff; }
+
+    .is-marked[data-occ-group="3"], .is-word-marked[data-occ-group="3"] {
+      background: rgba(52, 199, 89, 0.2) !important; border-bottom-color: rgba(52, 199, 89, 0.7) !important;
+    }
+    .is-marked[data-occ-group="3"]::after, .is-word-marked[data-occ-group="3"]::after { background: #34c759; }
+
+    .is-marked[data-occ-group="4"], .is-word-marked[data-occ-group="4"] {
+      background: rgba(175, 82, 222, 0.2) !important; border-bottom-color: rgba(175, 82, 222, 0.7) !important;
+    }
+    .is-marked[data-occ-group="4"]::after, .is-word-marked[data-occ-group="4"]::after { background: #af52de; }
+
+    .occ-group-section {
+      border-top: 1px solid #e0e0e0; padding-top: 12px; margin-top: 4px;
+    }
+    .occ-group-subrow {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px;
+    }
+    .occ-group-sublabel {
+      font-size: 13px; font-weight: 700; color: #666; white-space: nowrap;
+    }
+    .occ-group-pills {
+      display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;
+    }
+    .occ-group-pill {
+      background: #e3e3e8; color: #333; border: none; border-radius: 14px;
+      padding: 5px 11px; font-size: 12px; font-weight: 800; cursor: pointer;
+      transition: transform 0.1s, background 0.15s;
+    }
+    .occ-group-pill:active { transform: scale(0.95); }
+    .occ-group-pill.active-mark { background: #cc5500; color: #fff; }
+    .occ-group-pill.active-hide { background: #007aff; color: #fff; }
+    .sheet-occ-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      background: rgba(227, 227, 232, 0.6); padding: 8px 12px; border-radius: 10px;
+      margin: 0 0 12px 0; overflow-x: auto; scrollbar-width: none;
+    }
+    .sheet-occ-bar::-webkit-scrollbar { display: none; }
+    @media (prefers-color-scheme: dark) {
+      .occ-group-section { border-top-color: #38383a; }
+      .occ-group-sublabel { color: #aaa; }
+      .occ-group-pill { background: #2c2c2e; color: #eee; }
+      .sheet-occ-bar { background: #1c1c1e; border: 1px solid #333; }
+    }
+    
     @media (prefers-color-scheme: dark) {
       .word-mark-target.is-word-marked { 
         background: rgba(255, 159, 10, 0.2); 
@@ -1608,7 +1665,7 @@
 <script src="./tcm-inference-engine.js"></script>
 
 </head>
-</head>
+
 <body>
   <div id="lightbox" onclick="closeLightbox()">
     <div id="lightbox-title"></div>
@@ -1792,6 +1849,17 @@ display: flex; flex-direction: column;">
           <button id="btnPhraseOff" onclick="setPhraseOccState('off')">Off</button>
           <button id="btnPhraseMark" onclick="setPhraseOccState('mark')">Mark</button>
           <button id="btnPhraseHide" onclick="setPhraseOccState('hide')">Hide</button>
+        </div>
+      </div>
+
+      <div class="occ-group-section">
+        <div class="occ-group-subrow">
+          <span class="occ-group-sublabel">🖍️ Mark Into Group:</span>
+          <div class="occ-group-pills" id="modalMarkGroupPills"></div>
+        </div>
+        <div class="occ-group-subrow" style="margin-bottom: 4px;">
+          <span class="occ-group-sublabel">🙈 Groups to Hide:</span>
+          <div class="occ-group-pills" id="modalHideGroupPills"></div>
         </div>
       </div>
 
@@ -2063,7 +2131,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "10.13.26.v1";
+const APP_VERSION = "10.14.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3559,7 +3627,8 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
     // 2. The custom Named Points links (Handles optional spaces automatically!)
     const namedPointsRegex = /\b(Shi\s*Xuan|Si\s*Feng|Ba\s*Xie|Luo\s*Zhen|Yao\s*Tong\s*Xue|Er\s*Bai|Zhou\s*Jian|Jian\s*Qian|Bai\s*Chong\s*Wo|He\s*Ding|Xi\s*Yan|Lan\s*Wei\s*Xue|Dan\s*Nang\s*Xue|Ba\s*Feng|Si\s*Shen\s*Cong|Yin\s*Tang|Yu\s*Yao|Qiu\s*Hou|Tai\s*Yang|Er\s*Jian|Bi\s*Tong|Bai\s*Lao|An\s*Mian|Jia\s*Cheng\s*Jiang|Jin\s*Jin\s*Yu\s*Ye|Hai\s*Quan|Ding\s*Chuan|Huan\s*Men|Wei\s*Guan\s*Xia\s*Shu|Yao\s*Yan|Shi\s*Qi\s*Zhui\s*Xia|San\s*Jiao\s*Jiu|Zi\s*Gong|Ti\s*Tuo|Hua\s*Tuo\s*Jia\s*Ji|Pi\s*Gen)\b/gi;
     
-    // Automatically re-hide the parent line if clicked while revealed
+    // Automatically re-hide the parent line if clicked while revealed, and yield to Mark Mode when active
+    const markModeGuard = "if(document.body.classList.contains('mark-mode-active')) return;";
     const hideLineLogic = "const rl=this.closest('.line-revealed'); if(rl){rl.classList.remove('line-revealed');rl.classList.add('line-occluded');}";
 
     const parts = htmlText.split(/(<[^>]*>)/g);
@@ -3567,12 +3636,12 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
       if (!parts[i].startsWith("<")) {
         // Apply standard links
         parts[i] = parts[i].replace(regex, (match, chan, num) => {
-          return `<span class="point-link" onclick="event.stopPropagation(); ${hideLineLogic} openQuickPeek('${chan}', '${num}')">${match}</span>`;
+          return `<span class="point-link" onclick="${markModeGuard} event.stopPropagation(); ${hideLineLogic} openQuickPeek('${chan}', '${num}')">${match}</span>`;
         });
         
         // Apply named point links (passes the name as 'chan' and leaves 'num' blank)
         parts[i] = parts[i].replace(namedPointsRegex, (match) => {
-          return `<span class="point-link" onclick="event.stopPropagation(); ${hideLineLogic} openQuickPeek('${match}', '')">${match}</span>`;
+          return `<span class="point-link" onclick="${markModeGuard} event.stopPropagation(); ${hideLineLogic} openQuickPeek('${match}', '')">${match}</span>`;
         });
       }
     }
@@ -5957,6 +6026,16 @@ document.addEventListener('keyup', (e) => {
 
     container.appendChild(actionRow);
 
+    // Inline Group Bar when Mark or Hide mode is active
+    const anyMark = (lineOccState === 'mark' || wordOccState === 'mark' || phraseOccState === 'mark');
+    const anyHide = (lineOccState === 'hide' || wordOccState === 'hide' || phraseOccState === 'hide');
+    if (anyMark || anyHide) {
+      const groupBar = document.createElement("div");
+      groupBar.className = "sheet-occ-bar";
+      groupBar.innerHTML = buildInlineGroupBarHTML(point, anyMark, anyHide);
+      container.appendChild(groupBar);
+    }
+
 
     // --- NEW: Track if we found filtered paragraphs ---
     let hasFilteredContent = false;
@@ -6185,10 +6264,147 @@ div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed
 }
 
 
-// --- UNIFIED 3-STATE OCCLUSION ENGINE ---
-let lineOccState = 'off'; // 'off', 'mark', 'hide'
-let wordOccState = 'off'; // 'off', 'mark', 'hide'
+// --- UNIFIED 3-STATE OCCLUSION ENGINE (WITH MULTI-GROUP SUPPORT) ---
+let lineOccState = 'off';   // 'off', 'mark', 'hide'
+let wordOccState = 'off';   // 'off', 'mark', 'hide'
 let phraseOccState = 'off'; // 'off', 'mark', 'hide'
+
+let activeMarkGroup = 1;           // Which group new marks are assigned to (1, 2, 3...)
+let occludeAllGroups = true;       // When true, Hide mode hides all groups
+let activeHideGroups = new Set([1]); // Which specific groups are hidden when occludeAllGroups is false
+let maxOcclusionGroup = 3;         // Minimum visible group buttons (expands dynamically)
+
+function parseOccItem(rawStr) {
+  if (!rawStr || typeof rawStr !== "string") return { text: "", group: 1 };
+  const m = rawStr.match(/^G(\d+)::([\s\S]*)$/);
+  if (m) return { text: m[2], group: Math.max(1, parseInt(m[1], 10)) };
+  return { text: rawStr, group: 1 };
+}
+
+function formatOccItem(text, group) {
+  const g = Math.max(1, parseInt(group, 10) || 1);
+  const clean = String(text).replace(/^G\d+::/, "");
+  return g === 1 ? clean : `G${g}::${clean}`;
+}
+
+function shouldHideGroup(groupNum) {
+  if (occludeAllGroups) return true;
+  return activeHideGroups.has(Number(groupNum) || 1);
+}
+
+function getDetectedMaxGroup(point) {
+  let maxG = maxOcclusionGroup;
+  const checkArr = (arr) => {
+    arr.forEach(raw => {
+      const { group } = parseOccItem(raw);
+      if (group > maxG) maxG = group;
+    });
+  };
+  if (point) {
+    checkArr(getOcclusionArray(point, "Line Occlusions"));
+    checkArr(getOcclusionArray(point, "Word Occlusions"));
+    checkArr(getOcclusionArray(point, "Phrase Occlusions"));
+  }
+  checkArr(pendingLineMarks);
+  checkArr(pendingWordMarks);
+  checkArr(pendingPhraseMarks);
+  if (activeMarkGroup > maxG) maxG = activeMarkGroup;
+  maxOcclusionGroup = maxG;
+  return maxG;
+}
+
+window.setActiveMarkGroup = function(groupNum) {
+  activeMarkGroup = Math.max(1, parseInt(groupNum, 10) || 1);
+  if (activeMarkGroup > maxOcclusionGroup) maxOcclusionGroup = activeMarkGroup;
+  renderModalGroupPills();
+  updateOcclusionBasketUI();
+  const sheet = document.getElementById('bottomSheet');
+  if (sheet && sheet.classList.contains('open')) updateSheetUI(false, true);
+};
+
+window.addNewOcclusionGroup = function() {
+  maxOcclusionGroup = getDetectedMaxGroup(sheetContextPoints ? sheetContextPoints[currentSheetIndex] : null) + 1;
+  activeMarkGroup = maxOcclusionGroup;
+  renderModalGroupPills();
+  updateOcclusionBasketUI();
+  const sheet = document.getElementById('bottomSheet');
+  if (sheet && sheet.classList.contains('open')) updateSheetUI(false, true);
+};
+
+window.toggleHideGroup = function(groupNum) {
+  if (groupNum === 'all') {
+    occludeAllGroups = true;
+  } else {
+    const g = parseInt(groupNum, 10);
+    if (occludeAllGroups) {
+      occludeAllGroups = false;
+      activeHideGroups = new Set([g]);
+    } else {
+      if (activeHideGroups.has(g)) {
+        activeHideGroups.delete(g);
+        if (activeHideGroups.size === 0) occludeAllGroups = true;
+      } else {
+        activeHideGroups.add(g);
+      }
+    }
+  }
+  renderModalGroupPills();
+  const sheet = document.getElementById('bottomSheet');
+  if (sheet && sheet.classList.contains('open')) updateSheetUI(false, true);
+  if (document.getElementById('compareModal').style.display === 'flex') openCompareModal();
+  if (document.getElementById('studyModal').style.display === 'flex') renderCurrentStudyCard();
+};
+
+function renderModalGroupPills() {
+  const markContainer = document.getElementById("modalMarkGroupPills");
+  const hideContainer = document.getElementById("modalHideGroupPills");
+  if (!markContainer || !hideContainer) return;
+
+  const currentPt = (sheetContextPoints && sheetContextPoints[currentSheetIndex]) ? sheetContextPoints[currentSheetIndex] : null;
+  const maxG = getDetectedMaxGroup(currentPt);
+
+  let markHtml = "";
+  for (let g = 1; g <= maxG; g++) {
+    const activeCls = (activeMarkGroup === g) ? " active-mark" : "";
+    markHtml += `<button type="button" class="occ-group-pill${activeCls}" onclick="setActiveMarkGroup(${g})">G${g}</button>`;
+  }
+  markHtml += `<button type="button" class="occ-group-pill" onclick="addNewOcclusionGroup()" title="Add Group">+</button>`;
+  markContainer.innerHTML = markHtml;
+
+  let hideHtml = `<button type="button" class="occ-group-pill${occludeAllGroups ? ' active-hide' : ''}" onclick="toggleHideGroup('all')">All</button>`;
+  for (let g = 1; g <= maxG; g++) {
+    const isSelected = !occludeAllGroups && activeHideGroups.has(g);
+    hideHtml += `<button type="button" class="occ-group-pill${isSelected ? ' active-hide' : ''}" onclick="toggleHideGroup(${g})">G${g}</button>`;
+  }
+  hideContainer.innerHTML = hideHtml;
+}
+
+function buildInlineGroupBarHTML(point, anyMark, anyHide) {
+  const maxG = getDetectedMaxGroup(point);
+  let html = "";
+
+  if (anyMark) {
+    html += `<div style="display:flex; align-items:center; gap:6px;">
+      <span class="occ-group-sublabel" style="font-size:11px;">🖍️ Mark:</span>`;
+    for (let g = 1; g <= maxG; g++) {
+      const activeCls = (activeMarkGroup === g) ? " active-mark" : "";
+      html += `<button type="button" class="occ-group-pill${activeCls}" style="padding:4px 9px; font-size:11px;" onclick="setActiveMarkGroup(${g})">G${g}</button>`;
+    }
+    html += `<button type="button" class="occ-group-pill" style="padding:4px 9px; font-size:11px;" onclick="addNewOcclusionGroup()">+</button></div>`;
+  }
+
+  if (anyHide) {
+    html += `<div style="display:flex; align-items:center; gap:6px; margin-left:auto;">
+      <span class="occ-group-sublabel" style="font-size:11px;">🙈 Hide:</span>
+      <button type="button" class="occ-group-pill${occludeAllGroups ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleHideGroup('all')">All</button>`;
+    for (let g = 1; g <= maxG; g++) {
+      const isSelected = !occludeAllGroups && activeHideGroups.has(g);
+      html += `<button type="button" class="occ-group-pill${isSelected ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleHideGroup(${g})">G${g}</button>`;
+    }
+    html += `</div>`;
+  }
+  return html;
+}
 
 function updateOccToggleUI() {
   ['Off', 'Mark', 'Hide'].forEach(s => {
@@ -6201,6 +6417,7 @@ function updateOccToggleUI() {
   } else {
     document.body.classList.remove('mark-mode-active');
   }
+  renderModalGroupPills();
   updateOcclusionBasketUI(); 
 }
 
@@ -6227,6 +6444,45 @@ document.addEventListener("selectionchange", () => {
   updateOcclusionBasketUI();
 });
 
+// Resolves saved + pending occlusions for a point into a Map: key -> { key, text, group, savedGroup, status }
+function resolveOcclusionItems(point, type) {
+  const fieldMap = { line: "Line Occlusions", word: "Word Occlusions", phrase: "Phrase Occlusions" };
+  const marksMap = { line: pendingLineMarks, word: pendingWordMarks, phrase: pendingPhraseMarks };
+  const unmarksMap = { line: pendingLineUnmarks, word: pendingWordUnmarks, phrase: pendingPhraseUnmarks };
+
+  const savedRaw = point ? getOcclusionArray(point, fieldMap[type]) : [];
+  const isCurrentSheetPoint = point && sheetContextPoints && sheetContextPoints[currentSheetIndex] && sheetContextPoints[currentSheetIndex]["Short Name"] === point["Short Name"];
+
+  const map = new Map();
+  savedRaw.forEach(itemStr => {
+    const { text, group } = parseOccItem(itemStr);
+    if (!text) return;
+    const key = (type === 'line') ? text : text.toLowerCase();
+    map.set(key, { key, text, group, savedGroup: group, status: 'saved' });
+  });
+
+  if (isCurrentSheetPoint) {
+    unmarksMap[type].forEach(unmarkKey => {
+      if (map.has(unmarkKey)) {
+        map.get(unmarkKey).status = 'pending-remove';
+      }
+    });
+    marksMap[type].forEach(markStr => {
+      const { text, group } = parseOccItem(markStr);
+      if (!text) return;
+      const key = (type === 'line') ? text : text.toLowerCase();
+      if (map.has(key)) {
+        const existing = map.get(key);
+        existing.group = group;
+        existing.status = 'pending-add';
+      } else {
+        map.set(key, { key, text, group, savedGroup: null, status: 'pending-add' });
+      }
+    });
+  }
+  return map;
+}
+
 window.updateOcclusionBasketUI = function() {
   const basket = document.getElementById("phraseBasket");
   const textEl = document.getElementById("phraseBasketText");
@@ -6244,11 +6500,11 @@ window.updateOcclusionBasketUI = function() {
 
   if (currentSelection.length > 0 && phraseOccState === 'mark') {
     let displayStr = currentSelection.length > 15 ? currentSelection.substring(0, 15) + "..." : currentSelection;
-    textEl.innerHTML = `<strong>Mark:</strong> "${displayStr}"`;
-    actionsEl.innerHTML = `<button style="background: #0a84ff; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="addPhraseToPool()">+ Add</button>`;
+    textEl.innerHTML = `<strong>Mark (G${activeMarkGroup}):</strong> "${escapeHTML(displayStr)}"`;
+    actionsEl.innerHTML = `<button onmousedown="event.preventDefault()" style="background: #0a84ff; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="addPhraseToPool()">+ Add G${activeMarkGroup}</button>`;
     basket.classList.add("visible");
   } else if (pendingCount > 0) {
-    textEl.innerHTML = `<strong>${pendingCount} Edit${pendingCount > 1 ? 's' : ''}</strong> Pending`;
+    textEl.innerHTML = `<strong>${pendingCount} Edit${pendingCount > 1 ? 's' : ''}</strong> (G${activeMarkGroup})`;
     actionsEl.innerHTML = `
       <button style="background: #34c759; border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="saveOcclusionPool()">Save</button>
       <button style="background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 15px; padding: 6px 12px; font-weight: bold; cursor: pointer;" onclick="clearOcclusionPool()">Clear</button>
@@ -6259,50 +6515,106 @@ window.updateOcclusionBasketUI = function() {
   }
 };
 
-
 window.addPhraseToPool = function() {
   if (!currentSelection) return;
-  pendingPhraseMarks.push(currentSelection);
+  const key = currentSelection.toLowerCase();
+  // Remove any older pending mark for the same phrase before pushing with activeMarkGroup
+  pendingPhraseMarks = pendingPhraseMarks.filter(m => parseOccItem(m).text.toLowerCase() !== key);
+  const unIdx = pendingPhraseUnmarks.indexOf(key);
+  if (unIdx > -1) pendingPhraseUnmarks.splice(unIdx, 1);
+
+  pendingPhraseMarks.push(formatOccItem(currentSelection, activeMarkGroup));
   window.getSelection().removeAllRanges(); 
   currentSelection = "";
   updateOcclusionBasketUI();
   updateSheetUI(false, true); 
 };
 
+function handleInteractiveMarkToggle(point, type, rawText) {
+  const marksMap = { line: pendingLineMarks, word: pendingWordMarks, phrase: pendingPhraseMarks };
+  const unmarksMap = { line: pendingLineUnmarks, word: pendingWordUnmarks, phrase: pendingPhraseUnmarks };
+  const marksArr = marksMap[type];
+  const unmarksArr = unmarksMap[type];
+
+  const key = (type === 'line') ? rawText : rawText.toLowerCase();
+  const map = resolveOcclusionItems(point, type);
+  const item = map.get(key);
+
+  const removeFromPendingMarks = () => {
+    for (let i = marksArr.length - 1; i >= 0; i--) {
+      const parsed = parseOccItem(marksArr[i]);
+      const k = (type === 'line') ? parsed.text : parsed.text.toLowerCase();
+      if (k === key) marksArr.splice(i, 1);
+    }
+  };
+
+  if (!item) {
+    // 1. Not marked yet -> Mark into activeMarkGroup
+    marksArr.push(formatOccItem(rawText, activeMarkGroup));
+  } else if (item.status === 'pending-remove') {
+    // 2. Was staged for removal -> Restore into activeMarkGroup
+    const uIdx = unmarksArr.indexOf(key);
+    if (uIdx > -1) unmarksArr.splice(uIdx, 1);
+    removeFromPendingMarks();
+    if (activeMarkGroup !== item.savedGroup) {
+      marksArr.push(formatOccItem(item.text, activeMarkGroup));
+    }
+  } else if (item.status === 'saved') {
+    if (item.group === activeMarkGroup) {
+      // 3a. Same group -> Stage for removal
+      if (!unmarksArr.includes(key)) unmarksArr.push(key);
+    } else {
+      // 3b. Different activeMarkGroup selected -> Reassign group!
+      removeFromPendingMarks();
+      marksArr.push(formatOccItem(item.text, activeMarkGroup));
+    }
+  } else if (item.status === 'pending-add') {
+    removeFromPendingMarks();
+    if (item.group !== activeMarkGroup) {
+      // 4a. Switch pending item to the newly selected activeMarkGroup
+      if (item.savedGroup === activeMarkGroup) {
+        const uIdx = unmarksArr.indexOf(key);
+        if (uIdx > -1) unmarksArr.splice(uIdx, 1);
+      } else {
+        marksArr.push(formatOccItem(item.text, activeMarkGroup));
+      }
+    } else {
+      // 4b. Tapped again on the same group -> Unmark completely
+      if (item.savedGroup !== null && !unmarksArr.includes(key)) {
+        unmarksArr.push(key);
+      }
+    }
+  }
+
+  updateOcclusionBasketUI();
+  updateSheetUI(false, true);
+}
+
 window.toggleMarkedPhrase = function(event, element, passedPointId) {
   event.stopPropagation();
   const phrase = element.getAttribute('data-phrase');
   const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
   let p = points.find(x => x["Short Name"] === pointId);
-  if (!p) return;
+  if (!p || !phrase) return;
+  handleInteractiveMarkToggle(p, 'phrase', phrase);
+};
 
-  let savedPhrases = getOcclusionArray(p, "Phrase Occlusions");
-  const isSaved = savedPhrases.includes(phrase);
+window.toggleMarkedLine = function(event, element, passedPointId) {
+  event.stopPropagation();
+  const text = element.getAttribute('data-original-text');
+  const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
+  let p = points.find(x => x["Short Name"] === pointId);
+  if (!p || !text) return;
+  handleInteractiveMarkToggle(p, 'line', text);
+};
 
-  if (isSaved) {
-    const idx = pendingPhraseUnmarks.indexOf(phrase);
-    if (idx > -1) {
-      pendingPhraseUnmarks.splice(idx, 1);
-      element.classList.add('is-word-marked');
-      element.style.opacity = '1';
-    } else {
-      pendingPhraseUnmarks.push(phrase);
-      element.classList.remove('is-word-marked');
-      element.style.opacity = '0.4';
-    }
-  } else {
-    const idx = pendingPhraseMarks.indexOf(phrase);
-    if (idx > -1) {
-      pendingPhraseMarks.splice(idx, 1);
-      element.classList.remove('is-word-marked');
-      element.style.borderBottom = '';
-    } else {
-      pendingPhraseMarks.push(phrase);
-      element.classList.add('is-word-marked');
-      element.style.borderBottom = '2px solid #0a84ff';
-    }
-  }
-  updateOcclusionBasketUI();
+window.toggleMarkedWord = function(event, element, passedPointId) {
+  event.stopPropagation();
+  const word = element.getAttribute('data-word');
+  const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
+  let p = points.find(x => x["Short Name"] === pointId);
+  if (!p || !word) return;
+  handleInteractiveMarkToggle(p, 'word', word);
 };
 
 window.saveOcclusionPool = async function() {
@@ -6310,42 +6622,42 @@ window.saveOcclusionPool = async function() {
   let p = points.find(x => x["Short Name"] === pointId);
   if (!p) return;
 
-  let savedLines = getOcclusionArray(p, "Line Occlusions");
-  let savedWords = getOcclusionArray(p, "Word Occlusions");
-  let savedPhrases = getOcclusionArray(p, "Phrase Occlusions");
+  const buildFinalArray = (type) => {
+    const map = resolveOcclusionItems(p, type);
+    const out = [];
+    map.forEach(entry => {
+      if (entry.status !== 'pending-remove') {
+        out.push(formatOccItem(entry.text, entry.group));
+      }
+    });
+    return out;
+  };
 
-  // Apply Additions
-  pendingLineMarks.forEach(l => { if (!savedLines.includes(l)) savedLines.push(l); });
-  pendingWordMarks.forEach(w => { if (!savedWords.includes(w)) savedWords.push(w); });
-  pendingPhraseMarks.forEach(ph => { if (!savedPhrases.includes(ph)) savedPhrases.push(ph); });
+  const hadLineEdits = (pendingLineMarks.length > 0 || pendingLineUnmarks.length > 0);
+  const hadWordEdits = (pendingWordMarks.length > 0 || pendingWordUnmarks.length > 0);
+  const hadPhraseEdits = (pendingPhraseMarks.length > 0 || pendingPhraseUnmarks.length > 0);
 
-  // Apply Removals
-  pendingLineUnmarks.forEach(l => { const i = savedLines.indexOf(l); if (i > -1) savedLines.splice(i, 1); });
-  pendingWordUnmarks.forEach(w => { const i = savedWords.indexOf(w); if (i > -1) savedWords.splice(i, 1); });
-  pendingPhraseUnmarks.forEach(ph => { const i = savedPhrases.indexOf(ph); if (i > -1) savedPhrases.splice(i, 1); });
-
-  p["Line Occlusions"] = JSON.stringify(savedLines);
-  p["Word Occlusions"] = JSON.stringify(savedWords);
-  p["Phrase Occlusions"] = JSON.stringify(savedPhrases);
+  p["Line Occlusions"] = JSON.stringify(buildFinalArray('line'));
+  p["Word Occlusions"] = JSON.stringify(buildFinalArray('word'));
+  p["Phrase Occlusions"] = JSON.stringify(buildFinalArray('phrase'));
 
   await saveSinglePointToVault(p);
 
-  // Package batch saves to Google Sheets
   if (navigator.onLine) {
-    if (pendingLineMarks.length > 0 || pendingLineUnmarks.length > 0) {
-        fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: p["Line Occlusions"] }) });
+    if (hadLineEdits) {
+      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: p["Line Occlusions"] }) });
     }
-    if (pendingWordMarks.length > 0 || pendingWordUnmarks.length > 0) {
-        fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Word Occlusions", value: p["Word Occlusions"] }) });
+    if (hadWordEdits) {
+      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Word Occlusions", value: p["Word Occlusions"] }) });
     }
-    if (pendingPhraseMarks.length > 0 || pendingPhraseUnmarks.length > 0) {
-        fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Phrase Occlusions", value: p["Phrase Occlusions"] }) });
+    if (hadPhraseEdits) {
+      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Phrase Occlusions", value: p["Phrase Occlusions"] }) });
     }
   }
 
   clearOcclusionPool(false); 
   updateOcclusionBasketUI();
-  updateSheetUI(false, true); // Re-renders the card completely to remove styling overrides
+  updateSheetUI(false, true);
   showToast("Occlusions saved to database.");
 };
 
@@ -6356,38 +6668,41 @@ window.clearOcclusionPool = function(redraw = true) {
   
   if (redraw) {
     updateOcclusionBasketUI();
-    updateSheetUI(false, true); // Returns the UI to its saved state
+    updateSheetUI(false, true);
   }
 };
-
 
 window.applyPhraseOcclusionToHTML = function(html, pointId) {
   if (phraseOccState === 'off') return html;
 
   let p = points.find(x => x["Short Name"] === pointId);
-  let savedPhrases = p ? getOcclusionArray(p, "Phrase Occlusions") : [];
-  let activePhrases = [...savedPhrases];
+  const map = resolveOcclusionItems(p, 'phrase');
+  if (map.size === 0) return html;
 
-  if (phraseOccState === 'mark' && sheetContextPoints && sheetContextPoints[currentSheetIndex] && sheetContextPoints[currentSheetIndex]["Short Name"] === pointId) {
-    activePhrases.push(...pendingPhraseMarks);
-  }
+  const activeEntries = [];
+  map.forEach(entry => {
+    if (phraseOccState === 'mark') {
+      activeEntries.push(entry);
+    } else if (phraseOccState === 'hide' && entry.status !== 'pending-remove' && shouldHideGroup(entry.group)) {
+      activeEntries.push(entry);
+    }
+  });
 
-  if (activePhrases.length === 0) return html;
+  if (activeEntries.length === 0) return html;
 
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
 
-  const escapedPhrases = activePhrases
-  .filter(w => w && w.trim().length > 0) // Prevents catastrophic zero-length matches
-  .sort((a, b) => b.length - a.length)
-  .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const escapedPhrases = activeEntries
+    .map(e => e.text)
+    .filter(w => w && w.trim().length > 0)
+    .sort((a, b) => b.length - a.length)
+    .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   
-  // ADD THIS LINE:
   if (escapedPhrases.length === 0) return html; 
 
   const phraseRegex = new RegExp("(" + escapedPhrases.join("|") + ")", "gi");
 
-  // 1. Map all text nodes and their absolute start/end positions in the full text string
   const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
   let textNodes = [];
   let fullText = "";
@@ -6403,7 +6718,6 @@ window.applyPhraseOcclusionToHTML = function(html, pointId) {
     fullText += text;
   }
 
-  // 2. Find all phrase matches in the continuous text
   let matches = [];
   let match;
   while ((match = phraseRegex.exec(fullText)) !== null) {
@@ -6414,7 +6728,6 @@ window.applyPhraseOcclusionToHTML = function(html, pointId) {
     });
   }
 
-  // 3. Process matches in REVERSE order so structural DOM changes don't affect indices of earlier text
   matches.sort((a, b) => b.start - a.start);
 
   matches.forEach(m => {
@@ -6428,17 +6741,21 @@ window.applyPhraseOcclusionToHTML = function(html, pointId) {
         range.setEnd(endBlock.node, m.end - endBlock.start);
 
         const lowerMatch = m.text.toLowerCase();
-        const isSaved = savedPhrases.some(p => p.toLowerCase() === lowerMatch);
+        const entry = map.get(lowerMatch);
+        if (!entry) return;
         
         const span = document.createElement('span');
         
         if (phraseOccState === 'mark') {
-          let isMarkedClass = (isSaved && !pendingPhraseUnmarks.some(p => p.toLowerCase() === lowerMatch)) || pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? " is-word-marked" : "";
-          let pendingStyle = pendingPhraseMarks.some(p => p.toLowerCase() === lowerMatch) ? "border-bottom: 2px solid #0a84ff;" : 
-                             (isSaved && pendingPhraseUnmarks.some(p => p.toLowerCase() === lowerMatch) ? "opacity: 0.4;" : "");
+          let isMarkedClass = (entry.status !== 'pending-remove') ? " is-word-marked" : "";
+          let pendingStyle = (entry.status === 'pending-add') ? "border-bottom: 2px solid #0a84ff;" : 
+                             (entry.status === 'pending-remove' ? "opacity: 0.4;" : "");
 
           span.className = "word-mark-target" + isMarkedClass;
           span.setAttribute("data-phrase", lowerMatch);
+          if (entry.status !== 'pending-remove') {
+            span.setAttribute("data-occ-group", entry.group);
+          }
           span.setAttribute("onclick", `window.toggleMarkedPhrase(event, this, '${pointId}')`);
           if (pendingStyle) span.setAttribute("style", pendingStyle);
 
@@ -6447,7 +6764,6 @@ window.applyPhraseOcclusionToHTML = function(html, pointId) {
           span.setAttribute("onclick", "if(this.classList.contains('line-occluded')) { event.stopPropagation(); this.classList.remove('line-occluded'); this.classList.add('line-revealed'); } else { this.classList.remove('line-revealed'); this.classList.add('line-occluded'); }");
         }
 
-        // Extract the nodes within the range and wrap them in the span, preserving HTML
         const contents = range.extractContents();
         span.appendChild(contents);
         range.insertNode(span);
@@ -6459,23 +6775,15 @@ window.applyPhraseOcclusionToHTML = function(html, pointId) {
   });
 
   return tempDiv.innerHTML;
-}
+};
 
-
-
-
-
-
-
-
-// --- NEW MANUAL WORD DOM PARSER ---
 window.applyWordOcclusionToHTML = function(html, pointId) {
   if (wordOccState === 'off') return html;
 
   let p = points.find(x => x["Short Name"] === pointId);
-  let savedWords = p ? getOcclusionArray(p, "Word Occlusions") : [];
+  const map = resolveOcclusionItems(p, 'word');
 
-  if (wordOccState === 'hide' && savedWords.length === 0) return html;
+  if (wordOccState === 'hide' && map.size === 0) return html;
   
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
@@ -6487,14 +6795,18 @@ window.applyWordOcclusionToHTML = function(html, pointId) {
 
   let hideRegex = null;
   if (wordOccState === 'hide') {
-    const escapedWords = [...savedWords]
-      .filter(w => w && w.trim().length > 0) // <-- ADD THIS FILTER
+    const wordsToHide = [];
+    map.forEach(entry => {
+      if (entry.status !== 'pending-remove' && shouldHideGroup(entry.group)) {
+        wordsToHide.push(entry.text);
+      }
+    });
+    const escapedWords = wordsToHide
+      .filter(w => w && w.trim().length > 0)
       .sort((a,b) => b.length - a.length)
       .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
       
-    // <-- ADD THIS BAILOUT
     if (escapedWords.length === 0) return html; 
-    
     hideRegex = new RegExp("\\b(" + escapedWords.join("|") + ")\\b", "gi");
   }
   
@@ -6507,14 +6819,13 @@ window.applyWordOcclusionToHTML = function(html, pointId) {
     if (wordOccState === 'mark') {
       replacedHTML = node.nodeValue.replace(markRegex, (match) => {
         let lowerMatch = match.toLowerCase();
-        let isSaved = savedWords.includes(lowerMatch);
+        let entry = map.get(lowerMatch);
+        let isMarkedClass = (entry && entry.status !== 'pending-remove') ? " is-word-marked" : "";
+        let groupAttr = (entry && entry.status !== 'pending-remove') ? ` data-occ-group="${entry.group}"` : "";
+        let pendingStyle = (entry && entry.status === 'pending-add') ? " style='border-bottom: 2px solid #0a84ff;'" : 
+                           (entry && entry.status === 'pending-remove' ? " style='opacity: 0.4;'" : "");
         
-        // NEW: Check pending arrays during redraw
-        let isMarkedClass = (isSaved && !pendingWordUnmarks.includes(lowerMatch)) || pendingWordMarks.includes(lowerMatch) ? " is-word-marked" : "";
-        let pendingStyle = pendingWordMarks.includes(lowerMatch) ? " style='border-bottom: 2px solid #0a84ff;'" : 
-                           (isSaved && pendingWordUnmarks.includes(lowerMatch) ? " style='opacity: 0.4;'" : "");
-        
-        return `<span class="word-mark-target${isMarkedClass}"${pendingStyle} data-word="${lowerMatch}" onclick="window.toggleMarkedWord(event, this, '${pointId}')">${match}</span>`;
+        return `<span class="word-mark-target${isMarkedClass}"${groupAttr}${pendingStyle} data-word="${lowerMatch}" onclick="window.toggleMarkedWord(event, this, '${pointId}')">${match}</span>`;
       });
     } else if (wordOccState === 'hide') {
       replacedHTML = node.nodeValue.replace(hideRegex, (match) => {
@@ -6530,13 +6841,11 @@ window.applyWordOcclusionToHTML = function(html, pointId) {
     }
   });
   return tempDiv.innerHTML;
-}
+};
 
-
-// --- UPDATED LINE DOM PARSER ---
 window.applyLineOcclusionToHTML = function(html, pointId, forceWrapAll = false) {
   let p = points.find(x => x["Short Name"] === pointId);
-  let savedLines = p ? getOcclusionArray(p, "Line Occlusions") : [];
+  const map = resolveOcclusionItems(p, 'line');
 
   if (lineOccState !== 'mark' && lineOccState !== 'hide' && !forceWrapAll) return html;
 
@@ -6546,29 +6855,30 @@ window.applyLineOcclusionToHTML = function(html, pointId, forceWrapAll = false) 
   function processLine(nodes) {
     if (nodes.length === 0) return;
     const rawText = nodes.reduce((acc, n) => acc + (n.textContent || ''), '').trim().replace(/\s+/g, ' ');
-    if (rawText.length < 2) return; 
+    if (rawText.length < 2 || rawText === '[...]') return;
 
     let shouldWrap = false;
     let span = document.createElement('span');
     span.setAttribute('data-original-text', rawText);
 
+    const entry = map.get(rawText);
+
     if (lineOccState === 'mark') {
       shouldWrap = true;
       span.className = 'mark-target';
       
-      // NEW: Check pending arrays during redraw
-      let isSaved = savedLines.includes(rawText);
-      if ((isSaved && !pendingLineUnmarks.includes(rawText)) || pendingLineMarks.includes(rawText)) {
-          span.classList.add('is-marked');
+      if (entry && entry.status !== 'pending-remove') {
+        span.classList.add('is-marked');
+        span.setAttribute('data-occ-group', entry.group);
       }
-      if (pendingLineMarks.includes(rawText)) {
-          span.style.borderBottom = '2px solid #0a84ff';
-      } else if (isSaved && pendingLineUnmarks.includes(rawText)) {
-          span.style.opacity = '0.4';
+      if (entry && entry.status === 'pending-add') {
+        span.style.borderBottom = '2px solid #0a84ff';
+      } else if (entry && entry.status === 'pending-remove') {
+        span.style.opacity = '0.4';
       }
 
       span.setAttribute('onclick', `window.toggleMarkedLine(event, this, '${pointId}')`);
-    } else if (lineOccState === 'hide' && savedLines.includes(rawText)) {
+    } else if (lineOccState === 'hide' && entry && entry.status !== 'pending-remove' && shouldHideGroup(entry.group)) {
       shouldWrap = true;
       span.className = 'line-occluded';
       span.setAttribute('onclick', "event.stopPropagation(); this.classList.toggle('line-revealed'); this.classList.toggle('line-occluded');");
@@ -6600,11 +6910,7 @@ window.applyLineOcclusionToHTML = function(html, pointId, forceWrapAll = false) 
   processLine(currentLineNodes);
 
   return tempDiv.innerHTML;
-}
-
-
-// --- NEW CLOUD-SYNC OCCLUSION ENGINE ---
-
+};
 
 // Helper to safely read stringified arrays from Google Sheets
 window.getOcclusionArray = function(point, field) {
@@ -6623,7 +6929,7 @@ window.clearAllOcclusions = async function() {
   if (!p) return;
 
   let changed = false;
-    let oldLines = getOcclusionArray(p, "Line Occlusions");
+  let oldLines = getOcclusionArray(p, "Line Occlusions");
   let oldWords = getOcclusionArray(p, "Word Occlusions");
   let oldPhrases = getOcclusionArray(p, "Phrase Occlusions");
 
@@ -6632,7 +6938,6 @@ window.clearAllOcclusions = async function() {
   if (oldPhrases.length > 0) { p["Phrase Occlusions"] = "[]"; changed = true; }
 
   if (changed) {
-    // NEW: Flush the staging pool so pending marks don't get accidentally re-saved!
     if (typeof clearOcclusionPool === 'function') clearOcclusionPool(false);
     
     await saveSinglePointToVault(p);
@@ -6660,109 +6965,35 @@ window.markAllLinesInSection = function(buttonEl, pointId) {
   let p = points.find(x => x["Short Name"] === pointId);
   if (!p) return;
 
-  let savedLines = getOcclusionArray(p, "Line Occlusions");
+  const map = resolveOcclusionItems(p, 'line');
   let addedCount = 0;
 
   targets.forEach(target => {
     const text = target.getAttribute('data-original-text');
     if (!text) return;
 
-    // 1. If it was pending removal, cancel the removal!
+    const item = map.get(text);
     const unmarkIdx = pendingLineUnmarks.indexOf(text);
     if (unmarkIdx > -1) {
       pendingLineUnmarks.splice(unmarkIdx, 1);
-      target.classList.add('is-marked');
-      target.style.opacity = '1';
       addedCount++;
     }
-    // 2. If it's not saved and not already pending addition, stage it!
-    else if (!savedLines.includes(text) && !pendingLineMarks.includes(text)) {
-      pendingLineMarks.push(text);
-      target.classList.add('is-marked');
-      target.style.borderBottom = '2px solid #0a84ff';
+    if (!item || item.status === 'pending-remove' || item.group !== activeMarkGroup) {
+      pendingLineMarks = pendingLineMarks.filter(m => parseOccItem(m).text !== text);
+      if (!item || item.savedGroup !== activeMarkGroup) {
+        pendingLineMarks.push(formatOccItem(text, activeMarkGroup));
+      }
       addedCount++;
     }
   });
 
   if (addedCount > 0) {
     updateOcclusionBasketUI();
+    updateSheetUI(false, true);
   } else {
-    showToast("All lines are already marked or pending.");
+    showToast(`All lines in this section are already in G${activeMarkGroup}.`);
   }
 };
-
-window.toggleMarkedLine = function(event, element, passedPointId) {
-  event.stopPropagation();
-  const text = element.getAttribute('data-original-text');
-  const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
-  let p = points.find(x => x["Short Name"] === pointId);
-  if (!p) return;
-
-  let savedLines = getOcclusionArray(p, "Line Occlusions");
-  const isSaved = savedLines.includes(text);
-
-  if (isSaved) {
-    const idx = pendingLineUnmarks.indexOf(text);
-    if (idx > -1) {
-      pendingLineUnmarks.splice(idx, 1);
-      element.classList.add('is-marked');
-      element.style.opacity = '1';
-    } else {
-      pendingLineUnmarks.push(text);
-      element.classList.remove('is-marked');
-      element.style.opacity = '0.4';
-    }
-  } else {
-    const idx = pendingLineMarks.indexOf(text);
-    if (idx > -1) {
-      pendingLineMarks.splice(idx, 1);
-      element.classList.remove('is-marked');
-      element.style.borderBottom = '';
-    } else {
-      pendingLineMarks.push(text);
-      element.classList.add('is-marked');
-      element.style.borderBottom = '2px solid #0a84ff';
-    }
-  }
-  updateOcclusionBasketUI();
-};
-
-window.toggleMarkedWord = function(event, element, passedPointId) {
-  event.stopPropagation();
-  const word = element.getAttribute('data-word');
-  const pointId = passedPointId || sheetContextPoints[currentSheetIndex]["Short Name"];
-  let p = points.find(x => x["Short Name"] === pointId);
-  if (!p) return;
-
-  let savedWords = getOcclusionArray(p, "Word Occlusions");
-  const isSaved = savedWords.includes(word);
-
-  if (isSaved) {
-    const idx = pendingWordUnmarks.indexOf(word);
-    if (idx > -1) {
-      pendingWordUnmarks.splice(idx, 1);
-      element.classList.add('is-word-marked');
-      element.style.opacity = '1';
-    } else {
-      pendingWordUnmarks.push(word);
-      element.classList.remove('is-word-marked');
-      element.style.opacity = '0.4';
-    }
-  } else {
-    const idx = pendingWordMarks.indexOf(word);
-    if (idx > -1) {
-      pendingWordMarks.splice(idx, 1);
-      element.classList.remove('is-word-marked');
-      element.style.borderBottom = '';
-    } else {
-      pendingWordMarks.push(word);
-      element.classList.add('is-word-marked');
-      element.style.borderBottom = '2px solid #0a84ff';
-    }
-  }
-  updateOcclusionBasketUI();
-};
-
 
 
 // --- WIPE KEYBOARD CURSOR ON TOUCH ---
@@ -7293,9 +7524,10 @@ function processIntake() {
 
     // 1. CLOSE MODAL (Escape OR Cmd + .)
     if (event.key === 'Escape' || (isCmd && event.key === '.')) {
+      if (isQuickPeekOpen() || document.getElementById('lightbox').style.display === 'flex' || document.getElementById('compareModal').style.display === 'flex') return;
       if (intakeModal.style.display !== 'none') {
         event.preventDefault();
-        closeIntakeModal(); // <--- CHANGED THIS LINE
+        closeIntakeModal();
       }
     }
 
