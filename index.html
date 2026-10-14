@@ -365,7 +365,8 @@
     
           #quickPeekModal .quick-peek-content {
       height: 100%; max-height: 100%; width: 88%; max-width: 420px; 
-      margin: 0; padding: 0; overflow-y: auto; background: #f0f0f5;
+      margin: 0; padding: 0; overflow-y: auto; overflow-x: hidden;
+      overscroll-behavior-x: none; background: #f0f0f5;
       border-radius: 20px 0 0 20px; box-shadow: -5px 0 25px rgba(0,0,0,0.15); 
       will-change: transform;
       /* Snappy entrance synced perfectly to the Bottom Sheet */
@@ -396,9 +397,97 @@
     }
     
     #quickPeekModal .point-notes { margin: 0 10px 7px 10px; }
-        #quickPeekModal .section-label { 
+    #quickPeekModal .section-label { 
       top: var(--qp-header-height, 90px); 
-    } 
+    }
+
+    /* --- QUICK PEEK SEARCH & NAVIGATION STYLES --- */
+    .qp-sticky-header {
+      position: sticky; top: 0; z-index: 90;
+      background: rgba(240, 240, 245, 0.98); backdrop-filter: blur(8px);
+      padding: calc(10px + env(safe-area-inset-top)) 12px 10px 12px;
+      border-bottom: 1px solid #d1d1d6;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border-radius: 20px 0 0 0;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .qp-nav-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      width: 100%; box-sizing: border-box; overflow: hidden;
+    }
+    /* Forces the left container (Back pill) to absorb remaining space and shrink cleanly */
+    .qp-nav-row > div:first-child {
+      flex: 1; min-width: 0; overflow: hidden;
+    }
+    /* Locks the right-side action buttons so they never move or squish */
+    .qp-nav-row > div:last-child {
+      flex-shrink: 0;
+    }
+    /* Prevents the "Quick Peek Search" title from wrapping onto 2 lines */
+    .qp-nav-row > div:first-child > div {
+      flex-shrink: 0; white-space: nowrap;
+    }
+    .qp-nav-btn {
+      background: #e3e3e8; color: #007aff; border: none; border-radius: 16px;
+      padding: 6px 10px; font-size: 13px; font-weight: 700; cursor: pointer;
+      display: block; line-height: 1.2; box-sizing: border-box;
+      flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* Allows ONLY the Back pill to shrink and truncate with "..." when space gets tight */
+    .qp-nav-row > div:first-child .qp-nav-btn {
+      flex: 0 1 auto; min-width: 0; max-width: 100%;
+    }
+    .qp-nav-btn:active { opacity: 0.7; transform: scale(0.97); }
+    .qp-close-btn {
+      background: #ffffff; color: #cc5500; border: none; border-radius: 50%;
+      width: 30px; height: 30px; font-size: 16px; font-weight: bold;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.1); flex-shrink: 0;
+    }
+    .qp-close-btn:active { background: #fff0e6; transform: scale(0.95); }
+    .qp-point-info-row {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .qp-point-info-row img {
+      width: 48px; height: 66px; object-fit: contain; border-radius: 4px;
+      cursor: pointer; background: white; padding: 2px; flex-shrink: 0;
+    }
+    .qp-results-list {
+      padding: 10px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .qp-result-card {
+      background: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px;
+      padding: 10px 12px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      transition: transform 0.1s, border-color 0.15s;
+    }
+    .qp-result-card:active { transform: scale(0.98); border-color: #007aff; }
+    .qp-result-top {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+    }
+    .qp-result-title {
+      font-size: 15px; font-weight: 800; color: #cc5500;
+    }
+    .qp-result-meta {
+      font-size: 12px; color: #666; margin-top: 2px;
+    }
+    .qp-result-snippet {
+      font-size: 12px; color: #3a3a3c; margin-top: 6px; padding-top: 6px;
+      border-top: 1px dashed #e5e5ea; line-height: 1.35;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .qp-history-box {
+      background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #d1d1d6;
+    }
+    @media (prefers-color-scheme: dark) {
+      .qp-sticky-header { background: rgba(28, 28, 30, 0.98); border-color: #38383a; }
+      .qp-nav-btn, #qpAddAllCompareBtn { background: #2c2c2e !important; color: #0a84ff !important; }
+      .qp-close-btn { background: rgba(255,255,255,0.15); color: #ccc; }
+      .qp-point-info-row img { background: #1c1c1e; }
+      .qp-result-card, .qp-history-box { background: #1c1c1e; border-color: #333; }
+      .qp-result-title { color: #ff9f0a; }
+      .qp-result-meta { color: #8e8e93; }
+      .qp-result-snippet { color: #ccc; border-top-color: #333; }
+    }
 
  
 
@@ -3337,7 +3426,7 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
 
   function escapeHTML(str) { return !str ? "" : String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   
-      function highlightText(text) {
+      function highlightText(text, customRegex) {
     if (!text) return ""; 
     let escaped = escapeHTML(text); 
     
@@ -3348,16 +3437,17 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
       .replace(/\[u\]([\s\S]*?)\[\/u\]/gi, "<u>$1</u>")
       .replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>");
 
-    // NEW FIX: Sweep up any orphaned/broken BBCode tags that were severed during paragraph filtering
+    // Sweep up any orphaned/broken BBCode tags that were severed during paragraph filtering
     withBB = withBB.replace(/\[\/?(b|i|u|color(?:=[^\]]+)?)\]/gi, "");
 
-    if (!activeHighlightRegex) return withBB;
+    const regexToUse = (customRegex !== undefined) ? customRegex : activeHighlightRegex;
+    if (!regexToUse) return withBB;
     
     // Highlight text while ignoring anything inside HTML brackets
     let parts = withBB.split(/(<[^>]*>)/g);
     for (let i = 0; i < parts.length; i++) {
       if (!parts[i].startsWith("<")) {
-        parts[i] = parts[i].replace(activeHighlightRegex, "<mark>$1</mark>");
+        parts[i] = parts[i].replace(regexToUse, "<mark>$1</mark>");
       }
     }
     return parts.join("");
@@ -3491,10 +3581,73 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
 
 
 
-        function openQuickPeek(chan, num) {
+// --- QUICK PEEK SESSION STATE & SEARCH ENGINE ---
+  let qpHistory = [];
+  let qpCurrentState = null; // { mode: 'point' | 'search', pointId: '', query: '', highlightRegex: null, scrollTop: 0 }
+  let qpSearchResults = [];
+  let qpSearchHighlightRegex = null;
+  let qpCloseTimer = null;
+
+  function isQuickPeekOpen() {
+    const modal = document.getElementById("quickPeekModal");
+    return modal && modal.style.display === "flex" && !modal.classList.contains("closing");
+  }
+
+  function pushCurrentQuickPeekState() {
+    if (!qpCurrentState) return;
+    const container = document.getElementById("quickPeekContainer");
+    if (container) qpCurrentState.scrollTop = container.scrollTop;
+    if (qpCurrentState.mode === "search") {
+      const input = document.getElementById("qpSearchInput");
+      if (input) qpCurrentState.query = input.value;
+    }
+    qpHistory.push({ ...qpCurrentState });
+  }
+
+  function updateQuickPeekHeaderHeight() {
+    setTimeout(() => {
+      const qpHeader = document.querySelector('#quickPeekModal .qp-sticky-header');
+      if (qpHeader) {
+        document.documentElement.style.setProperty('--qp-header-height', qpHeader.getBoundingClientRect().height + 'px');
+      }
+    }, 10);
+  }
+
+  function getBackLabel() {
+    if (qpHistory.length === 0) return "";
+    const prev = qpHistory[qpHistory.length - 1];
+    if (prev.mode === "point") return `← ${prev.pointId}`;
+    if (prev.mode === "search") {
+      const q = (prev.query || "").trim();
+      return q ? `← "${q}"` : `← Search`;
+    }
+    return "← Back";
+  }
+
+  window.qpGoBack = function() {
+    if (qpHistory.length === 0) return;
+    const prevState = qpHistory.pop();
+    qpCurrentState = prevState;
+
+    if (prevState.mode === "point") {
+      const targetPoint = points.find(p => p["Short Name"] === prevState.pointId);
+      if (targetPoint) {
+        buildQuickPeekDOM(targetPoint, prevState.highlightRegex);
+        const container = document.getElementById("quickPeekContainer");
+        if (container) container.scrollTop = prevState.scrollTop || 0;
+        updateQuickPeekHeaderHeight();
+      }
+    } else if (prevState.mode === "search") {
+      buildQuickPeekSearchDOM(prevState.query || "");
+      const container = document.getElementById("quickPeekContainer");
+      if (container) container.scrollTop = prevState.scrollTop || 0;
+      updateQuickPeekHeaderHeight();
+    }
+  };
+
+  function openQuickPeek(chan, num) {
     chan = chan.toUpperCase().replace(/\./g, "");
     
-    // Symmetrical aliases so it doesn't matter what your DB uses
     const aliases = {
       'HE': ['HT', 'HE'], 'HT': ['HT', 'HE'],
       'TB': ['SJ', 'TE', 'TB', 'TH'], 'TE': ['SJ', 'TE', 'TB', 'TH'], 'TH': ['SJ', 'TE', 'TB', 'TH'], 'SJ': ['SJ', 'TE', 'TB', 'TH'],
@@ -3509,13 +3662,10 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
     let stdChans = aliases[chan] || [chan];
     let targetPoint = null;
 
-    // Check all possible aliases against the database
     for (let stdChan of stdChans) {
       let targetId1 = stdChan + "-" + num;
       let targetId2 = stdChan + " " + num;
       let targetId3 = stdChan + num;
-      
-      // FIX: Check a spaceless version so "Yintang" matches "Yin Tang" infallibly
       let spacelessTarget = (stdChan + num).replace(/\s+/g, "");
 
       targetPoint = points.find(p => 
@@ -3534,89 +3684,564 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
       return;
     }
 
-    buildQuickPeekDOM(targetPoint);
-    document.getElementById("quickPeekModal").style.display = "flex";
-    
-    document.getElementById("quickPeekContainer").scrollTop = 0; 
-    
-    // Dynamically measure the header height so the sections stick perfectly
-    setTimeout(() => {
-      const qpHeader = document.querySelector('#quickPeekModal .detail-header-info');
-      if (qpHeader) {
-        document.documentElement.style.setProperty('--qp-header-height', qpHeader.getBoundingClientRect().height + 'px');
-      }
-    }, 10);
+    openQuickPeekPointObject(targetPoint);
   }
 
+  window.openQuickPeekById = function(pointId, fromQuickPeekSearch = false) {
+    const targetPoint = points.find(p => p["Short Name"] === pointId);
+    if (!targetPoint) { 
+      showToast("Record not found."); 
+      return; 
+    }
+    if (fromQuickPeekSearch && qpCurrentState && qpCurrentState.mode === "search") {
+      const input = document.getElementById("qpSearchInput");
+      if (input && input.value.trim().length > 1) {
+        saveSearchHistory(input.value.trim());
+      }
+    }
+    openQuickPeekPointObject(targetPoint, fromQuickPeekSearch ? qpSearchHighlightRegex : undefined);
+  };
 
-
-
-        function closeQuickPeek() {
+  function openQuickPeekPointObject(targetPoint, customHighlightRegex) {
     const modal = document.getElementById("quickPeekModal");
-    
-    // 1. Trigger the slide-out animation
+    if (qpCloseTimer) {
+      clearTimeout(qpCloseTimer);
+      qpCloseTimer = null;
+      modal.classList.remove("closing");
+    }
+
+    const wasOpen = isQuickPeekOpen();
+    let regexToUse = activeHighlightRegex;
+
+    if (wasOpen && qpCurrentState) {
+      if (!(qpCurrentState.mode === "point" && qpCurrentState.pointId === targetPoint["Short Name"])) {
+        pushCurrentQuickPeekState();
+      }
+      regexToUse = (customHighlightRegex !== undefined) ? customHighlightRegex : qpCurrentState.highlightRegex;
+    } else {
+      qpHistory = [];
+      if (customHighlightRegex !== undefined) regexToUse = customHighlightRegex;
+    }
+
+    qpCurrentState = {
+      mode: "point",
+      pointId: targetPoint["Short Name"],
+      highlightRegex: regexToUse,
+      scrollTop: 0
+    };
+
+    buildQuickPeekDOM(targetPoint, regexToUse);
+    modal.style.display = "flex";
+    document.getElementById("quickPeekContainer").scrollTop = 0;
+    updateQuickPeekHeaderHeight();
+  }
+
+  window.openQuickPeekSearch = function(initialQuery = "") {
+    const modal = document.getElementById("quickPeekModal");
+    if (qpCloseTimer) {
+      clearTimeout(qpCloseTimer);
+      qpCloseTimer = null;
+      modal.classList.remove("closing");
+    }
+
+    const wasOpen = isQuickPeekOpen();
+    if (wasOpen && qpCurrentState) {
+      if (qpCurrentState.mode === "search") {
+        const input = document.getElementById("qpSearchInput");
+        if (input) input.focus();
+        return;
+      }
+      pushCurrentQuickPeekState();
+    } else {
+      qpHistory = [];
+    }
+
+    qpCurrentState = {
+      mode: "search",
+      query: initialQuery,
+      scrollTop: 0
+    };
+
+    buildQuickPeekSearchDOM(initialQuery);
+    modal.style.display = "flex";
+    document.getElementById("quickPeekContainer").scrollTop = 0;
+    updateQuickPeekHeaderHeight();
+
+    setTimeout(() => {
+      const input = document.getElementById("qpSearchInput");
+      if (input) input.focus();
+    }, 50);
+  };
+
+  function closeQuickPeek() {
+    const modal = document.getElementById("quickPeekModal");
     modal.classList.add("closing"); 
     
-    // 2. Wait exactly 0.4s for the snappy animation to finish, then hide it
-    setTimeout(() => {
+    if (qpCloseTimer) clearTimeout(qpCloseTimer);
+    qpCloseTimer = setTimeout(() => {
       modal.style.display = "none";
-      modal.classList.remove("closing"); // Reset it for next time
-      document.getElementById("quickPeekContainer").innerHTML = ""; 
-    }, 400); // Synced to the new 0.4s CSS duration
+      modal.classList.remove("closing");
+      document.getElementById("quickPeekContainer").innerHTML = "";
+      qpHistory = [];
+      qpCurrentState = null;
+      qpCloseTimer = null;
+    }, 400);
   }
 
-
-
-    function buildQuickPeekDOM(point) {
+  function buildQuickPeekDOM(point, customRegex) {
     const container = document.getElementById("quickPeekContainer");
     container.innerHTML = ""; 
 
-    const headerInfo = document.createElement("div"); headerInfo.className = "detail-header-info";
-    
+    const stickyHeader = document.createElement("div");
+    stickyHeader.className = "qp-sticky-header";
+
+    // Row 1: Navigation & Actions (Back, Search, Compare, Close)
+    const navRow = document.createElement("div");
+    navRow.className = "qp-nav-row";
+
+    const leftGroup = document.createElement("div");
+    leftGroup.style.cssText = "display:flex; align-items:center; gap:6px;";
+    if (qpHistory.length > 0) {
+      const backBtn = document.createElement("button");
+      backBtn.className = "qp-nav-btn";
+      backBtn.textContent = getBackLabel();
+      backBtn.onclick = (e) => { e.stopPropagation(); window.qpGoBack(); };
+      leftGroup.appendChild(backBtn);
+    }
+
+    const rightGroup = document.createElement("div");
+    rightGroup.style.cssText = "display:flex; align-items:center; gap:8px; margin-left:auto;";
+
+    const searchBtn = document.createElement("button");
+    searchBtn.className = "qp-nav-btn";
+    searchBtn.innerHTML = "🔍 Search";
+    searchBtn.onclick = (e) => { e.stopPropagation(); window.openQuickPeekSearch(""); };
+
+    const isCompared = compareList.includes(point["Short Name"]);
+    const compBtn = document.createElement("button");
+    compBtn.className = "qp-nav-btn";
+    compBtn.style.background = isCompared ? "#cc5500" : "";
+    compBtn.style.color = isCompared ? "#ffffff" : "";
+    compBtn.innerHTML = isCompared ? "✓ Compare" : "+ Compare";
+    compBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleCompare(point["Short Name"]);
+      const nowAdded = compareList.includes(point["Short Name"]);
+      compBtn.style.background = nowAdded ? "#cc5500" : "";
+      compBtn.style.color = nowAdded ? "#ffffff" : "";
+      compBtn.innerHTML = nowAdded ? "✓ Compare" : "+ Compare";
+    };
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "qp-close-btn";
+    closeBtn.innerHTML = "✕";
+    closeBtn.onclick = closeQuickPeek;
+
+    rightGroup.appendChild(searchBtn);
+    rightGroup.appendChild(compBtn);
+    rightGroup.appendChild(closeBtn);
+    navRow.appendChild(leftGroup);
+    navRow.appendChild(rightGroup);
+    stickyHeader.appendChild(navRow);
+
+    // Row 2: Point Image + Title + Meta
+    const infoRow = document.createElement("div");
+    infoRow.className = "qp-point-info-row";
+
     const imgInfo = document.createElement("img"); 
     imgInfo.src = getImagePath(point);
     imgInfo.onclick = (e) => { e.stopPropagation(); openLightboxSingle(point["Short Name"], point["Image ID"]); };
     
-    const titleGroup = document.createElement("div"); titleGroup.className = "detail-title-group";
-        // NEW: Grab the importance data and create the HTML span
+    const titleGroup = document.createElement("div");
+    titleGroup.className = "detail-title-group";
+    titleGroup.style.paddingRight = "0";
+
     const imp = point.Important ? String(point.Important).trim() : "";
     const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
 
-    const titleEl = document.createElement("div"); titleEl.className = "detail-title";
-    titleEl.innerHTML = highlightText(point["Short Name"]) + impHtml;
+    const titleEl = document.createElement("div");
+    titleEl.className = "detail-title";
+    titleEl.innerHTML = highlightText(point["Short Name"], customRegex) + impHtml;
 
-    const meta = document.createElement("div"); meta.className = "detail-meta";
+    const meta = document.createElement("div");
+    meta.className = "detail-meta";
     const fullName = point["Full Name"] || point[" Full Name"] || "";
     const shortChan = point["Channel Short Name"] || point[" Channel Short Name"] || "";
     let metaHtml = "";
-    if (fullName) metaHtml += "<span>" + highlightText(fullName) + "</span>";
-    if (shortChan) metaHtml += "<span>" + highlightText(shortChan) + "</span>";
+    if (fullName) metaHtml += "<span>" + highlightText(fullName, customRegex) + "</span>";
+    if (shortChan) metaHtml += "<span>" + highlightText(shortChan, customRegex) + "</span>";
     meta.innerHTML = metaHtml;
 
-    
-    titleGroup.appendChild(titleEl); titleGroup.appendChild(meta);
-    headerInfo.appendChild(imgInfo); headerInfo.appendChild(titleGroup);
+    titleGroup.appendChild(titleEl);
+    titleGroup.appendChild(meta);
+    infoRow.appendChild(imgInfo);
+    infoRow.appendChild(titleGroup);
+    stickyHeader.appendChild(infoRow);
+    container.appendChild(stickyHeader);
 
-    const navGroup = document.createElement("div"); navGroup.className = "detail-nav-group";
-    const closeBtn = document.createElement("button"); closeBtn.className = "absolute-close-btn"; closeBtn.innerHTML = "✕";
-    closeBtn.onclick = closeQuickPeek;
-    navGroup.appendChild(closeBtn); headerInfo.appendChild(navGroup); container.appendChild(headerInfo);
+    const bodyWrapper = document.createElement("div");
+    bodyWrapper.style.paddingTop = "10px";
 
     const addDetail = (label, value) => {
-      // Hide empty fields in Quick Peek
       if (!value || String(value).trim() === "") return; 
-      
       const div = document.createElement("div"); 
       div.className = "point-notes";
-      const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value)));
+      const fullHtml = linkifyPoints(formatTextWithTables(highlightText(value, customRegex)));
       div.innerHTML = "<div class='section-label'>" + label + "</div><div class='section-content'>" + fullHtml + "</div>";
-      container.appendChild(div);
+      bodyWrapper.appendChild(div);
     };
 
-        TCM_SECTIONS.forEach(sec => {
+    TCM_SECTIONS.forEach(sec => {
       let val = point[sec.key] || point[sec.altKey] || "";
       addDetail(sec.label, val);
     });
+
+    container.appendChild(bodyWrapper);
+  }
+
+  // Self-contained Search Evaluator for Quick Peek (does not touch main search globals)
+  function evaluateQuickPeekQuery(rawQuery) {
+    let query = (rawQuery || "").trim();
+    if (!query) {
+      return { results: [], highlightRegex: null, parsedIncludes: [] };
+    }
+
+    let isDocWide = false;
+    if (query.toLowerCase().startsWith("all:")) {
+      isDocWide = true;
+      query = query.substring(4).trim();
+    }
+
+    query = query.replace(/\s*\|\s*/g, "|");
+    const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
+    const rawKeywords = query.match(tokenRegex) || [];
+    
+    const headers = [];
+    const fullNamesGroups = [];
+    const exclude = [];
+    const parsedIncludes = [];
+    const strictImportance = [];
+
+    rawKeywords.forEach(token => {
+      if (token.match(/^!+$/)) {
+        strictImportance.push(token);
+      } else if (token.startsWith("<>")) {
+        const terms = token.slice(2).toLowerCase().split(",");
+        terms.forEach(t => exclude.push(...expandTCMPoint(t)));
+      } else if (token.startsWith("@")) {
+        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
+        const terms = cleanToken.split(",");
+        terms.forEach(t => {
+          const rangeTerms = expandPointRange(t);
+          rangeTerms.forEach(rt => headers.push(...expandTCMPoint(rt)));
+        });
+      } else if (token.startsWith("#")) {
+        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
+        const terms = cleanToken.split(",");
+        const orGroup = [];
+        terms.forEach(t => orGroup.push(...expandTCMPoint(t)));
+        if (orGroup.length > 0) fullNamesGroups.push(orGroup);
+      } else {
+        const parts = token.split("|").filter(Boolean);
+        const orGroup = [];
+        parts.forEach(part => {
+          if (part.startsWith('"') && part.endsWith('"') && part.length >= 2) {
+            const phrase = part.slice(1, -1).toLowerCase();
+            const safePhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            orGroup.push({ type: 'exact', regex: new RegExp("\\b" + safePhrase + "\\b", "i"), regexString: "\\b" + safePhrase + "\\b", text: phrase });
+          } else {
+            const phrase = part.toLowerCase();
+            const expandedTerms = expandTCMPoint(phrase);
+            expandedTerms.forEach(ext => {
+              const safePhrase = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              orGroup.push({ type: 'substring', regexString: safePhrase, text: ext });
+            });
+          }
+        });
+        if (orGroup.length > 0) parsedIncludes.push(orGroup);
+      }
+    });
+
+    const regexParts = [];
+    parsedIncludes.forEach(group => group.forEach(item => regexParts.push(item.regexString)));
+    headers.forEach(h => regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    fullNamesGroups.forEach(group => group.forEach(f => regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))));
+
+    const validRegexParts = regexParts.filter(t => t.trim().length > 2).sort((a, b) => b.length - a.length);
+    const localHighlightRegex = validRegexParts.length > 0 ? new RegExp("(" + validRegexParts.join("|") + ")", "gi") : null;
+
+    const results = points.filter(point => {
+      if (strictImportance.length > 0) {
+        const imp = point.Important ? String(point.Important).trim() : "";
+        if (!strictImportance.includes(imp)) return false;
+      }
+      if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
+
+      if (headers.length > 0 && !headers.some(h => {
+        if (/\d$/.test(h)) {
+          return new RegExp(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "i").test(point._shortNameLower);
+        }
+        let cleanH = h.replace(/[\s\-]/g, "");
+        let cleanName = point._shortNameLower.replace(/[\s\-]/g, "");
+        return cleanName.includes(cleanH);
+      })) return false;
+
+      if (fullNamesGroups.length > 0) {
+        const hashTarget = ((point["Full Name"] || point[" Full Name"] || "") + " " + 
+                           (point["Channel Short Name"] || point[" Channel Short Name"] || "")).toLowerCase();
+        const passesAllHashGroups = fullNamesGroups.every(group => group.some(f => hashTarget.includes(f)));
+        if (!passesAllHashGroups) return false;
+      }
+
+      if (parsedIncludes.length > 0) {
+        const passesPass1 = parsedIncludes.every(orGroup => {
+          return orGroup.some(term => {
+            if (term.type === 'exact') return term.regex.test(point._searchIndex);
+            else return point._searchIndex.includes(term.text);
+          });
+        });
+        if (!passesPass1) return false;
+
+        const hasValidParagraph = point._paragraphs.some(p => {
+          return parsedIncludes.every(orGroup => {
+            return orGroup.some(term => {
+              if (term.type === 'exact') {
+                term.regex.lastIndex = 0; return term.regex.test(p);
+              } else {
+                return p.includes(term.text);
+              }
+            });
+          });
+        });
+        if (!isDocWide && !hasValidParagraph) return false;
+      }
+      return true;
+    });
+
+    return { results, highlightRegex: localHighlightRegex, parsedIncludes };
+  }
+
+  function buildQuickPeekSearchDOM(initialQuery = "") {
+    const container = document.getElementById("quickPeekContainer");
+    container.innerHTML = "";
+
+    const stickyHeader = document.createElement("div");
+    stickyHeader.className = "qp-sticky-header";
+
+    // Row 1: Back Button + Title + Close Button
+    const navRow = document.createElement("div");
+    navRow.className = "qp-nav-row";
+
+    const leftGroup = document.createElement("div");
+    leftGroup.style.cssText = "display:flex; align-items:center; gap:8px;";
+    if (qpHistory.length > 0) {
+      const backBtn = document.createElement("button");
+      backBtn.className = "qp-nav-btn";
+      backBtn.textContent = getBackLabel();
+      backBtn.onclick = (e) => { e.stopPropagation(); window.qpGoBack(); };
+      leftGroup.appendChild(backBtn);
+    }
+
+    const headerTitle = document.createElement("div");
+    headerTitle.style.cssText = "font-weight:800; font-size:15px; color:#8e8e93;";
+    headerTitle.textContent = "Quick Peek Search";
+    leftGroup.appendChild(headerTitle);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "qp-close-btn";
+    closeBtn.innerHTML = "✕";
+    closeBtn.onclick = closeQuickPeek;
+
+    navRow.appendChild(leftGroup);
+    navRow.appendChild(closeBtn);
+    stickyHeader.appendChild(navRow);
+
+    // Row 2: Search Input Box
+    const searchWrap = document.createElement("div");
+    searchWrap.className = "search-container";
+    searchWrap.innerHTML = `
+      <input id="qpSearchInput" class="search-box" type="text" placeholder="Search @short, #full, terms..." value="${escapeHTML(initialQuery)}" />
+      <div class="clear-btn-hitbox" onclick="clearQuickPeekSearchInput()"><span class="clear-btn-icon">✕</span></div>
+    `;
+    stickyHeader.appendChild(searchWrap);
+
+    // Row 3: Results Counter + "+ cf. All" Button
+    const metaRow = document.createElement("div");
+    metaRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#8e8e93; font-weight:600;";
+    metaRow.innerHTML = `
+      <span id="qpResultsCounter">Type to search...</span>
+      <button id="qpAddAllCompareBtn" onclick="addAllQuickPeekToCompare()" style="display:none; background:#e3e3e8; color:#007aff; border:none; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer;">+ cf.</button>
+    `;
+    stickyHeader.appendChild(metaRow);
+    container.appendChild(stickyHeader);
+
+    // Results Body
+    const resultsContainer = document.createElement("div");
+    resultsContainer.id = "qpResultsList";
+    resultsContainer.className = "qp-results-list";
+    container.appendChild(resultsContainer);
+
+    const inputEl = document.getElementById("qpSearchInput");
+    inputEl.addEventListener("input", debounce(() => {
+      if (qpCurrentState && qpCurrentState.mode === "search") {
+        qpCurrentState.query = inputEl.value;
+      }
+      renderQuickPeekSearchResults(inputEl.value);
+    }, 200));
+
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        if (inputEl.value.trim().length > 0) {
+          clearQuickPeekSearchInput();
+        } else {
+          inputEl.blur();
+        }
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (inputEl.value.trim().length > 1) saveSearchHistory(inputEl.value.trim());
+        inputEl.blur();
+      }
+    });
+
+    renderQuickPeekSearchResults(initialQuery);
+  }
+
+  window.clearQuickPeekSearchInput = function() {
+    const input = document.getElementById("qpSearchInput");
+    if (!input) return;
+    input.value = "";
+    if (qpCurrentState && qpCurrentState.mode === "search") qpCurrentState.query = "";
+    renderQuickPeekSearchResults("");
+    input.focus();
+  };
+
+  window.applyQuickPeekHistorySearch = function(term) {
+    const input = document.getElementById("qpSearchInput");
+    if (!input) return;
+    input.value = term;
+    if (qpCurrentState && qpCurrentState.mode === "search") qpCurrentState.query = term;
+    saveSearchHistory(term);
+    renderQuickPeekSearchResults(term);
+  };
+
+  window.addAllQuickPeekToCompare = function() {
+    let addedCount = 0;
+    qpSearchResults.forEach(p => {
+      if (!compareList.includes(p["Short Name"])) {
+        compareList.push(p["Short Name"]);
+        addedCount++;
+      }
+    });
+    updateCompareBasketUI();
+    showToast(`Added ${addedCount} points to Compare`);
+    const input = document.getElementById("qpSearchInput");
+    if (input) renderQuickPeekSearchResults(input.value);
+  };
+
+  function getMatchingSnippet(point, highlightRegex) {
+    if (!highlightRegex) return "";
+    for (let sec of TCM_SECTIONS) {
+      let val = point[sec.key] || point[sec.altKey];
+      if (!val) continue;
+      let lines = String(val).split(/\r?\n/);
+      for (let line of lines) {
+        let cleanLine = stripBBCode(line).trim();
+        highlightRegex.lastIndex = 0;
+        if (highlightRegex.test(cleanLine)) {
+          return `<strong>${sec.label}:</strong> ` + highlightText(cleanLine, highlightRegex);
+        }
+      }
+    }
+    return "";
+  }
+
+  function renderQuickPeekSearchResults(rawQuery) {
+    const listEl = document.getElementById("qpResultsList");
+    const counterEl = document.getElementById("qpResultsCounter");
+    const addAllBtn = document.getElementById("qpAddAllCompareBtn");
+    if (!listEl || !counterEl) return;
+
+    const cleanQuery = (rawQuery || "").trim();
+
+    // If search input is empty, show Recent Searches for quick 1-tap access
+    if (cleanQuery.length === 0) {
+      qpSearchResults = [];
+      qpSearchHighlightRegex = null;
+      if (addAllBtn) addAllBtn.style.display = "none";
+
+      let history = JSON.parse(localStorage.getItem('tcm_search_history')) || [];
+      if (history.length === 0) {
+        counterEl.textContent = "Enter a search term above";
+        listEl.innerHTML = `<div style="text-align:center; padding:30px 15px; color:#8e8e93; font-size:13px;">Search by keyword, <b>@point</b>, <b>#channel</b>, or <b>"exact phrase"</b>.</div>`;
+        return;
+      }
+
+      counterEl.textContent = "Recent Searches";
+      let histHtml = `<div class="qp-history-box">`;
+      history.forEach(term => {
+        const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        histHtml += `<button type="button" class="history-item" onclick="applyQuickPeekHistorySearch('${safeTerm}')"><span class="history-icon">🕒</span> ${escapeHTML(term)}</button>`;
+      });
+      histHtml += `</div>`;
+      listEl.innerHTML = histHtml;
+      return;
+    }
+
+    const evalObj = evaluateQuickPeekQuery(cleanQuery);
+    qpSearchResults = evalObj.results;
+    qpSearchHighlightRegex = evalObj.highlightRegex;
+
+    counterEl.textContent = `Results: ${qpSearchResults.length} of ${points.length}`;
+
+    if (addAllBtn) {
+      if (qpSearchResults.length > 0 && qpSearchResults.length <= 40) {
+        addAllBtn.style.display = "inline-block";
+        addAllBtn.textContent = `+ cf. ${qpSearchResults.length}`;
+      } else {
+        addAllBtn.style.display = "none";
+      }
+    }
+
+    if (qpSearchResults.length === 0) {
+      listEl.innerHTML = `<div style="text-align:center; padding:30px 15px; color:#8e8e93;">No points match "${escapeHTML(cleanQuery)}".</div>`;
+      return;
+    }
+
+    let html = "";
+    qpSearchResults.forEach(p => {
+      const shortName = p["Short Name"];
+      const safeName = shortName.replace(/'/g, "\\'");
+      const fullName = p["Full Name"] || p[" Full Name"] || "";
+      const chanShort = p["Channel Short Name"] || p[" Channel Short Name"] || p["Channel Full Name"] || "";
+      const imp = p.Important ? String(p.Important).trim() : "";
+      const impHtml = imp !== "" ? `<span class="importance-badge" style="font-size:14px; margin-left:5px;">${imp}</span>` : "";
+      const isCompared = compareList.includes(shortName);
+      const snippetHtml = getMatchingSnippet(p, qpSearchHighlightRegex);
+
+      html += `
+        <div class="qp-result-card" onclick="openQuickPeekById('${safeName}', true)">
+          <div class="qp-result-top">
+            <div>
+              <div class="qp-result-title">${highlightText(shortName, qpSearchHighlightRegex)}${impHtml}</div>
+              <div class="qp-result-meta">${highlightText(fullName, qpSearchHighlightRegex)}${fullName && chanShort ? " &bull; " : ""}${highlightText(chanShort, qpSearchHighlightRegex)}</div>
+            </div>
+            <button onclick="
+              event.stopPropagation();
+              toggleCompare('${safeName}');
+              const isAdded = compareList.includes('${safeName}');
+              this.style.background = isAdded ? '#cc5500' : '#007aff';
+              this.textContent = isAdded ? '✓' : '+';
+            " style="background:${isCompared ? '#cc5500' : '#007aff'}; color:white; border:none; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; min-width:28px; flex-shrink:0;">
+              ${isCompared ? '✓' : '+'}
+            </button>
+          </div>
+          ${snippetHtml ? `<div class="qp-result-snippet">${snippetHtml}</div>` : ""}
+        </div>
+      `;
+    });
+
+    listEl.innerHTML = html;
   }
 
 
@@ -4145,7 +4770,7 @@ async function saveEdit() {
     icon.style.color = "";
   }
 
-  // --- NEW: Reset Intake Parser Buttons ---
+  // --- Reset Intake Parser Buttons ---
   const intakeResults = document.getElementById("intakeResults");
   if (intakeResults) {
     const compareBtns = intakeResults.querySelectorAll("button");
@@ -4153,6 +4778,21 @@ async function saveEdit() {
       if (btn.textContent.trim() === "✓") {
         btn.style.background = "#007aff";
         btn.textContent = "+";
+      }
+    });
+  }
+
+  // --- Reset Quick Peek Compare Buttons ---
+  const qpContainer = document.getElementById("quickPeekContainer");
+  if (qpContainer) {
+    qpContainer.querySelectorAll("button").forEach(btn => {
+      if (btn.textContent.trim() === "✓") {
+        btn.style.background = "#007aff";
+        btn.textContent = "+";
+      } else if (btn.textContent.trim() === "✓ Compare") {
+        btn.style.background = "";
+        btn.style.color = "";
+        btn.innerHTML = "+ Compare";
       }
     });
   }
@@ -4808,8 +5448,8 @@ function handleGlobalEnter(e) {
 // --- MASTER KEYBOARD LISTENER ---
 document.addEventListener('keydown', (e) => {
   
-  // 1. SEARCH SHORTCUTS (Cmd/Ctrl + F  OR  "/")
-  if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') || e.key === '/') {
+  // 1. MAIN SEARCH SHORTCUTS (Cmd/Ctrl + F  OR  "/")
+  if (((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f') || e.key === '/') {
     const activeEl = document.activeElement;
     // Only trigger if we aren't already actively typing in a text box
     if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA' && !activeEl.isContentEditable)) {
@@ -4823,7 +5463,17 @@ document.addEventListener('keydown', (e) => {
       return;
     }
   }
-    // 1b. FILTER SHORTCUT (Cmd/Ctrl + Shift + F)
+
+  // 1a. QUICK PEEK SEARCH SHORTCUTS (Cmd/Ctrl + Shift + F  OR  "?")
+  if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f') || e.key === ']') {
+    const activeEl = document.activeElement;
+    if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA' && !activeEl.isContentEditable)) {
+      e.preventDefault();
+      openQuickPeekSearch();
+      return;
+    }
+  }
+    // 1b. FILTER SHORTCUT (Cmd/Ctrl + Shift + l)
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
     const activeEl = document.activeElement;
     if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA' && !activeEl.isContentEditable)) {
@@ -4859,10 +5509,10 @@ document.addEventListener('keydown', (e) => {
         return;
       }
 
-      // If the Quick Peek modal is open, trigger its image
+     // If the Quick Peek modal is open, trigger its image
       const quickPeek = document.getElementById('quickPeekModal');
       if (quickPeek && quickPeek.style.display === 'flex') {
-        const img = quickPeek.querySelector('.detail-header-info img');
+        const img = quickPeek.querySelector('.qp-point-info-row img');
         if (img) img.click();
         return;
       }
@@ -5296,8 +5946,11 @@ document.addEventListener('keyup', (e) => {
         <div class="action-icon">🧠</div><div class="action-label">Study Deck</div>
       </button>
       <button class="action-item" onclick="openOcclusionModal()">
-  <div class="action-icon" id="occIcon" style="${(lineOccState !== 'off' || wordOccState !== 'off' || phraseOccState !== 'off') ? 'background:#cc5500; color:white;' : ''}">🌫️</div><div class="action-label">Occlude</div>
-</button>
+        <div class="action-icon" id="occIcon" style="${(lineOccState !== 'off' || wordOccState !== 'off' || phraseOccState !== 'off') ? 'background:#cc5500; color:white;' : ''}">🌫️</div><div class="action-label">Occlude</div>
+      </button>
+      <button class="action-item" onclick="openQuickPeekSearch()">
+        <div class="action-icon">⚡</div><div class="action-label">Peek Search</div>
+      </button>
     `;
 
 
@@ -6320,28 +6973,6 @@ function closeIntakeModal() {
     handleSearch(true); 
   }
 }
-
-
-window.openQuickPeekById = function(pointId) {
-  const targetPoint = points.find(p => p["Short Name"] === pointId);
-  if (!targetPoint) { 
-    showToast("Record not found."); 
-    return; 
-  }
-  
-  buildQuickPeekDOM(targetPoint);
-  document.getElementById("quickPeekModal").style.display = "flex";
-  document.getElementById("quickPeekContainer").scrollTop = 0; 
-  
-  // Recalculate dynamic header height for sticky sections
-  setTimeout(() => {
-    const qpHeader = document.querySelector('#quickPeekModal .detail-header-info');
-    if (qpHeader) {
-      document.documentElement.style.setProperty('--qp-header-height', qpHeader.getBoundingClientRect().height + 'px');
-    }
-  }, 10);
-};
-
 
 
 
@@ -7792,10 +8423,16 @@ async function syncSRSData() {
   }
 }
 
+
 // --- KEYBOARD CONTROLS ---
 document.addEventListener('keydown', (e) => {
   const modal = document.getElementById("studyModal");
   if (modal.style.display !== "flex") return;
+
+  // Yield keyboard control if typing in an input or if Quick Peek / Lightbox is open above Study Modal
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.isContentEditable)) return;
+  if (isQuickPeekOpen() || document.getElementById("lightbox").style.display === "flex") return;
   
   const cardEl = document.getElementById("activeStudyCard");
   const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
