@@ -478,7 +478,30 @@
     .qp-history-box {
       background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #d1d1d6;
     }
+    .mentioned-in-toggle {
+      cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;
+    }
+    .mentioned-in-toggle:active { opacity: 0.7; }
+    .mentioned-in-list {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .mentioned-in-card {
+      background: #f8f8fa; border: 1px solid #e5e5ea; border-radius: 8px; padding: 8px 10px;
+    }
+    .mentioned-in-card-header {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px;
+    }
+    .mentioned-in-source {
+      font-size: 14px; font-weight: 800; color: #007aff; cursor: pointer;
+    }
+    .mentioned-in-source:active { opacity: 0.7; }
+    .mentioned-in-line {
+      font-size: 12.5px; color: #3a3a3c; line-height: 1.35; padding-top: 4px; margin-top: 4px; border-top: 1px dashed #e5e5ea;
+    }
     @media (prefers-color-scheme: dark) {
+      .mentioned-in-card { background: #2c2c2e; border-color: #38383a; }
+      .mentioned-in-source { color: #0a84ff; }
+      .mentioned-in-line { color: #ddd; border-top-color: #38383a; }
       .qp-sticky-header { background: rgba(28, 28, 30, 0.98); border-color: #38383a; }
       .qp-nav-btn { background: #2c2c2e; color: #0a84ff; }
       #qpAddAllCompareBtn { background: #2c2c2e !important; color: #0a84ff !important; }
@@ -829,98 +852,109 @@
     }
 
 
-/* --- FLASHCARD MODE STYLES (PRESERVED HEIGHT) --- */
-
-/* 1. Ensure the card acts as the anchor for the overlay */
-.flashcard-mode .point-notes {
-  position: relative;
-  cursor: pointer;
-}
-
-/* 2. Hide the text, but keep its physical footprint so the size NEVER changes */
-.flashcard-mode .point-notes:not(.revealed) .section-content {
-  visibility: hidden;
-}
-
-/* 3. Draw the "Front" perfectly over the hidden space */
-.flashcard-mode .point-notes:not(.revealed)::after {
-  content: attr(data-point) " - " attr(data-section);
-  position: absolute;
-  top: 28px; /* Docks cleanly underneath the header */
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: #ffffff; /* Solid white to hide links/images underneath */
-  color: #cc5500;
-  font-size: 18px;
-  font-weight: 800;
-  display: flex;
-  align-items: left;
-  justify-content: left;
-  text-align: left;
-  padding: 15px;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-  z-index: 5;
-}
-
-
-
-/* 5. Back State */
-.flashcard-mode .point-notes.revealed .section-label {
-  background: #ffe0b2;
-}
-.flashcard-mode .point-notes.revealed {
-  cursor: default; /* Returns cursor to normal when reading text */
-}
-
-/* 6. Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .flashcard-mode .point-notes:not(.revealed)::after {
-    background: #1c1c1e;
-    color: #ff9f0a;
-  }
-}
 
 
   
  
 
-    /* --- PARAGRAPH OCCLUSION STYLES --- */
-    .occluded-blank {
-      color: #cc5500;
-      font-weight: 375;
-      letter-spacing: 3px;
-      cursor: pointer;
-      transition: opacity 0.1s;
-      user-select: none;
-    }
-    .occluded-blank:active { opacity: 0.6; }
-    
-      .revealed-blank {
-      color: inherit;
-      font-weight: inherit;
-      text-decoration: underline;
-      text-decoration-style: dashed;
-      text-decoration-color: rgba(150, 150, 150, 0.6);
 
-      text-decoration-thickness: 1.1px; /* Increase this number to make the line thicker */
-      text-underline-offset: 1.4px;     /* Increase this to push the line further down */
-      
-      cursor: pointer;
-    }
     
-    /* --- FIX STICKY HEADERS IN BOTTOM SHEET --- */
+    /* --- STICKY MINI-HEADER & SECTION JUMP-PILLS --- */
+.section-jump-bar {
+  position: sticky;
+  top: -15px; /* Docks flush against .sheet-header */
+  z-index: 94;
+  margin: 0 -15px 12px -15px;
+  padding: 7px 12px;
+  background: rgba(240, 240, 245, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid #d1d1d6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.jump-bar-point-badge {
+  background: #cc5500;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 9px;
+  border-radius: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  box-shadow: 0 1px 3px rgba(204, 85, 0, 0.3);
+}
+.jump-bar-point-badge:active { transform: scale(0.95); }
+
+.jump-pills-scroller {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex: 1;
+  align-items: center;
+}
+.jump-pills-scroller::-webkit-scrollbar { display: none; }
+
+.jump-pill {
+  background: #ffffff;
+  color: #555;
+  border: 1px solid #d1d1d6;
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.jump-pill:active { transform: scale(0.96); }
+.jump-pill.active {
+  background: #007aff;
+  color: #ffffff;
+  border-color: #007aff;
+}
+
+/* Hide jump pills for non-matching sections until "Show full text" is toggled */
+.bottom-sheet:not(.show-all-text) .jump-pill-hidden {
+  display: none;
+}
+
+/* Docks section headers cleanly underneath the sticky jump-bar */
 .bottom-sheet .section-label {
   position: sticky;
-  top: -15px; /* Counteracts the 15px padding of .sheet-content */
+  top: calc(var(--jump-bar-offset, 0px) - 15px);
   z-index: 90;
 }
 
-/* Ensure the flashcard mode hint still looks good when sticky */
-.bottom-sheet .flashcard-mode .section-label {
-  top: -15px; 
-}
+@media (prefers-color-scheme: dark) {
+  .section-jump-bar {
+    background: rgba(18, 18, 20, 0.96);
+    border-bottom-color: #38383a;
+  }
+  .jump-bar-point-badge {
+    background: #ff9f0a;
+    color: #000000;
+  }
+  .jump-pill {
+    background: #1c1c1e;
+    border-color: #38383a;
+    color: #aeaeb2;
+  }
+  .jump-pill.active {
+    background: #0a84ff;
+    color: #ffffff;
+    border-color: #0a84ff;
+  }
+} 
+
 
 /* --- INVISIBLE RECALL MODE --- */
 .study-blur {
@@ -2131,7 +2165,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "10.14.26.v1";
+const APP_VERSION = "10.26.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2566,24 +2600,225 @@ bootApp(); // Start the engine
   }
 
 
+  // --- ULTRA-FAST O(1) REVERSE MENTION INDEX ---
+  let reverseMentionMap = new Map();
+
+  const CANONICAL_CHAN_MAP = {
+    'HE': 'HT', 'HT': 'HT',
+    'TB': 'SJ', 'TE': 'SJ', 'TH': 'SJ', 'SJ': 'SJ',
+    'P': 'PC', 'PC': 'PC',
+    'LIV': 'LV', 'LR': 'LV', 'LV': 'LV',
+    'KID': 'KI', 'KD': 'KI', 'KI': 'KI',
+    'UB': 'BL', 'BL': 'BL',
+    'REN': 'RN', 'CV': 'RN', 'RN': 'RN',
+    'DU': 'DU', 'GV': 'DU'
+  };
+
+  const REVERSE_LOOKUP_SECTIONS = [
+    { key: "Combinations", label: "Combinations" },
+    { key: "Point Prescription", label: "Point Prescription" },
+    { key: "Supplementary Points", label: "Supplementary Points" },
+    { key: "SS Combo", label: "SS Combo" },
+    { key: "Commentary", label: "Commentary" },
+    { key: "Summary of clinical application", label: "Summary of Clinical Application" },
+    { key: "Explanation", label: "Explanation" },
+    { key: "Notes", label: "Notes" },
+    { key: "CAM Notes", label: "CAM Notes" }
+  ];
+
+  const MENTION_STD_REGEX = /\b(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*(\d+)\b/gi;
+  const MENTION_NAMED_REGEX = /\b(Shi\s*Xuan|Si\s*Feng|Ba\s*Xie|Luo\s*Zhen|Yao\s*Tong\s*Xue|Er\s*Bai|Zhou\s*Jian|Jian\s*Qian|Bai\s*Chong\s*Wo|He\s*Ding|Xi\s*Yan|Lan\s*Wei\s*Xue|Dan\s*Nang\s*Xue|Ba\s*Feng|Si\s*Shen\s*Cong|Yin\s*Tang|Yu\s*Yao|Qiu\s*Hou|Tai\s*Yang|Er\s*Jian|Bi\s*Tong|Bai\s*Lao|An\s*Mian|Jia\s*Cheng\s*Jiang|Jin\s*Jin\s*Yu\s*Ye|Hai\s*Quan|Ding\s*Chuan|Huan\s*Men|Wei\s*Guan\s*Xia\s*Shu|Yao\s*Yan|Shi\s*Qi\s*Zhui\s*Xia|San\s*Jiao\s*Jiu|Zi\s*Gong|Ti\s*Tuo|Hua\s*Tuo\s*Jia\s*Ji|Pi\s*Gen)\b/gi;
+
+  function getCanonicalPointKey(rawNameOrChan, optNum) {
+    if (!rawNameOrChan) return "";
+    if (optNum !== undefined && optNum !== "") {
+      const cleanChan = String(rawNameOrChan).toUpperCase().replace(/[\.\s\-]/g, "");
+      const stdChan = CANONICAL_CHAN_MAP[cleanChan] || cleanChan;
+      return stdChan + "-" + String(optNum).trim();
+    }
+    const str = String(rawNameOrChan).trim();
+    const stdMatch = str.match(/^(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*(\d+)$/i);
+    if (stdMatch) {
+      const cleanChan = stdMatch[1].toUpperCase().replace(/[\.\s\-]/g, "");
+      const stdChan = CANONICAL_CHAN_MAP[cleanChan] || cleanChan;
+      return stdChan + "-" + stdMatch[2];
+    }
+    return str.toUpperCase().replace(/[\s\-]/g, "");
+  }
+
+  function extractOutgoingMentions(point) {
+    const selfKey = point._canonicalKey || getCanonicalPointKey(point["Short Name"]);
+    const mentionsByTarget = {};
+
+    REVERSE_LOOKUP_SECTIONS.forEach(sec => {
+      const val = point[sec.key];
+      if (!val) return;
+      const lines = String(val).split(/\r?\n/);
+
+      for (let i = 0; i < lines.length; i++) {
+        const rawLine = lines[i].trim();
+        if (!rawLine) continue;
+        // Skip markdown table divider lines
+        if (/^\|(?:[\s\-:]+\|)+$/.test(rawLine)) continue;
+
+        const seenOnLine = new Set();
+        let m;
+
+        MENTION_STD_REGEX.lastIndex = 0;
+        while ((m = MENTION_STD_REGEX.exec(rawLine)) !== null) {
+          const targetKey = getCanonicalPointKey(m[1], m[2]);
+          if (targetKey && targetKey !== selfKey) seenOnLine.add(targetKey);
+        }
+
+        MENTION_NAMED_REGEX.lastIndex = 0;
+        while ((m = MENTION_NAMED_REGEX.exec(rawLine)) !== null) {
+          const targetKey = getCanonicalPointKey(m[1]);
+          if (targetKey && targetKey !== selfKey) seenOnLine.add(targetKey);
+        }
+
+        if (seenOnLine.size > 0) {
+          // Format pipe-table lines cleanly so they don't render broken table syntax in snippets
+          const displayLine = (rawLine.startsWith("|") && rawLine.endsWith("|"))
+            ? rawLine.slice(1, -1).split("|").map(c => c.trim()).filter(Boolean).join(" • ")
+            : rawLine;
+
+          seenOnLine.forEach(targetKey => {
+            if (!mentionsByTarget[targetKey]) mentionsByTarget[targetKey] = [];
+            mentionsByTarget[targetKey].push({ label: sec.label, line: displayLine });
+          });
+        }
+      }
+    });
+
+    return mentionsByTarget;
+  }
+
+  function rebuildReverseMentionMap(pointsArray) {
+    reverseMentionMap = new Map();
+    pointsArray.forEach(pt => {
+      const outgoing = pt._outgoingMentions;
+      if (!outgoing) return;
+      for (const targetKey in outgoing) {
+        if (!reverseMentionMap.has(targetKey)) {
+          reverseMentionMap.set(targetKey, []);
+        }
+        reverseMentionMap.get(targetKey).push({
+          sourcePoint: pt,
+          snippets: outgoing[targetKey]
+        });
+      }
+    });
+  }
+
+  function buildMentionedInSection(point) {
+    const key = point._canonicalKey || getCanonicalPointKey(point["Short Name"]);
+    const mentions = reverseMentionMap.get(key);
+    if (!mentions || mentions.length === 0) return null;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "point-notes";
+
+    const header = document.createElement("div");
+    header.className = "section-label mentioned-in-toggle";
+    header.innerHTML = `<span>🔗 Mentioned In (${mentions.length})</span><span class="mentioned-chevron">▼</span>`;
+
+    const content = document.createElement("div");
+    content.className = "section-content";
+    content.style.display = "none";
+    let isRendered = false;
+
+    header.onclick = (e) => {
+      e.stopPropagation();
+      const isHidden = content.style.display === "none";
+      if (isHidden && !isRendered) {
+        // Lazy render: Only build inner HTML the first time the user expands the bar
+        const listEl = document.createElement("div");
+        listEl.className = "mentioned-in-list";
+
+        const selfVariants = expandTCMPoint(point["Short Name"].toLowerCase())
+          .filter(Boolean)
+          .sort((a, b) => b.length - a.length)
+          .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        const selfHighlightRegex = selfVariants.length > 0
+          ? new RegExp("\\b(" + selfVariants.join("|") + ")\\b", "gi")
+          : null;
+
+        mentions.forEach(item => {
+          const src = item.sourcePoint;
+          const shortName = src["Short Name"];
+          const safeName = shortName.replace(/'/g, "\\'");
+          const fullName = src["Full Name"] || src[" Full Name"] || "";
+          const chanShort = src["Channel Short Name"] || src[" Channel Short Name"] || "";
+          const isCompared = compareList.includes(shortName);
+
+          const card = document.createElement("div");
+          card.className = "mentioned-in-card";
+
+          let snippetsHtml = "";
+          item.snippets.forEach(s => {
+            const lineHtml = linkifyPoints(highlightText(s.line, selfHighlightRegex));
+            snippetsHtml += `<div class="mentioned-in-line"><strong>${escapeHTML(s.label)}:</strong> ${lineHtml}</div>`;
+          });
+
+          card.innerHTML = `
+            <div class="mentioned-in-card-header">
+              <div class="mentioned-in-source" onclick="event.stopPropagation(); openQuickPeekById('${safeName}')">
+                ${escapeHTML(shortName)}
+                <span style="font-weight:500; font-size:12px; color:#8e8e93;">
+                  ${fullName ? " • " + escapeHTML(fullName) : ""}${chanShort ? " (" + escapeHTML(chanShort) + ")" : ""}
+                </span>
+              </div>
+              <button onclick="
+                event.stopPropagation();
+                toggleCompare('${safeName}');
+                const isAdded = compareList.includes('${safeName}');
+                this.style.background = isAdded ? '#cc5500' : '#007aff';
+                this.textContent = isAdded ? '✓' : '+';
+              " style="background:${isCompared ? '#cc5500' : '#007aff'}; color:white; border:none; padding:3px 9px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; flex-shrink:0;">
+                ${isCompared ? '✓' : '+'}
+              </button>
+            </div>
+            ${snippetsHtml}
+          `;
+          listEl.appendChild(card);
+        });
+
+        content.appendChild(listEl);
+        isRendered = true;
+      }
+
+      content.style.display = isHidden ? "block" : "none";
+      const chev = header.querySelector(".mentioned-chevron");
+      if (chev) chev.textContent = isHidden ? "▲" : "▼";
+    };
+
+    wrapper.appendChild(header);
+    wrapper.appendChild(content);
+    return wrapper;
+  }
+
   function processPoints(dataArray) {
     const oldMap = {};
     points.forEach(p => oldMap[p["Short Name"]] = p);
 
-    return dataArray.map(point => {
+    const processed = dataArray.map(point => {
       const old = oldMap[point["Short Name"]];
       if (old && JSON.stringify(old) === JSON.stringify(point)) {
         point._searchIndex = old._searchIndex;
         point._shortNameLower = old._shortNameLower; 
         point._fullNameLower = old._fullNameLower;   
-        point._paragraphs = old._paragraphs; 
+        point._paragraphs = old._paragraphs;
+        point._canonicalKey = old._canonicalKey;
+        point._outgoingMentions = old._outgoingMentions;
         return point;
       }
       point._searchIndex = generateSearchIndex(point);
       point._shortNameLower = (point["Short Name"] || "").toString().toLowerCase();
       point._fullNameLower = (point["Full Name"] || point[" Full Name"] || "").toString().toLowerCase();
+      point._canonicalKey = getCanonicalPointKey(point["Short Name"]);
+      point._outgoingMentions = extractOutgoingMentions(point);
       
-             let fields = [
+      let fields = [
         point.Important, point["Short Name"], point["Full Name"] || point[" Full Name"], 
         point["Channel Full Name"] || point[" Channel Full Name"], point["Channel Short Name"] || point[" Channel Short Name"]
       ];
@@ -2592,7 +2827,6 @@ bootApp(); // Start the engine
       let paras = [];
       fields.forEach(f => {
         if (f) {
-           // PRE-COMPUTE: Strip BBCode, split by line, and pre-lowercase every paragraph to save 200,000+ calculations during search
            const cleanText = stripBBCode(String(f));
            paras.push(...cleanText.split(/\r?\n/).filter(p => p.trim() !== "").map(p => p.toLowerCase()));
         }
@@ -2601,6 +2835,9 @@ bootApp(); // Start the engine
       
       return point;
     });
+
+    rebuildReverseMentionMap(processed);
+    return processed;
   }
 
 
@@ -2725,181 +2962,6 @@ function applySectionFilter() {
 }
    
   
-let isFlashcardMode = false;
-
-function toggleFlashcardMode() {
-  isFlashcardMode = !isFlashcardMode;
-  const sheet = document.getElementById("sheetContent");
-  const fcIcon = document.getElementById("fcIcon"); // Grab the icon directly
-  
-  if (isFlashcardMode) {
-    sheet.classList.add("flashcard-mode");
-    
-    // Update the button color directly without rebuilding the DOM
-    if (fcIcon) {
-      fcIcon.style.background = "#cc5500";
-      fcIcon.style.color = "white";
-    }
-    
-    showToast("Flashcard Mode: ON");
-  } else {
-    sheet.classList.remove("flashcard-mode");
-    
-    // Revert the button color
-    if (fcIcon) {
-      fcIcon.style.background = "";
-      fcIcon.style.color = "";
-    }
-    
-    showToast("Flashcard Mode: OFF");
-  }
-}
-
-
-// --- OCCLUSION MODE LOGIC ---
-let isOcclusionMode = false;
-let occlusionLevel = 30;
-
-
-
-function toggleOcclusion(enable) {
-  if (enable) {
-    isOcclusionMode = true;
-    occlusionLevel = parseInt(document.getElementById("occlusionSlider").value, 10);
-    showToast(`Occlusion Mode: ON (${occlusionLevel}%)`);
-  } else {
-    isOcclusionMode = false;
-    showToast("Occlusion Mode: OFF");
-  }
-  closeOcclusionModal();
-  updateSheetUI(false, true); // Rebuilds the UI immediately to apply the filter
-}
-
-function applyOcclusionToHTML(html, percent) {
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = html;
-
-  // 1. Expanded Stop Words (Filters out common long filler words)
-  const stopWords = new Set(["this","that","with","from","have","they","will","what","when","where","your","then","than","into","only","also","some","very","just","like","their","these","those","which","could","should","would","been","much","there","because","through","about","between","during"]);
-
-    // 2. High-Value Priority Dictionary 
-  const tcmKeywords = new Set([
-    // Anatomical & Directional
-    "radial", "medial", "proximal", "distal", "anterior", "posterior", "lateral",
-    
-    // Core Concepts & Vital Substances
-    "qi", "blood", "yin", "yang", "essence", "jing", "fluid", "fluids", "jin", "ye", 
-    "mind", "shen", "spirit", "hun", "po", "yi", "zhi", "yuan", "gu", "zong", "zhen", 
-    "wei", "ying", "zheng", "def", "xu", "xs", "dry", "sweat", "fever", "chills", "aversion", "white", "red", "thin", "sticky", "peeled", "hot", 
-    
-    // Organs & Body Parts
-    "heart", "liver", "spleen", "lung", "lungs", "kidney", "kidneys", "pericardium", 
-    "stomach", "intestine", "gallbladder", "bladder", "triple", "burner", "san", "jiao",
-    "uterus", "brain", "marrow", "bone", "bones", "sinews", "muscles", "skin", "vessels",
-    
-    // Five Elements & Climates
-    "wood", "fire", "earth", "metal", "water", "wind", "cold", "heat", "damp", 
-    "dampness", "dryness", "summerheat",
-    
-    // Pathology & Actions
-    "deficiency", "empty", "excess", "full", "stagnation", "stasis", "rebellious", 
-    "sinking", "tonify", "sedate", "pacify", "invigorate", "resolve", "expel", 
-    "nourish", "clear", "subdue", "extinguish", "ascending", "descending", "entering", "exiting", "cough",
-    
-    // Emotions
-    "anger", "joy", "sadness", "worry", "pensiveness", "fear", "shock", "grief",
-    
-        // Pulse & Tongue Diagnostics
-    "pulse", "tongue", "coating", "body", "tip", "scattered", "leather", "front", "rear", "yellow", "ulcers"
-
-    
-  ]);
-
-
-  const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
-  let textNodes = [];
-  let currentNode;
-  while (currentNode = walker.nextNode()) {
-    textNodes.push(currentNode);
-  }
-
-  let allWords = [];
-  textNodes.forEach((node, nodeIndex) => {
-    const text = node.nodeValue;
-    
-    // 3. Upgraded Regex: Allows 2+ letters now so we can catch "Qi", "Du", etc.
-    const regex = /\b((?:LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV)\s*-?\s*\d{1,2}|[A-Za-z]{2,})\b/gi;
-
-    
-    let match;
-    while ((match = regex.exec(text)) !== null) {
-      const word = match[0];
-      const lowerWord = word.toLowerCase();
-      
-      if (!stopWords.has(lowerWord)) {
-        
-        // 4. The Smart Scoring Engine
-        let score = 0;
-        let isPointName = /^(?:LU|LI|ST|SP|HT|SI|BL|KI|PC|SJ|GB|LR|DU|RN|CV|GV)[-\s]*\d+/i.test(word);
-
-        if (isPointName) {
-            score = 100 + (Math.random() * 10); // Tier 1: Point names (e.g., LU-5) are critical
-        } else if (tcmKeywords.has(lowerWord)) {
-            score = 75 + (Math.random() * 10);  // Tier 2: Core concepts, organs, and pathogens
-        } else if (word.length >= 4) {
-            score = (word.length * 2) + (Math.random() * 5); // Tier 3: Fallback to length for general terminology
-        } else {
-            continue; // Skip 2-3 letter words that aren't in the priority dictionary (like "and", "the", "for")
-        }
-
-        allWords.push({
-          word: word,
-          nodeIndex: nodeIndex,
-          index: match.index,
-          length: word.length,
-          score: score
-        });
-      }
-    }
-  });
-
-  // Bail out instantly if there are no eligible words at all OR if slider is at 0%
-  if (allWords.length === 0 || percent === 0) return tempDiv.innerHTML;
-
-  // Math.max guarantees that even short, 1-sentence notes will get at least 1 blank!
-  const totalWordsToOcclude = Math.max(1, Math.round(allWords.length * (percent / 100)));
-  
-  allWords.sort((a, b) => b.score - a.score);
-  const selectedWords = allWords.slice(0, totalWordsToOcclude);
-
-  selectedWords.sort((a, b) => {
-    if (a.nodeIndex === b.nodeIndex) return b.index - a.index;
-    return b.nodeIndex - a.nodeIndex;
-  });
-
-  selectedWords.forEach(sw => {
-    const node = textNodes[sw.nodeIndex];
-    const text = node.nodeValue;
-    
-    const before = text.substring(0, sw.index);
-    const after = text.substring(sw.index + sw.length);
-
-    const span = document.createElement('span');
-    span.className = 'occluded-blank';
-    span.dataset.original = sw.word;
-    span.textContent = '______';
-    
-    span.setAttribute('onclick', "if(this.classList.contains('occluded-blank')) { event.stopPropagation(); this.textContent=this.dataset.original; this.className='revealed-blank'; } else { this.textContent='______'; this.className='occluded-blank'; }");
-
-    const afterNode = document.createTextNode(after);
-    node.nodeValue = before;
-    
-    node.parentNode.insertBefore(span, node.nextSibling);
-    node.parentNode.insertBefore(afterNode, span.nextSibling);
-  });
-
-  return tempDiv.innerHTML;
-}
 
 
   
@@ -3290,68 +3352,49 @@ function renderSearchHistory() {
 
   
 
-    function handleSearch(preserveState = false) {
-    let currentScroll = 0;
-    
-    if (preserveState) {
-        currentScroll = appContainer.scrollTop;
-    }
+    function runSearchQuery(rawQuery, options = { respectActiveChannels: true }) {
+    let query = (rawQuery || "").trim();
+    let isDocWide = false;
 
-
-    let query = searchInput.value.trim();
-     // --- NEW: Check for the "all:" prefix ---
-    isDocumentWideSearch = false; // Reset it on every search
     if (query.toLowerCase().startsWith("all:")) {
-      isDocumentWideSearch = true;
+      isDocWide = true;
       query = query.substring(4).trim();
     }
-    
-    
-    const headerClearBtn = document.getElementById("headerClearBtn");
-    const historyContainer = document.getElementById("searchHistoryContainer");
-        if (query.length > 0) {
-      headerClearBtn.style.display = "flex"; 
-      if (historyContainer) historyContainer.style.display = "none"; // ADD THIS
-    } else {
-      headerClearBtn.style.display = "none";
+
+    if (!query && !options.respectActiveChannels) {
+      return { results: [], highlightRegex: null, parsedIncludes: [], isDocWide: false, textTerms: [] };
     }
 
     query = query.replace(/\s*\|\s*/g, "|");
     const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
     const rawKeywords = query.match(tokenRegex) || [];
-    
-        const headers = []; const fullNamesGroups = []; const exclude = []; const parsedIncludes = []; const strictImportance = [];
 
+    const headers = [];
+    const fullNamesGroups = [];
+    const exclude = [];
+    const parsedIncludes = [];
+    const strictImportance = [];
 
-    
     rawKeywords.forEach(token => {
-           // NEW: Intercept strings that are purely exclamation marks
       if (token.match(/^!+$/)) {
         strictImportance.push(token);
-      } 
-        else if (token.startsWith("<>")) {
+      } else if (token.startsWith("<>")) {
         const terms = token.slice(2).toLowerCase().split(",");
         terms.forEach(t => exclude.push(...expandTCMPoint(t)));
-            }       else if (token.startsWith("@")) {
-        // Strip quotation marks so multi-word custom points parse cleanly!
+      } else if (token.startsWith("@")) {
         const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
         const terms = cleanToken.split(",");
-
         terms.forEach(t => {
-          // Pass the term through the range parser first!
           const rangeTerms = expandPointRange(t);
-          // Then expand aliases for every generated point in the range
           rangeTerms.forEach(rt => headers.push(...expandTCMPoint(rt)));
         });
       } else if (token.startsWith("#")) {
-  const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
-  const terms = cleanToken.split(",");
-  const orGroup = [];
-  terms.forEach(t => orGroup.push(...expandTCMPoint(t)));
-  if (orGroup.length > 0) fullNamesGroups.push(orGroup);
-}
-
-        else {
+        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
+        const terms = cleanToken.split(",");
+        const orGroup = [];
+        terms.forEach(t => orGroup.push(...expandTCMPoint(t)));
+        if (orGroup.length > 0) fullNamesGroups.push(orGroup);
+      } else {
         const parts = token.split("|").filter(Boolean);
         const orGroup = [];
         parts.forEach(part => {
@@ -3373,67 +3416,64 @@ function renderSearchHistory() {
     });
 
     const regexParts = [];
-    activeTextTerms = []; activeParsedIncludes = parsedIncludes; 
+    const textTerms = [];
 
-    parsedIncludes.forEach(group => { group.forEach(item => { regexParts.push(item.regexString); activeTextTerms.push(item.text); }); });
-    headers.forEach(h => { regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(h); });
-    fullNamesGroups.forEach(group => { 
-  group.forEach(f => { regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); activeTextTerms.push(f); });
-});
-
+    parsedIncludes.forEach(group => {
+      group.forEach(item => {
+        regexParts.push(item.regexString);
+        textTerms.push(item.text);
+      });
+    });
+    headers.forEach(h => {
+      regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      textTerms.push(h);
+    });
+    fullNamesGroups.forEach(group => {
+      group.forEach(f => {
+        regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        textTerms.push(f);
+      });
+    });
 
     const validRegexParts = regexParts.filter(t => t.trim().length > 2).sort((a, b) => b.length - a.length);
-    if (validRegexParts.length > 0) activeHighlightRegex = new RegExp("(" + validRegexParts.join("|") + ")", "gi");
-    else activeHighlightRegex = null;
+    const highlightRegex = validRegexParts.length > 0 ? new RegExp("(" + validRegexParts.join("|") + ")", "gi") : null;
 
-        filteredPoints = points.filter(point => {
-      // 1. CHANNEL CHECK (Fastest Check - Bails instantly if hidden)
-      const chanFull = point["Channel Full Name"] || point[" Channel Full Name"] || "";
-      if (!(activeChannels.includes("All") || activeChannels.includes(chanFull))) return false;
-
-      // 2. IMPORTANCE FILTER (Fast Check)
-      if (strictImportance.length > 0) {
-        const imp = point.Important ? String(point.Important).trim() : "";
-        if (!strictImportance.includes(imp)) return false; 
+    const results = points.filter(point => {
+      // 1. CHANNEL CHECK
+      if (options.respectActiveChannels) {
+        const chanFull = point["Channel Full Name"] || point[" Channel Full Name"] || "";
+        if (!(activeChannels.includes("All") || activeChannels.includes(chanFull))) return false;
       }
 
-      // 3. EXCLUSIONS <> (Fast Check)
+      // 2. IMPORTANCE FILTER
+      if (strictImportance.length > 0) {
+        const imp = point.Important ? String(point.Important).trim() : "";
+        if (!strictImportance.includes(imp)) return false;
+      }
+
+      // 3. EXCLUSIONS <>
       if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
 
-           // 4. SHORT NAMES @ (Fast Check with Smart Boundaries)
+      // 4. SHORT NAMES @
       if (headers.length > 0 && !headers.some(h => {
-        // If the search term ends in a number (like "lu-1"), enforce a strict word boundary 
-        // so it doesn't accidentally match "lu-10" or "lu-11".
         if (/\d$/.test(h)) {
           return new RegExp(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "i").test(point._shortNameLower);
         }
-                // NEW: Strip spaces and hyphens from both the search term and the card name 
-        // so it finds the point regardless of how it is punctuated!
         let cleanH = h.replace(/[\s\-]/g, "");
         let cleanName = point._shortNameLower.replace(/[\s\-]/g, "");
         return cleanName.includes(cleanH);
-
       })) return false;
 
+      // 5. FULL NAMES & CHANNELS #
+      if (fullNamesGroups.length > 0) {
+        const hashTarget = ((point["Full Name"] || point[" Full Name"] || "") + " " +
+                           (point["Channel Short Name"] || point[" Channel Short Name"] || "")).toLowerCase();
+        const passesAllHashGroups = fullNamesGroups.every(group => group.some(f => hashTarget.includes(f)));
+        if (!passesAllHashGroups) return false;
+      }
 
-     // 5. FULL NAMES & CHANNELS # (Grouped AND/OR Logic)
-if (fullNamesGroups.length > 0) {
-  const hashTarget = ((point["Full Name"] || point[" Full Name"] || "") + " " + 
-                     (point["Channel Short Name"] || point[" Channel Short Name"] || "")).toLowerCase();
-  
-  // EVERY space-separated group (AND) must have at least one comma-separated match (OR)
-  const passesAllHashGroups = fullNamesGroups.every(group => {
-    return group.some(f => hashTarget.includes(f));
-  });
-  
-  if (!passesAllHashGroups) return false;
-}
-
-
-      // 6. GENERAL SEARCH & PARAGRAPH LOGIC (Heavy Lifter)
+      // 6. GENERAL SEARCH & PARAGRAPH LOGIC
       if (parsedIncludes.length > 0) {
-        
-        // Pass 1: Quick flat check on the whole string. Bails out instantly if the word isn't in the point at all.
         const passesPass1 = parsedIncludes.every(orGroup => {
           return orGroup.some(term => {
             if (term.type === 'exact') return term.regex.test(point._searchIndex);
@@ -3442,54 +3482,72 @@ if (fullNamesGroups.length > 0) {
         });
         if (!passesPass1) return false;
 
-        // Pass 2: The strict paragraph-scoping check. 
-        // Only runs if the point survives Pass 1!
         const hasValidParagraph = point._paragraphs.some(p => {
           return parsedIncludes.every(orGroup => {
             return orGroup.some(term => {
               if (term.type === 'exact') {
                 term.regex.lastIndex = 0; return term.regex.test(p);
               } else {
-                return p.includes(term.text); // NO .toLowerCase() needed here anymore! Lightning fast.
+                return p.includes(term.text);
               }
             });
           });
         });
-        
-// NEW: Bypass this check if the "all:" prefix was used
-        if (!isDocumentWideSearch && !hasValidParagraph) return false; 
- 
+
+        if (!isDocWide && !hasValidParagraph) return false;
       }
-      
-      return true; // If it survives all rules, keep it!
+
+      return true;
     });
 
-    
-    resultsCounter.textContent = "Search Results: " + filteredPoints.length + " of " + points.length; 
+    return { results, highlightRegex, parsedIncludes, isDocWide, textTerms };
+  }
 
-// Show "+ Compare All" button ONLY if results are manageable (40 or fewer)
-// Show buttons ONLY if results are manageable
-// Show "+ Compare All" button ONLY if results are manageable (40 or fewer)
-const addAllBtn = document.getElementById("addAllCompareBtn");
-if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
-  addAllBtn.style.display = "inline-block";
-  addAllBtn.textContent = "+ cf. " + filteredPoints.length;
-} else {
-  addAllBtn.style.display = "none";
-}
-    
-        const queryDisplay = document.getElementById("searchQueryDisplay");
-    if (searchInput.value.trim().length > 0) {
-      queryDisplay.textContent = '"' + searchInput.value.trim() + '"';
-      queryDisplay.style.visibility = "visible"; // Changed from display = "block"
-    } else {
-      queryDisplay.style.visibility = "hidden"; // Changed from display = "none"
+  function handleSearch(preserveState = false) {
+    let currentScroll = 0;
+    if (preserveState) {
+      currentScroll = appContainer.scrollTop;
     }
 
+    const rawQuery = searchInput.value.trim();
+    const { results, highlightRegex, parsedIncludes, isDocWide, textTerms } = runSearchQuery(rawQuery, { respectActiveChannels: true });
+
+    filteredPoints = results;
+    activeHighlightRegex = highlightRegex;
+    activeParsedIncludes = parsedIncludes;
+    isDocumentWideSearch = isDocWide;
+    activeTextTerms = textTerms;
+
+    const effectiveQuery = isDocWide ? rawQuery.substring(4).trim() : rawQuery;
+    const headerClearBtn = document.getElementById("headerClearBtn");
+    const historyContainer = document.getElementById("searchHistoryContainer");
+    if (effectiveQuery.length > 0) {
+      headerClearBtn.style.display = "flex";
+      if (historyContainer) historyContainer.style.display = "none";
+    } else {
+      headerClearBtn.style.display = "none";
+    }
+
+    resultsCounter.textContent = "Search Results: " + filteredPoints.length + " of " + points.length;
+
+    const addAllBtn = document.getElementById("addAllCompareBtn");
+    if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
+      addAllBtn.style.display = "inline-block";
+      addAllBtn.textContent = "+ cf. " + filteredPoints.length;
+    } else {
+      addAllBtn.style.display = "none";
+    }
+
+    const queryDisplay = document.getElementById("searchQueryDisplay");
+    if (rawQuery.length > 0) {
+      queryDisplay.textContent = '"' + rawQuery + '"';
+      queryDisplay.style.visibility = "visible";
+    } else {
+      queryDisplay.style.visibility = "hidden";
+    }
 
     setTimeout(updateStickyHeaderHeights, 10);
     renderRows(preserveState, currentScroll);
-
   }
 
   function escapeHTML(str) { return !str ? "" : String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -3965,130 +4023,13 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
       addDetail(sec.label, val);
     });
 
+    const mentionedInEl = buildMentionedInSection(point);
+    if (mentionedInEl) bodyWrapper.appendChild(mentionedInEl);
+
     container.appendChild(bodyWrapper);
   }
 
-  // Self-contained Search Evaluator for Quick Peek (does not touch main search globals)
-  function evaluateQuickPeekQuery(rawQuery) {
-    let query = (rawQuery || "").trim();
-    if (!query) {
-      return { results: [], highlightRegex: null, parsedIncludes: [] };
-    }
 
-    let isDocWide = false;
-    if (query.toLowerCase().startsWith("all:")) {
-      isDocWide = true;
-      query = query.substring(4).trim();
-    }
-
-    query = query.replace(/\s*\|\s*/g, "|");
-    const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
-    const rawKeywords = query.match(tokenRegex) || [];
-    
-    const headers = [];
-    const fullNamesGroups = [];
-    const exclude = [];
-    const parsedIncludes = [];
-    const strictImportance = [];
-
-    rawKeywords.forEach(token => {
-      if (token.match(/^!+$/)) {
-        strictImportance.push(token);
-      } else if (token.startsWith("<>")) {
-        const terms = token.slice(2).toLowerCase().split(",");
-        terms.forEach(t => exclude.push(...expandTCMPoint(t)));
-      } else if (token.startsWith("@")) {
-        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
-        const terms = cleanToken.split(",");
-        terms.forEach(t => {
-          const rangeTerms = expandPointRange(t);
-          rangeTerms.forEach(rt => headers.push(...expandTCMPoint(rt)));
-        });
-      } else if (token.startsWith("#")) {
-        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
-        const terms = cleanToken.split(",");
-        const orGroup = [];
-        terms.forEach(t => orGroup.push(...expandTCMPoint(t)));
-        if (orGroup.length > 0) fullNamesGroups.push(orGroup);
-      } else {
-        const parts = token.split("|").filter(Boolean);
-        const orGroup = [];
-        parts.forEach(part => {
-          if (part.startsWith('"') && part.endsWith('"') && part.length >= 2) {
-            const phrase = part.slice(1, -1).toLowerCase();
-            const safePhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            orGroup.push({ type: 'exact', regex: new RegExp("\\b" + safePhrase + "\\b", "i"), regexString: "\\b" + safePhrase + "\\b", text: phrase });
-          } else {
-            const phrase = part.toLowerCase();
-            const expandedTerms = expandTCMPoint(phrase);
-            expandedTerms.forEach(ext => {
-              const safePhrase = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              orGroup.push({ type: 'substring', regexString: safePhrase, text: ext });
-            });
-          }
-        });
-        if (orGroup.length > 0) parsedIncludes.push(orGroup);
-      }
-    });
-
-    const regexParts = [];
-    parsedIncludes.forEach(group => group.forEach(item => regexParts.push(item.regexString)));
-    headers.forEach(h => regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-    fullNamesGroups.forEach(group => group.forEach(f => regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))));
-
-    const validRegexParts = regexParts.filter(t => t.trim().length > 2).sort((a, b) => b.length - a.length);
-    const localHighlightRegex = validRegexParts.length > 0 ? new RegExp("(" + validRegexParts.join("|") + ")", "gi") : null;
-
-    const results = points.filter(point => {
-      if (strictImportance.length > 0) {
-        const imp = point.Important ? String(point.Important).trim() : "";
-        if (!strictImportance.includes(imp)) return false;
-      }
-      if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
-
-      if (headers.length > 0 && !headers.some(h => {
-        if (/\d$/.test(h)) {
-          return new RegExp(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "i").test(point._shortNameLower);
-        }
-        let cleanH = h.replace(/[\s\-]/g, "");
-        let cleanName = point._shortNameLower.replace(/[\s\-]/g, "");
-        return cleanName.includes(cleanH);
-      })) return false;
-
-      if (fullNamesGroups.length > 0) {
-        const hashTarget = ((point["Full Name"] || point[" Full Name"] || "") + " " + 
-                           (point["Channel Short Name"] || point[" Channel Short Name"] || "")).toLowerCase();
-        const passesAllHashGroups = fullNamesGroups.every(group => group.some(f => hashTarget.includes(f)));
-        if (!passesAllHashGroups) return false;
-      }
-
-      if (parsedIncludes.length > 0) {
-        const passesPass1 = parsedIncludes.every(orGroup => {
-          return orGroup.some(term => {
-            if (term.type === 'exact') return term.regex.test(point._searchIndex);
-            else return point._searchIndex.includes(term.text);
-          });
-        });
-        if (!passesPass1) return false;
-
-        const hasValidParagraph = point._paragraphs.some(p => {
-          return parsedIncludes.every(orGroup => {
-            return orGroup.some(term => {
-              if (term.type === 'exact') {
-                term.regex.lastIndex = 0; return term.regex.test(p);
-              } else {
-                return p.includes(term.text);
-              }
-            });
-          });
-        });
-        if (!isDocWide && !hasValidParagraph) return false;
-      }
-      return true;
-    });
-
-    return { results, highlightRegex: localHighlightRegex, parsedIncludes };
-  }
 
   function buildQuickPeekSearchDOM(initialQuery = "") {
     const container = document.getElementById("quickPeekContainer");
@@ -4257,7 +4198,7 @@ if (filteredPoints.length > 0 && filteredPoints.length <= 40) {
       return;
     }
 
-    const evalObj = evaluateQuickPeekQuery(cleanQuery);
+    const evalObj = runSearchQuery(cleanQuery, { respectActiveChannels: false });
     qpSearchResults = evalObj.results;
     qpSearchHighlightRegex = evalObj.highlightRegex;
 
@@ -5356,6 +5297,8 @@ async function completeSave(newValue) {
     // 2. Update active memory safely
     currentEditingPoint[currentEditingField] = newValue; 
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
+    currentEditingPoint._outgoingMentions = extractOutgoingMentions(currentEditingPoint);
+    rebuildReverseMentionMap(points);
 
     // 3. Rebuild the Paragraph Array for the Search Engine
         let fields = [
@@ -5443,8 +5386,8 @@ async function completeSave(newValue) {
     // NEW: Disable swiping globally whenever ANY mark mode is active
     if (lineOccState === 'mark' || wordOccState === 'mark' || phraseOccState === 'mark') return;
 
-    // Prevent swiping if they are scrolling the pill nav, interacting with a table, link, or action button
-    if (e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button') || e.target.closest('.point-action-row') || e.target.closest('.pill-nav')) return;
+    // Prevent swiping if they are scrolling the pill nav, jump bar, interacting with a table, link, or action button
+    if (e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button') || e.target.closest('.point-action-row') || e.target.closest('.pill-nav') || e.target.closest('.section-jump-bar')) return;
 
 
     let touchEndX = e.changedTouches[0].screenX; 
@@ -5615,30 +5558,7 @@ document.addEventListener('keydown', (e) => {
     handleGlobalEnter(e);
   }
   
-  // 4. FLASHCARD SPACEBAR FLIP
-  if (e.key === ' ' || e.code === 'Space') {
-    const sheet = document.getElementById('bottomSheet');
-    if (isFlashcardMode && sheet && sheet.classList.contains('open')) {
-      e.preventDefault(); 
-      const sheetContent = document.getElementById('sheetContent');
-      const cards = sheetContent.querySelectorAll('.point-notes');
-      const containerRect = sheetContent.getBoundingClientRect();
-      
-      let activeCard = null;
-      for (let i = 0; i < cards.length; i++) {
-        const rect = cards[i].getBoundingClientRect();
-        if (rect.bottom > containerRect.top + 60) {
-          activeCard = cards[i];
-          break; 
-        }
-      }
-      if (activeCard) {
-        const label = activeCard.querySelector('.section-label');
-        if (label) label.click();
-      }
-      return; 
-    }
-  }
+
 
 // 5. GLOBAL ESCAPE KEY
   if (e.key === 'Escape') {
@@ -6026,7 +5946,7 @@ document.addEventListener('keyup', (e) => {
 
     container.appendChild(actionRow);
 
-    // Inline Group Bar when Mark or Hide mode is active
+   // Inline Group Bar when Mark or Hide mode is active
     const anyMark = (lineOccState === 'mark' || wordOccState === 'mark' || phraseOccState === 'mark');
     const anyHide = (lineOccState === 'hide' || wordOccState === 'hide' || phraseOccState === 'hide');
     if (anyMark || anyHide) {
@@ -6036,6 +5956,55 @@ document.addEventListener('keyup', (e) => {
       container.appendChild(groupBar);
     }
 
+    // --- STICKY MINI-HEADER & SECTION JUMP-PILLS BAR ---
+    const jumpBar = document.createElement("div");
+    jumpBar.className = "section-jump-bar";
+
+    const pointBadge = document.createElement("button");
+    pointBadge.type = "button";
+    pointBadge.className = "jump-bar-point-badge";
+    pointBadge.textContent = point["Short Name"] + (imp ? " " + imp : "");
+    pointBadge.title = "Scroll to top";
+    pointBadge.onclick = (e) => {
+      e.stopPropagation();
+      container.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const jumpScroller = document.createElement("div");
+    jumpScroller.className = "jump-pills-scroller";
+    jumpBar.appendChild(pointBadge);
+    jumpBar.appendChild(jumpScroller);
+    container.appendChild(jumpBar);
+
+    const jumpTargets = [];
+
+    const scrollToSectionEl = (targetEl, pillBtn) => {
+      jumpScroller.querySelectorAll(".jump-pill").forEach(p => p.classList.remove("active"));
+      pillBtn.classList.add("active");
+
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const jumpBarH = jumpBar.offsetHeight || 38;
+      const targetScroll = container.scrollTop + (targetRect.top - containerRect.top) - jumpBarH - 6;
+      container.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
+    };
+
+    const registerJumpPill = (pillLabel, sectionEl, isHiddenBySearch = false, onBeforeJump = null) => {
+      const pillBtn = document.createElement("button");
+      pillBtn.type = "button";
+      pillBtn.className = "jump-pill" + (isHiddenBySearch ? " jump-pill-hidden" : "");
+      if (!isHiddenBySearch && !jumpScroller.querySelector(".jump-pill.active")) pillBtn.classList.add("active");
+      pillBtn.textContent = pillLabel;
+
+      pillBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (typeof onBeforeJump === "function") onBeforeJump();
+        scrollToSectionEl(sectionEl, pillBtn);
+      };
+
+      jumpScroller.appendChild(pillBtn);
+      jumpTargets.push({ pillBtn, sectionEl });
+    };
 
     // --- NEW: Track if we found filtered paragraphs ---
     let hasFilteredContent = false;
@@ -6061,12 +6030,6 @@ document.addEventListener('keyup', (e) => {
       const div = document.createElement("div"); 
       
       
-      // Pass data to CSS for the Flashcard Front
-div.setAttribute("data-point", stripBBCode(point["Short Name"]));
-div.setAttribute("data-section", stripBBCode(label));
-
-// Let tapping anywhere on the hidden card flip it open!
-div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed');");
 
       
       // Split the text into paragraphs and sort them
@@ -6109,7 +6072,7 @@ div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed
       // --- 4. APPLY LINE OCCLUSION ---
       fullHtml = applyLineOcclusionToHTML(fullHtml, point["Short Name"]);
 
-      const headerHtml = "<div class='section-label' onclick='if(isFlashcardMode) {this.parentElement.classList.toggle(\"revealed\"); event.stopPropagation();}'>" + label + editIcon + markAllIcon + "</div>";
+      const headerHtml = "<div class='section-label'>" + label + editIcon + markAllIcon + "</div>";
 
 
             // --- UPGRADED STEP 4: SMART SECTION FILTERING ---
@@ -6163,17 +6126,89 @@ div.setAttribute("onclick", "if(isFlashcardMode) this.classList.toggle('revealed
       }
 
       container.appendChild(div);
+      registerJumpPill(label, div, div.classList.contains("hidden-section"));
     };
 
 
     // Call addDetail for all fields...
-        TCM_SECTIONS.forEach(sec => {
+    TCM_SECTIONS.forEach(sec => {
       let val = point[sec.key] || point[sec.altKey] || "";
       // Smart check to handle the trailing space on "Location" for the edit trigger
       let fieldName = (sec.label === "Location" && !point.hasOwnProperty("Location ")) ? "Location" : sec.key;
       addDetail(sec.label, val, fieldName);
     });
 
+    const mentionedInEl = buildMentionedInSection(point);
+    if (mentionedInEl) {
+      container.appendChild(mentionedInEl);
+      const headerEl = mentionedInEl.querySelector(".mentioned-in-toggle");
+      const contentEl = mentionedInEl.querySelector(".section-content");
+      const pillText = headerEl ? headerEl.querySelector("span").textContent : "🔗 Mentioned In";
+
+      registerJumpPill(pillText, mentionedInEl, false, () => {
+        // Automatically expand "Mentioned In" if it is currently collapsed when jumping to it
+        if (contentEl && contentEl.style.display === "none" && headerEl) {
+          headerEl.click();
+        }
+      });
+    }
+
+    // Hide the jump bar if no sections exist; otherwise set the sticky offset for section headers
+    if (jumpTargets.length === 0) {
+      jumpBar.style.display = "none";
+      container.style.setProperty("--jump-bar-offset", "0px");
+    } else {
+      requestAnimationFrame(() => {
+        container.style.setProperty("--jump-bar-offset", (jumpBar.offsetHeight - 1) + "px");
+      });
+    }
+
+    // Lightweight rAF Scroll-Spy to highlight the active section pill while scrolling
+    if (!container._hasJumpScrollSpy) {
+      let spyTicking = false;
+      container.addEventListener("scroll", () => {
+        if (spyTicking) return;
+        spyTicking = true;
+        requestAnimationFrame(() => {
+          spyTicking = false;
+          const activeTargets = container._jumpTargets;
+          const activeBar = container._jumpBar;
+          const activeScroller = container._jumpScroller;
+          if (!activeTargets || activeTargets.length === 0 || !activeBar) return;
+
+          const containerTop = container.getBoundingClientRect().top;
+          const threshold = containerTop + (activeBar.offsetHeight || 38) + 28;
+          let currentActive = null;
+
+          for (let i = 0; i < activeTargets.length; i++) {
+            const item = activeTargets[i];
+            if (item.sectionEl.offsetParent === null) continue; // Skip hidden sections
+            const rect = item.sectionEl.getBoundingClientRect();
+            if (rect.top <= threshold) {
+              currentActive = item;
+            } else {
+              break;
+            }
+          }
+
+          if (!currentActive) {
+            currentActive = activeTargets.find(t => t.sectionEl.offsetParent !== null) || activeTargets[0];
+          }
+
+          if (currentActive && !currentActive.pillBtn.classList.contains("active")) {
+            activeScroller.querySelectorAll(".jump-pill").forEach(p => p.classList.remove("active"));
+            currentActive.pillBtn.classList.add("active");
+            const pillCenter = currentActive.pillBtn.offsetLeft + (currentActive.pillBtn.clientWidth / 2);
+            const scrollerCenter = activeScroller.clientWidth / 2;
+            activeScroller.scrollTo({ left: pillCenter - scrollerCenter, behavior: "smooth" });
+          }
+        });
+      }, { passive: true });
+      container._hasJumpScrollSpy = true;
+    }
+    container._jumpTargets = jumpTargets;
+    container._jumpBar = jumpBar;
+    container._jumpScroller = jumpScroller;
 
     // Add/Edit Button
     const addFieldBtn = document.createElement("button");
