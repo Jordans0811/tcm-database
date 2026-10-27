@@ -585,25 +585,29 @@
     .compare-header h2 { margin: 0; font-size: 22px; color: #333; font-weight: 800; }
     .compare-table-container { flex: 1; overflow: auto; padding: 0; -webkit-overflow-scrolling: touch; }
     
-    /* Compare Modal Header Controls */
-    .compare-actions { display: flex; align-items: center; gap: 15px; }
-    
+  /* Compare Modal Header Controls */
+    .compare-actions {
+      display: flex; align-items: center; gap: 8px;
+      overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    }
+    .compare-actions::-webkit-scrollbar { display: none; }
+    .compare-actions button { flex-shrink: 0; }
 
 /* --- SHRINK MODAL HEADER --- */
 .compare-header {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: calc(10px + env(safe-area-inset-top)) 15px 10px 15px; 
   background: white; border-bottom: 1px solid #d1d1d6; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
 .compare-header h2 {
-  margin: 0; font-size: 19px; 
+  margin: 0; font-size: 18px; white-space: nowrap;
   color: #333; font-weight: 800;
 }
 
 /* --- DOUBLE STICKY COMPARE GRID --- */
 .compare-flex-container {
   display: flex; flex-direction: column; gap: 20px; 
-  padding: 10px 15px 30px 15px; /* Reduced top gap so it sits closer to the main header */
+  padding: 10px 15px 30px 15px;
 }
 
 .compare-section {
@@ -614,13 +618,13 @@
 
 .compare-section-title {
   position: sticky; 
-  top: -1px; /* Seals the sub-pixel gap against the main header */
-  z-index: 10;
+  top: -1px;
+  z-index: 12; /* Stays above pinned column headers */
   background: #f8f8f8; padding: 0 15px; 
-  height: 30px; /* Shrunk down from 36px */
+  height: 30px;
   display: flex; align-items: center; box-sizing: border-box;
-  font-size: 11px; /* Shrunk down from 13px */
-  letter-spacing: 0.5px; /* Adds readability to smaller uppercase text */
+  font-size: 11px;
+  letter-spacing: 0.5px;
   font-weight: 800; color: #cc5500;
   text-transform: uppercase; border-bottom: 1px solid #d1d1d6;
   border-radius: 11px 11px 0 0; 
@@ -628,28 +632,72 @@
 
 .compare-section-grid {
   display: grid;
-  gap: 1px; background: #d1d1d6; /* Creates the grid separator lines automatically */
+  gap: 1px; background: #d1d1d6;
   border-radius: 0 0 11px 11px;
 }
 
 .compare-card-header {
   position: sticky; 
-  top: 29px; /* Docks flawlessly under the new 30px title (-1px top = 29px) */
+  top: 29px;
   z-index: 9; 
   background: #e3e3e8; 
-  padding: 6px 10px; /* Tighter padding to save vertical space */
-  font-size: 14px; /* Shrunk down from 16px for point names */
+  padding: 6px 8px;
+  font-size: 14px;
   font-weight: 800; text-align: center;
   color: #333;
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+}
+
+.compare-hdr-controls {
+  display: flex; align-items: center; gap: 2px; flex-shrink: 0;
+}
+
+.compare-hdr-btn {
+  background: transparent; border: none; cursor: pointer;
+  padding: 2px 5px; border-radius: 5px; font-size: 13px; line-height: 1;
+  color: #666; transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+.compare-hdr-btn:active { transform: scale(0.92); }
+.compare-hdr-btn.pin-active {
+  background: #cc5500; color: #ffffff;
+}
+.compare-remove-btn {
+  color: #8e8e93; font-weight: 900; font-size: 13px;
+}
+.compare-remove-btn:active {
+  background: rgba(255, 59, 48, 0.15); color: #ff3b30;
+}
+
+/* Sticky Baseline First Column when Pinned */
+#compareModal.pin-first-col .compare-card-header[data-col="0"] {
+  position: sticky;
+  left: 0;
+  z-index: 11;
+  border-right: 2px solid #cc5500;
+  box-shadow: 3px 0 8px rgba(0,0,0,0.12);
+}
+
+#compareModal.pin-first-col .compare-card-body[data-col="0"] {
+  position: sticky !important;
+  left: 0;
+  z-index: 8;
+  border-right: 2px solid #cc5500;
+  box-shadow: 3px 0 8px rgba(0,0,0,0.08);
+}
+
+/* Shared Clinical Term Highlight Pill */
+mark.shared-term-mark {
+  background-color: rgba(52, 199, 89, 0.26);
+  color: inherit;
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 600;
 }
 
 .compare-card-body {
-  background: white; /* Blocks out the grey grid gap lines */
+  background: white;
   padding: 15px 12px; font-size: 14px; line-height: 1.4;
 }
-
-
-
 
 /* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
@@ -658,11 +706,19 @@
   .compare-section-grid { background: #38383a; }
   .compare-card { background: #1c1c1e; }
   .compare-card-header { background: #2c2c2e; border-color: #38383a; color: white; }
-    .compare-card-body { background: #1c1c1e; color: #ffffff; }
-  
-  
+  .compare-card-body { background: #1c1c1e; color: #ffffff; }
+  .compare-hdr-btn { color: #aaa; }
+  .compare-hdr-btn.pin-active { background: #ff9f0a; color: #000; }
+  #compareModal.pin-first-col .compare-card-header[data-col="0"],
+  #compareModal.pin-first-col .compare-card-body[data-col="0"] {
+    border-right-color: #ff9f0a;
+    box-shadow: 3px 0 10px rgba(0,0,0,0.45);
+  }
+  mark.shared-term-mark {
+    background-color: rgba(48, 209, 88, 0.32);
+    color: #ffffff;
+  }
 }
-
 
 
 
@@ -1447,6 +1503,68 @@
       cursor: pointer; color: #333; background: #f8f8f8;
     }
 
+    /* Ensures Edit Modal opens above Study Modal when triggered mid-session */
+    #editModal { z-index: 10022; }
+
+    /* Study Modal Header Utility Buttons */
+    .study-hdr-icon-btn {
+      background: #e3e3e8; color: #007aff; border: none; border-radius: 8px;
+      padding: 6px 10px; font-size: 14px; font-weight: 800; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.1s, opacity 0.15s;
+    }
+    .study-hdr-icon-btn:active { transform: scale(0.94); opacity: 0.75; }
+
+    /* Embedded Study Modal Occlusion Bar */
+    .study-occ-bar {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 6px 12px 2px 12px; overflow-x: auto; scrollbar-width: none;
+      -webkit-overflow-scrolling: touch; flex-shrink: 0;
+    }
+    .study-occ-bar::-webkit-scrollbar { display: none; }
+
+    /* Interactive Touch-Grading Bar in Study Modal */
+    #studyHintBar {
+      display: flex; gap: 8px; align-items: stretch; justify-content: center;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;
+      background: white; border-top: 1px solid #d1d1d6; flex-shrink: 0;
+    }
+    .study-grade-btn {
+      flex: 1; max-width: 115px; border: none; border-radius: 10px;
+      padding: 10px 6px; font-size: 13px; font-weight: 800;
+      cursor: pointer; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2px;
+      transition: transform 0.1s, opacity 0.15s; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .study-grade-btn:active { transform: scale(0.95); opacity: 0.8; }
+    .study-grade-btn small {
+      font-size: 10px; font-weight: 600; opacity: 0.75;
+    }
+    .grade-btn-wrong { background: rgba(255, 59, 48, 0.12); color: #ff3b30; }
+    .grade-btn-undo { background: #e3e3e8; color: #555; flex: 0.75; }
+    .grade-btn-flip { background: #e3e3e8; color: #007aff; }
+    .grade-btn-correct { background: rgba(52, 199, 89, 0.15); color: #248a3d; }
+    .grade-btn-strong { background: rgba(0, 122, 255, 0.14); color: #007aff; }
+
+    /* Section-Level SRS Status Badge */
+    .srs-status-badge {
+      float: right; margin-right: 8px; padding: 1px 7px;
+      border-radius: 10px; font-size: 10.5px; font-weight: 800;
+      text-transform: none; letter-spacing: 0; cursor: pointer;
+      border: 1px solid transparent; transition: transform 0.1s;
+    }
+    .srs-status-badge:active { transform: scale(0.93); }
+    .srs-badge-learning {
+      background: rgba(255, 149, 0, 0.16); color: #cc5500; border-color: rgba(204, 85, 0, 0.3);
+    }
+    .srs-badge-graduated {
+      background: rgba(52, 199, 89, 0.15); color: #248a3d; border-color: rgba(52, 199, 89, 0.3);
+    }
+    .srs-badge-due {
+      background: rgba(0, 122, 255, 0.15); color: #007aff; border-color: rgba(0, 122, 255, 0.35);
+    }
+
     @media (prefers-color-scheme: dark) {
       .study-setting-toggle { background: #1c1c1e !important; color: #ffffff !important; border-color: #38383a !important; }
       #chunkSizeSelect { background: #1c1c1e !important; color: #ffffff !important; border-color: #38383a !important; }
@@ -1458,6 +1576,15 @@
       .study-back-header { background: #2c2c2e; border-color: #38383a; color: white; }
       .study-back-content { color: #eee; }
       #studyOrderSelect { background: #2c2c2e; color: white; }
+      .study-hdr-icon-btn { background: #2c2c2e; color: #0a84ff; }
+      .grade-btn-wrong { background: rgba(255, 69, 58, 0.2); color: #ff453a; }
+      .grade-btn-undo { background: #2c2c2e; color: #aeaeb2; }
+      .grade-btn-flip { background: #2c2c2e; color: #0a84ff; }
+      .grade-btn-correct { background: rgba(48, 209, 88, 0.2); color: #30d158; }
+      .grade-btn-strong { background: rgba(10, 132, 255, 0.22); color: #64b5f6; }
+      .srs-badge-learning { background: rgba(255, 159, 10, 0.22); color: #ff9f0a; }
+      .srs-badge-graduated { background: rgba(48, 209, 88, 0.2); color: #30d158; }
+      .srs-badge-due { background: rgba(10, 132, 255, 0.25); color: #64b5f6; }
     }
     
 
@@ -1973,14 +2100,15 @@ display: flex; flex-direction: column;">
     <div class="compare-content">
       
          <div class="compare-header">
-<h2>Compare Points</h2>
-<div class="compare-actions">
-  <button id="compareToggleNamesBtn" onclick="toggleCompareNames()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide Names</button>
-  <button onclick="shuffleCompare()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">🔀 Shuffle</button>
-  <button id="compareHideAllBtn" onclick="toggleAllCompareColumns()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide All</button>
-  <button onclick="closeCompareModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
-</div>
-</div>
+        <h2>Compare Points</h2>
+        <div class="compare-actions">
+          <button id="compareSharedBtn" onclick="toggleCompareSharedHighlight()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">✨ Shared</button>
+          <button id="compareToggleNamesBtn" onclick="toggleCompareNames()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide Names</button>
+          <button onclick="shuffleCompare()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">🔀 Shuffle</button>
+          <button id="compareHideAllBtn" onclick="toggleAllCompareColumns()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide All</button>
+          <button onclick="closeCompareModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+        </div>
+      </div>
 
 
       
@@ -2056,46 +2184,57 @@ display: flex; flex-direction: column;">
 
 
 
+<!-- CARD-LEVEL SRS STATUS / RESET / SUSPEND MODAL -->
+<div id="srsCardModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10023; justify-content: center; align-items: center;" onclick="if(event.target===this) closeSrsCardModal()">
+  <div class="modal-content" style="max-width: 360px; text-align: center; padding: 22px 20px;">
+    <h3 class="modal-title" id="srsCardModalTitle" style="margin-bottom: 6px;">Card SRS Status</h3>
+    <p id="srsCardModalInfo" style="margin: 0 0 18px 0; font-size: 13.5px; color: #8e8e93; line-height: 1.45;"></p>
+    <div class="modal-buttons" style="display: flex; flex-direction: column; gap: 10px;">
+      <button class="save-btn" style="width: 100%; background: #ff9f0a; box-shadow: 0 4px 10px rgba(255,159,10,0.25);" onclick="resetSingleCardSRS()">🔄 Reset Streak to 0 (Re-learn)</button>
+      <button class="save-btn" style="width: 100%; background: #ff3b30; box-shadow: 0 4px 10px rgba(255,59,48,0.25);" onclick="removeSingleCardSRS()">🗑️ Remove from Global Deck</button>
+      <button class="cancel-btn" style="width: 100%; margin-top: 2px;" onclick="closeSrsCardModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- FULL SCREEN STUDY MODAL -->
 <div id="studyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f0f5; z-index: 10019; flex-direction: column;">
   
   <div class="compare-header">
     <h2>Study Session</h2>
-  <div class="compare-actions">
+    <div class="compare-actions">
       <!-- NEW SYNC BUTTON IN HEADER -->
       <button id="studySyncBtnTop" onclick="syncSRSData()" style="display: none; background: #34c759; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Sync (0)</button>
-      
-      <select id="studyOrderSelect" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #333; border: none; cursor: pointer;">
-        <option value="order">⬇️ In Order</option>
+      <button class="study-hdr-icon-btn" onclick="studyEditCurrentCard()" title="Edit current card">✏️</button>
+      <button class="study-hdr-icon-btn" onclick="studyPeekCurrentCard()" title="Quick Peek Search">⚡</button>
+      <select id="studyOrderSelect" style="font-size: 13px; font-weight: 800; padding: 6px 10px; border-radius: 6px; background: #e3e3e8; color: #333; border: none; cursor: pointer;">
+        <option value="order">⬇️ Order</option>
         <option value="random">🔀 Random</option>
-        <option value="browse">👀 Browse</option> <!-- NEW BROWSE OPTION -->
+        <option value="browse">👀 Browse</option>
       </select>
       <button onclick="closeStudyModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
     </div>
   </div>
 
   <!-- Progress Track -->
-  <div style="width: 100%; height: 6px; background: #e3e3e8;">
+  <div style="width: 100%; height: 6px; background: #e3e3e8; flex-shrink: 0;">
     <div id="studyProgressBar" style="width: 0%; height: 100%; background: #34c759; transition: width 0.3s ease-out;"></div>
   </div>
 
-  <div style="text-align: center; font-size: 13px; color: #888; padding: 10px 0 0 0; font-weight: bold;" id="studyCounterDisplay">
+  <div style="text-align: center; font-size: 13px; color: #888; padding: 8px 0 2px 0; font-weight: bold; flex-shrink: 0;" id="studyCounterDisplay">
     Card 0 of 0
   </div>
 
+  <!-- Embedded Occlusion Group Bar -->
+  <div id="studyOccBar" class="study-occ-bar"></div>
+
   <!-- The 3D Card Canvas -->
-  <div id="studyCardContainer" style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; perspective: 1000px; overflow: hidden; touch-action: none;">
+  <div id="studyCardContainer" style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px 20px; perspective: 1000px; overflow: hidden; touch-action: none;">
     <!-- Card injected via JS -->
   </div>
 
- <!-- Desktop Keyboard Hint Bar -->
-  <div id="studyHintBar" style="display: flex; justify-content: space-around; padding: 15px; background: white; border-top: 1px solid #d1d1d6; font-size: 11px; font-weight: bold; color: #888;">
-    <span>← Correct</span>
-    <span>↑ Strong Correct</span>
-    <span>↓ Wrong</span>
-    <span>→ Go Back</span>
-    <span>[Space] Flip</span>
-  </div>
+  <!-- Interactive Touch-Grading & Keyboard Hint Bar -->
+  <div id="studyHintBar"></div>
 </div>
 
 
@@ -4820,112 +4959,278 @@ async function saveEdit() {
     }
   }
 
-        function openCompareModal() {
-    if (compareList.length === 0) return;
-    
-    const hideBtn = document.getElementById("compareHideAllBtn");
-if (hideBtn) {
-   allCompareHidden = false;
-   hideBtn.textContent = "Hide All";
-}
+        let comparePinFirst = false;
+  let compareHighlightShared = false;
 
-const namesBtn = document.getElementById("compareToggleNamesBtn");
-if (namesBtn) {
-   compareNamesHidden = false;
-   document.getElementById("compareModal").classList.remove("hide-names-active");
-   namesBtn.textContent = "Hide Names";
-}
-    
+  const COMPARE_SHARED_SKIP_SECTIONS = new Set(["Location", "Location Notes", "Needling"]);
+
+  const COMPARE_SHARED_IGNORE_WORDS = new Set([
+    "this","that","with","from","have","they","will","what","when","where","your","then","than","into","only","also",
+    "some","very","just","like","their","these","those","which","could","should","would","been","much","there","because",
+    "through","about","between","during","under","above","below","after","before","other","such","more","most","both",
+    "each","same","many","upon","within","without","along","across","towards","toward","against","among","around",
+    "point","points","channel","channels","meridian","meridians","vessel","vessels","branch","branches","course","pathway",
+    "location","needling","insertion","perpendicular","oblique","transverse","subcutaneous","cun","moxa","applicable",
+    "caution","cautions","depression","border","aspect","level","region","area","side","sides","body","part","parts",
+    "superior","inferior","anterior","posterior","medial","lateral","proximal","distal","dorsal","palmar","plantar",
+    "superficial","deep","internal","external","upper","lower","middle","center","central","front","back","left","right",
+    "used","often","main","major","important","especially","particularly","commonly","usually","frequently","general",
+    "treated","treating","treatment","treats","indicate","indicated","indicates","indication","indications","action","actions",
+    "commentary","combination","combinations","summary","clinical","application","notes","pattern","patterns","syndrome",
+    "syndromes","disorder","disorders","disease","diseases","condition","conditions","symptom","symptoms","patient","patients",
+    "effect","effects","effective","first","second","third","four","five","single","double","primary","secondary"
+  ]);
+
+  const COMPARE_SHORT_TCM_TERMS = new Set([
+    "qi","yin","yang","xue","jin","ye","jing","shen","hun","po","yi","zhi","wei","ying","yuan","zong","zhen","gu",
+    "du","ren","chong","dai","luo","shu","mu","xi","he","sea","wind","cold","heat","damp","dry","fire","wood","earth",
+    "metal","water","eye","eyes","ear","ears","jaw","hip","leg","arm","rib","ribs","toe","toes","gum","gums","lip","lips",
+    "hot","red","pale","weak","full","xu","bi","shan","lin","beng","lou"
+  ]);
+
+  function getCompareTermStem(word) {
+    const w = word.toLowerCase();
+    if (/^(?:lu|li|l\.i\.|st|sp|ht|he|si|bl|ub|ki|kd|kid|pc|p|sj|te|tb|th|gb|lr|liv|lv|du|gv|rn|ren|cv|ex-[a-z]+)\s*-?\s*\d+$/i.test(w)) {
+      return getCanonicalPointKey(w);
+    }
+    let stem = w;
+    if (stem.length >= 6) {
+      stem = stem.replace(/(?:ness|ment|tion|sion)$/, "");
+    }
+    if (stem.length >= 5) {
+      stem = stem.replace(/ies$/, "y").replace(/(?:ing|ed|es|s)$/, "");
+    } else if (stem.length === 4 && stem.endsWith("s") && !stem.endsWith("ss")) {
+      stem = stem.slice(0, -1);
+    }
+    return stem;
+  }
+
+  function buildSharedCompareRegex(pts, fields) {
+    if (!pts || pts.length < 2) return null;
+
+    const stemToPointSet = new Map();
+    const stemToSurfaceWords = new Map();
+    const tokenRegex = /\b(?:(?:LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*\d{1,2}|[A-Za-z]{2,})\b/g;
+
+    pts.forEach((p, ptIdx) => {
+      fields.forEach(f => {
+        if (COMPARE_SHARED_SKIP_SECTIONS.has(f.label)) return;
+        if (isSectionFilterActive && activeSections.length > 0 && !activeSections.includes(f.label)) return;
+
+        const rawVal = p[f.key] || p[f.altKey] || "";
+        if (!rawVal) return;
+        const cleanText = stripBBCode(String(rawVal));
+
+        let m;
+        tokenRegex.lastIndex = 0;
+        while ((m = tokenRegex.exec(cleanText)) !== null) {
+          const surface = m[0];
+          const lower = surface.toLowerCase();
+          const isPointCode = /\d/.test(lower);
+
+          if (!isPointCode) {
+            if (COMPARE_SHARED_IGNORE_WORDS.has(lower)) continue;
+            if (typeof TCM_STOPWORDS !== "undefined" && TCM_STOPWORDS.has(lower)) continue;
+            if (lower.length < 4 && !COMPARE_SHORT_TCM_TERMS.has(lower)) continue;
+          }
+
+          const stem = getCompareTermStem(lower);
+          if (!stemToPointSet.has(stem)) {
+            stemToPointSet.set(stem, new Set());
+            stemToSurfaceWords.set(stem, new Set());
+          }
+          stemToPointSet.get(stem).add(ptIdx);
+          stemToSurfaceWords.get(stem).add(lower);
+        }
+      });
+    });
+
+    const sharedWords = [];
+    stemToPointSet.forEach((ptSet, stem) => {
+      if (ptSet.size >= 2) {
+        stemToSurfaceWords.get(stem).forEach(w => sharedWords.push(w));
+      }
+    });
+
+    if (sharedWords.length === 0) return null;
+
+    const escaped = sharedWords
+      .sort((a, b) => b.length - a.length)
+      .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+
+    return new RegExp("\\b(" + escaped.join("|") + ")\\b", "gi");
+  }
+
+  function highlightSharedCompareTerms(html, sharedRegex) {
+    if (!html || !sharedRegex) return html;
+    const parts = html.split(/(<[^>]*>)/g);
+    for (let i = 0; i < parts.length; i++) {
+      if (!parts[i].startsWith("<")) {
+        parts[i] = parts[i].replace(sharedRegex, '<mark class="shared-term-mark">$1</mark>');
+      }
+    }
+    // Merge adjacent shared-term highlights across spaces or hyphens into unified phrase pills
+    return parts.join("").replace(/<\/mark>([ \t\-]+)<mark class="shared-term-mark">/gi, "$1");
+  }
+
+  window.togglePinFirstCompare = function() {
+    comparePinFirst = !comparePinFirst;
+    const modal = document.getElementById("compareModal");
+    if (modal) modal.classList.toggle("pin-first-col", comparePinFirst);
+    document.querySelectorAll('#compareModal .compare-card-header[data-col="0"] .compare-pin-btn').forEach(btn => {
+      btn.classList.toggle("pin-active", comparePinFirst);
+    });
+    showToast(comparePinFirst ? "📌 Baseline column pinned" : "Baseline column unpinned");
+  };
+
+  window.toggleCompareSharedHighlight = function() {
+    compareHighlightShared = !compareHighlightShared;
+    const btn = document.getElementById("compareSharedBtn");
+    if (btn) {
+      btn.style.background = compareHighlightShared ? "#34c759" : "#e3e3e8";
+      btn.style.color = compareHighlightShared ? "#ffffff" : "#007aff";
+    }
+    openCompareModal(true);
+  };
+
+  window.removePointFromCompare = function(pointId) {
+    compareList = compareList.filter(id => id !== pointId);
+    if (backupCompareList.length > 0) {
+      backupCompareList = backupCompareList.filter(id => id !== pointId);
+    }
+    updateCompareBasketUI();
+
+    // Sync Bottom Sheet compare icon if open on this point
+    if (sheetContextPoints && sheetContextPoints[currentSheetIndex] && sheetContextPoints[currentSheetIndex]["Short Name"] === pointId) {
+      const icon = document.getElementById("compareIcon");
+      if (icon) { icon.style.background = ""; icon.style.color = ""; }
+    }
+
+    if (compareList.length === 0) {
+      closeCompareModal();
+      return;
+    }
+    openCompareModal(true);
+  };
+
+  function openCompareModal(preserveToggles = false) {
+    if (compareList.length === 0) return;
+
+    const modal = document.getElementById("compareModal");
     const container = document.getElementById("compareContainer");
-    
+    const prevScrollTop = preserveToggles ? container.scrollTop : 0;
+    const prevScrollLeft = preserveToggles ? container.scrollLeft : 0;
+
+    if (!preserveToggles) {
+      allCompareHidden = false;
+      const hideBtn = document.getElementById("compareHideAllBtn");
+      if (hideBtn) hideBtn.textContent = "Hide All";
+
+      compareNamesHidden = false;
+      modal.classList.remove("hide-names-active");
+      const namesBtn = document.getElementById("compareToggleNamesBtn");
+      if (namesBtn) namesBtn.textContent = "Hide Names";
+
+      comparePinFirst = false;
+      modal.classList.remove("pin-first-col");
+
+      compareHighlightShared = false;
+      const sharedBtn = document.getElementById("compareSharedBtn");
+      if (sharedBtn) {
+        sharedBtn.style.background = "#e3e3e8";
+        sharedBtn.style.color = "#007aff";
+      }
+    } else {
+      modal.classList.toggle("pin-first-col", comparePinFirst);
+    }
+
     // Lock viewport to maintain native app feel
     viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
-    
+
     const fields = TCM_SECTIONS;
-
-
     let pts = compareList.map(id => points.find(p => p["Short Name"] === id)).filter(Boolean);
 
-        // --- THE RESPONSIVE IPAD + IPHONE ALGORITHM ---
-    // Determine the maximum columns to show on screen before horizontal scrolling begins
+    const sharedCompareRegex = compareHighlightShared ? buildSharedCompareRegex(pts, fields) : null;
+
+    // --- THE RESPONSIVE IPAD + IPHONE ALGORITHM ---
     const isIPad = window.innerWidth >= 850;
     const maxVisibleCols = isIPad ? 4 : 2;
     const colsToShow = Math.min(pts.length, maxVisibleCols);
 
-    // Expand the wrapper width proportionally if we exceed the visible column limit
-    // Example: 3 items on an iPhone (max 2) = (3 / 2) * 100 = 150% wrapper width.
     let wrapperWidthPercent = (pts.length / colsToShow) * 100;
     let explicitWidth = pts.length <= maxVisibleCols ? '100%' : `${wrapperWidthPercent}%`;
 
-    // Apply the responsive width to the master wrapper
     let html = `<div style="width: ${explicitWidth}; padding-bottom: 40px; box-sizing: border-box;">`;
 
-
-
-
-
     fields.forEach(f => {
-  // NEW: Respect the global section filter
-  if (isSectionFilterActive && activeSections.length > 0 && !activeSections.includes(f.label)) {
-    return; // Skip rendering this section entirely
-  }
+      if (isSectionFilterActive && activeSections.length > 0 && !activeSections.includes(f.label)) {
+        return;
+      }
 
-  // Skip the entire section if no points have data for it
-  const hasDataInRow = pts.some(p => {
-
+      const hasDataInRow = pts.some(p => {
         let val = p[f.key] || p[f.altKey] || "";
         return val && String(val).trim() !== "";
       });
       if (!hasDataInRow) return;
 
       html += `<div class="compare-section">`;
-      // Wraps the label in a span that sticks 15px from the left edge of the screen
       html += `<div class="compare-section-title"><span style="position: sticky; left: 15px;">${f.label}</span></div>`;
-
-      
-      // CSS Grid perfectly aligns headers and bodies in rows
       html += `<div class="compare-section-grid" style="grid-template-columns: repeat(${pts.length}, 1fr);">`;
-      
-    // ROW 1: Point Headers
-pts.forEach((p, i) => {
-   const imp = p.Important ? String(p.Important).trim() : "";
-   const impHtml = imp !== "" ? `<span class="importance-badge" style="font-size:16px;">${imp}</span>` : "";
-   
-   // Add the Eye Icon button and the data-col index
-   html += `<div class="compare-card-header" data-col="${i}">
-              <button onclick="toggleCompareColumn(${i})" style="background:transparent; border:none; cursor:pointer; padding:0 5px;">👁️</button> 
-              <span class="compare-point-name" onclick="this.classList.toggle('name-revealed')">${highlightText(p["Short Name"])} ${impHtml}</span>
-            </div>`;
-});
 
-// ROW 2: Data Bodies
-pts.forEach((p, i) => {
-   let rawVal = p[f.key] || p[f.altKey] || "";
-   let formatted = "";
+      // ROW 1: Point Headers
+      pts.forEach((p, i) => {
+        const imp = p.Important ? String(p.Important).trim() : "";
+        const impHtml = imp !== "" ? `<span class="importance-badge" style="font-size:15px; margin-left:4px;">${imp}</span>` : "";
+        const safeName = p["Short Name"].replace(/'/g, "\\'");
+        const pinBtnHtml = (i === 0 && pts.length > 1)
+          ? `<button class="compare-hdr-btn compare-pin-btn ${comparePinFirst ? 'pin-active' : ''}" onclick="event.stopPropagation(); togglePinFirstCompare()" title="Pin baseline column">📌</button>`
+          : "";
 
-   if (rawVal && String(rawVal).trim() !== "") {
-     // Re-ordered pipeline to protect unbroken text nodes
-     formatted = formatTextWithTables(highlightText(rawVal));
-     formatted = applyWordOcclusionToHTML(formatted, p["Short Name"]);
-     formatted = applyPhraseOcclusionToHTML(formatted, p["Short Name"]); 
-     formatted = linkifyPoints(formatted);
-     formatted = applyLineOcclusionToHTML(formatted, p["Short Name"]);
-   } else {
-     formatted = `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
-   }
-   
-   // UPDATED: Added the onclick toggle for peak mode
-   html += `<div class="compare-card-body" data-col="${i}" onclick="if(this.classList.contains('study-blur')) this.classList.toggle('study-peek');">${formatted}</div>`;
-});
+        html += `
+          <div class="compare-card-header" data-col="${i}">
+            <div class="compare-hdr-controls">
+              ${pinBtnHtml}
+              <button class="compare-hdr-btn" onclick="event.stopPropagation(); toggleCompareColumn(${i})" title="Hide/Show Column">👁️</button>
+            </div>
+            <span class="compare-point-name" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;" onclick="this.classList.toggle('name-revealed')">${highlightText(p["Short Name"])}${impHtml}</span>
+            <button class="compare-hdr-btn compare-remove-btn" onclick="event.stopPropagation(); removePointFromCompare('${safeName}')" title="Remove column">✕</button>
+          </div>`;
+      });
 
-      
-      html += `</div></div>`; // Close grid and section
+      // ROW 2: Data Bodies
+      pts.forEach((p, i) => {
+        let rawVal = p[f.key] || p[f.altKey] || "";
+        let formatted = "";
+
+        if (rawVal && String(rawVal).trim() !== "") {
+          formatted = formatTextWithTables(highlightText(rawVal));
+          if (compareHighlightShared && sharedCompareRegex && !COMPARE_SHARED_SKIP_SECTIONS.has(f.label)) {
+            formatted = highlightSharedCompareTerms(formatted, sharedCompareRegex);
+          }
+          formatted = applyWordOcclusionToHTML(formatted, p["Short Name"]);
+          formatted = applyPhraseOcclusionToHTML(formatted, p["Short Name"]);
+          formatted = linkifyPoints(formatted);
+          formatted = applyLineOcclusionToHTML(formatted, p["Short Name"]);
+        } else {
+          formatted = `<div style='text-align:center; margin-top:20px;'><span style='color:#ccc; font-style:italic;'>-</span></div>`;
+        }
+
+        const blurClass = allCompareHidden ? " study-blur" : "";
+        html += `<div class="compare-card-body${blurClass}" data-col="${i}" onclick="if(this.classList.contains('study-blur')) this.classList.toggle('study-peek');">${formatted}</div>`;
+      });
+
+      html += `</div></div>`;
     });
-    
-    html += `</div></div>`; // Close flex container and global wrapper
-    
+
+    html += `</div>`;
+
     container.innerHTML = html;
-    document.getElementById("compareModal").style.display = "flex";
+    modal.style.display = "flex";
+
+    if (preserveToggles) {
+      container.scrollTop = prevScrollTop;
+      container.scrollLeft = prevScrollLeft;
+    }
   }
 
 
@@ -5048,7 +5353,7 @@ window.shuffleCompare = function() {
     [compareList[i], compareList[j]] = [compareList[j], compareList[i]];
   }
   
-  openCompareModal(); 
+  openCompareModal(true); 
 };
 
 
@@ -5324,11 +5629,28 @@ async function completeSave(newValue) {
       console.warn("IndexedDB write failed. Changes saved to RAM only.", dbErr);
     }
 
-    // 5. Force UI Redraw
+    // 5. Force UI Redraw (including live Study Modal card if open)
     if (typeof window.refreshActivePanel === 'function') {
        window.refreshActivePanel(true); 
     } else {
        handleSearch(true); 
+    }
+
+    if (document.getElementById("studyModal").style.display === "flex") {
+      const editedId = currentEditingPoint["Short Name"];
+      const refreshCardObj = (c) => {
+        if (c && c.point && c.point["Short Name"] === editedId) {
+          c.point = currentEditingPoint;
+          const secCfg = TCM_SECTIONS.find(s => s.label === c.sectionLabel);
+          if (secCfg) c.content = currentEditingPoint[secCfg.key] || currentEditingPoint[secCfg.altKey] || "";
+        }
+      };
+      studyDeck.forEach(refreshCardObj);
+      activeChunk.forEach(refreshCardObj);
+      pendingDeck.forEach(refreshCardObj);
+      const wasFlipped = document.getElementById("activeStudyCard")?.classList.contains("is-flipped");
+      renderCurrentStudyCard();
+      if (wasFlipped) document.getElementById("activeStudyCard")?.classList.add("is-flipped");
     }
     
     showToast("✅ Edit saved successfully");
@@ -5562,6 +5884,7 @@ document.addEventListener('keydown', (e) => {
 
 // 5. GLOBAL ESCAPE KEY
   if (e.key === 'Escape') {
+    if (document.getElementById('srsCardModal').style.display === 'flex') { closeSrsCardModal(); return; }
     if (document.getElementById('resumeSessionModal').style.display === 'flex') { document.getElementById('resumeSessionModal').style.display = 'none'; return; }
     if (document.getElementById('studySettingsModal').style.display === 'flex') { closeStudySettingsModal(); return; }
     if (document.getElementById('lightbox').style.display === 'flex') { closeLightbox(); return; }
@@ -5965,8 +6288,23 @@ document.addEventListener('keyup', (e) => {
     pointBadge.className = "jump-bar-point-badge";
     pointBadge.textContent = point["Short Name"] + (imp ? " " + imp : "");
     pointBadge.title = "Scroll to top";
+    const lockScrollSpyTemporarily = () => {
+      container._isProgrammaticScroll = true;
+      clearTimeout(container._progScrollTimer);
+      container._progScrollTimer = setTimeout(() => {
+        container._isProgrammaticScroll = false;
+      }, 150);
+    };
+
     pointBadge.onclick = (e) => {
       e.stopPropagation();
+      lockScrollSpyTemporarily();
+      const firstVisible = jumpTargets.find(t => t.sectionEl.offsetParent !== null);
+      if (firstVisible) {
+        jumpScroller.querySelectorAll(".jump-pill").forEach(p => p.classList.remove("active"));
+        firstVisible.pillBtn.classList.add("active");
+      }
+      jumpScroller.scrollTo({ left: 0, behavior: "smooth" });
       container.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -5979,8 +6317,14 @@ document.addEventListener('keyup', (e) => {
     const jumpTargets = [];
 
     const scrollToSectionEl = (targetEl, pillBtn) => {
+      lockScrollSpyTemporarily();
       jumpScroller.querySelectorAll(".jump-pill").forEach(p => p.classList.remove("active"));
       pillBtn.classList.add("active");
+
+      // Center the tapped pill once cleanly
+      const pillCenter = pillBtn.offsetLeft + (pillBtn.clientWidth / 2);
+      const scrollerCenter = jumpScroller.clientWidth / 2;
+      jumpScroller.scrollTo({ left: pillCenter - scrollerCenter, behavior: "smooth" });
 
       const containerRect = container.getBoundingClientRect();
       const targetRect = targetEl.getBoundingClientRect();
@@ -6018,13 +6362,31 @@ document.addEventListener('keyup', (e) => {
         return; 
       }
       
-      const editIcon = `<button class="section-edit-btn" onclick="event.stopPropagation(); window.triggerEdit('${point["Short Name"]}', '${fieldName}')">✏️</button>`;
+      const safePtId = point["Short Name"].replace(/'/g, "\\'");
+      const safeSecLabel = label.replace(/'/g, "\\'");
+      const editIcon = `<button class="section-edit-btn" onclick="event.stopPropagation(); window.triggerEdit('${safePtId}', '${fieldName}')">✏️</button>`;
       
-      // --- NEW: Inject the Mark All Button ONLY if Mark Mode is ON ---
+      // --- SRS Status Badge for Enrolled Sections ---
+      let srsBadgeHtml = "";
+      const cardSrs = getVirtualSRS(point, label);
+      if (cardSrs && Array.isArray(cardSrs)) {
+        const srsInterval = Number(cardSrs[0]) || 0;
+        const srsDue = Number(cardSrs[1]) || 0;
+        const srsStreak = cardSrs.length > 2 ? (Number(cardSrs[2]) || 0) : 0;
+
+        if (srsInterval === 0) {
+          srsBadgeHtml = `<span class="srs-status-badge srs-badge-learning" onclick="event.stopPropagation(); openSrsCardModal('${safePtId}', '${safeSecLabel}')" title="Manage SRS Card">🔥 ${srsStreak}/3</span>`;
+        } else if (srsDue <= Date.now()) {
+          srsBadgeHtml = `<span class="srs-status-badge srs-badge-due" onclick="event.stopPropagation(); openSrsCardModal('${safePtId}', '${safeSecLabel}')" title="Manage SRS Card">📅 Due (${srsInterval}d)</span>`;
+        } else {
+          srsBadgeHtml = `<span class="srs-status-badge srs-badge-graduated" onclick="event.stopPropagation(); openSrsCardModal('${safePtId}', '${safeSecLabel}')" title="Manage SRS Card">📅 ${srsInterval}d</span>`;
+        }
+      }
+
+      // --- Inject the Mark All Button ONLY if Mark Mode is ON ---
       let markAllIcon = "";
-      if (lineOccState === 'mark')
- {
-        markAllIcon = `<button class="section-edit-btn" style="color:#cc5500; margin-right:12px;" onclick="event.stopPropagation(); markAllLinesInSection(this, '${point["Short Name"]}')">🖍️ All</button>`;
+      if (lineOccState === 'mark') {
+        markAllIcon = `<button class="section-edit-btn" style="color:#cc5500; margin-right:12px;" onclick="event.stopPropagation(); markAllLinesInSection(this, '${safePtId}')">🖍️ All</button>`;
       }
 
       const div = document.createElement("div"); 
@@ -6072,7 +6434,7 @@ document.addEventListener('keyup', (e) => {
       // --- 4. APPLY LINE OCCLUSION ---
       fullHtml = applyLineOcclusionToHTML(fullHtml, point["Short Name"]);
 
-      const headerHtml = "<div class='section-label'>" + label + editIcon + markAllIcon + "</div>";
+      const headerHtml = "<div class='section-label'>" + label + editIcon + srsBadgeHtml + markAllIcon + "</div>";
 
 
             // --- UPGRADED STEP 4: SMART SECTION FILTERING ---
@@ -6167,6 +6529,14 @@ document.addEventListener('keyup', (e) => {
     if (!container._hasJumpScrollSpy) {
       let spyTicking = false;
       container.addEventListener("scroll", () => {
+        // Hold the lock open while programmatic smooth-scrolling is in motion
+        if (container._isProgrammaticScroll) {
+          clearTimeout(container._progScrollTimer);
+          container._progScrollTimer = setTimeout(() => {
+            container._isProgrammaticScroll = false;
+          }, 120);
+          return;
+        }
         if (spyTicking) return;
         spyTicking = true;
         requestAnimationFrame(() => {
@@ -6369,15 +6739,17 @@ window.addNewOcclusionGroup = function() {
 window.toggleHideGroup = function(groupNum) {
   if (groupNum === 'all') {
     occludeAllGroups = true;
+    activeHideGroups.clear();
   } else {
     const g = parseInt(groupNum, 10);
     if (occludeAllGroups) {
+      // Switching out of "All" starts fresh with the group you just tapped
       occludeAllGroups = false;
       activeHideGroups = new Set([g]);
     } else {
+      // Multi-select: toggle this group on or off in your active combo
       if (activeHideGroups.has(g)) {
         activeHideGroups.delete(g);
-        if (activeHideGroups.size === 0) occludeAllGroups = true;
       } else {
         activeHideGroups.add(g);
       }
@@ -6386,7 +6758,7 @@ window.toggleHideGroup = function(groupNum) {
   renderModalGroupPills();
   const sheet = document.getElementById('bottomSheet');
   if (sheet && sheet.classList.contains('open')) updateSheetUI(false, true);
-  if (document.getElementById('compareModal').style.display === 'flex') openCompareModal();
+  if (document.getElementById('compareModal').style.display === 'flex') openCompareModal(true);
   if (document.getElementById('studyModal').style.display === 'flex') renderCurrentStudyCard();
 };
 
@@ -7926,6 +8298,8 @@ function openGlobalReview(forceCram = false, forceRestart = false) {
   if (dueDeck.length === 0 && !forceCram && !isBrowseMode) {
     activeChunk = [];
     pendingDeck = [];
+    renderStudyOccBar(null);
+    renderStudyHintBar(false, true);
     document.getElementById("studyCardContainer").innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: #007aff; margin-bottom: 5px;">All Caught Up!</h2>
@@ -8000,6 +8374,8 @@ if (isDue) dueDeck.push(cardObj);
   if (dueDeck.length === 0 && !forceCram && !isBrowseMode) {
     activeChunk = [];
     pendingDeck = [];
+    renderStudyOccBar(null);
+    renderStudyHintBar(false, true);
     document.getElementById("studyCardContainer").innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: #007aff; margin-bottom: 5px;">All Caught Up!</h2>
@@ -8022,6 +8398,271 @@ if (isDue) dueDeck.push(cardObj);
   finalizeDeckLaunch(order, isBrowseMode, false);
 }
 
+function renderStudyHintBar(isBrowseMode, isSessionOver = false) {
+  const hintBar = document.getElementById("studyHintBar");
+  if (!hintBar) return;
+
+  if (isSessionOver) {
+    hintBar.style.display = "none";
+    return;
+  }
+  hintBar.style.display = "flex";
+
+  if (isBrowseMode) {
+    hintBar.innerHTML = `
+      <button type="button" class="study-grade-btn grade-btn-undo" onclick="prevBrowseCard()">← Prev<small>Left Arrow</small></button>
+      <button type="button" class="study-grade-btn grade-btn-flip" onclick="document.getElementById('activeStudyCard')?.classList.toggle('is-flipped')">🔄 Flip<small>Space</small></button>
+      <button type="button" class="study-grade-btn grade-btn-strong" onclick="nextBrowseCard()">Next →<small>Right Arrow</small></button>
+    `;
+  } else {
+    hintBar.innerHTML = `
+      <button type="button" class="study-grade-btn grade-btn-wrong" onclick="rateCard('swipe-wrong')">❌ Wrong<small>↓ Reset</small></button>
+      <button type="button" class="study-grade-btn grade-btn-undo" onclick="undoLastStudyCard()">↩️ Undo<small>→ Back</small></button>
+      <button type="button" class="study-grade-btn grade-btn-flip" onclick="document.getElementById('activeStudyCard')?.classList.toggle('is-flipped')">🔄 Flip<small>Space</small></button>
+      <button type="button" class="study-grade-btn grade-btn-correct" onclick="rateCard('swipe-correct')">✅ Correct<small>← +1</small></button>
+      <button type="button" class="study-grade-btn grade-btn-strong" onclick="rateCard('swipe-strong')">⚡ Strong<small>↑ +2</small></button>
+    `;
+  }
+}
+
+// Remembers which occlusion engines you prefer so turning Cloze Off -> On doesn't force all 3 on
+let lastStudyOccTypes = { line: false, word: true, phrase: true };
+
+function rememberActiveOccTypes() {
+  if (lineOccState === 'hide' || wordOccState === 'hide' || phraseOccState === 'hide') {
+    lastStudyOccTypes = {
+      line: lineOccState === 'hide',
+      word: wordOccState === 'hide',
+      phrase: phraseOccState === 'hide'
+    };
+  }
+}
+
+function restorePreferredOccTypes() {
+  if (!lastStudyOccTypes.line && !lastStudyOccTypes.word && !lastStudyOccTypes.phrase) {
+    lastStudyOccTypes = { line: false, word: true, phrase: true };
+  }
+  lineOccState = lastStudyOccTypes.line ? 'hide' : 'off';
+  wordOccState = lastStudyOccTypes.word ? 'hide' : 'off';
+  phraseOccState = lastStudyOccTypes.phrase ? 'hide' : 'off';
+}
+
+function renderStudyOccBar(point) {
+  const bar = document.getElementById("studyOccBar");
+  if (!bar) return;
+
+  if (!point) {
+    bar.style.display = "none";
+    return;
+  }
+  bar.style.display = "flex";
+
+  rememberActiveOccTypes();
+
+  const maxG = getDetectedMaxGroup(point);
+  const anyHide = (lineOccState === 'hide' || wordOccState === 'hide' || phraseOccState === 'hide');
+
+  let html = `<button type="button" class="occ-group-pill${!anyHide ? ' active-mark' : ''}" style="padding:4px 9px; font-size:11px;" onclick="setStudyOccMode('off')">Off</button>`;
+  html += `<button type="button" class="occ-group-pill${lineOccState === 'hide' ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleStudyOccType('line')">Line</button>`;
+  html += `<button type="button" class="occ-group-pill${wordOccState === 'hide' ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleStudyOccType('word')">Word</button>`;
+  html += `<button type="button" class="occ-group-pill${phraseOccState === 'hide' ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleStudyOccType('phrase')">Phrase</button>`;
+
+  html += `<span style="color:#c7c7cc; font-weight:300; margin:0 2px;">|</span>`;
+
+  html += `<button type="button" class="occ-group-pill${(anyHide && occludeAllGroups) ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="setStudyOccMode('all')">All</button>`;
+
+  for (let g = 1; g <= maxG; g++) {
+    const isSelected = anyHide && !occludeAllGroups && activeHideGroups.has(g);
+    html += `<button type="button" class="occ-group-pill${isSelected ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="setStudyOccMode(${g})">G${g}</button>`;
+  }
+  bar.innerHTML = html;
+}
+
+window.toggleStudyOccType = function(type) {
+  const wasFlipped = document.getElementById("activeStudyCard")?.classList.contains("is-flipped");
+
+  if (type === 'line') lineOccState = (lineOccState === 'hide') ? 'off' : 'hide';
+  else if (type === 'word') wordOccState = (wordOccState === 'hide') ? 'off' : 'hide';
+  else if (type === 'phrase') phraseOccState = (phraseOccState === 'hide') ? 'off' : 'hide';
+
+  rememberActiveOccTypes();
+  updateOccToggleUI();
+  renderCurrentStudyCard();
+  if (wasFlipped) document.getElementById("activeStudyCard")?.classList.add("is-flipped");
+};
+
+window.setStudyOccMode = function(mode) {
+  const wasFlipped = document.getElementById("activeStudyCard")?.classList.contains("is-flipped");
+
+  if (mode === 'off') {
+    rememberActiveOccTypes();
+    lineOccState = 'off';
+    wordOccState = 'off';
+    phraseOccState = 'off';
+  } else {
+    const anyHide = (lineOccState === 'hide' || wordOccState === 'hide' || phraseOccState === 'hide');
+    if (!anyHide) {
+      restorePreferredOccTypes();
+    }
+    if (mode === 'all') {
+      occludeAllGroups = true;
+      activeHideGroups.clear();
+    } else {
+      const g = parseInt(mode, 10);
+      if (!anyHide || occludeAllGroups) {
+        // Switching from "Off" or "All" starts with just the group you tapped
+        occludeAllGroups = false;
+        activeHideGroups = new Set([g]);
+      } else {
+        // Multi-select: add or remove this group from your current combo (e.g., G1 + G3)
+        if (activeHideGroups.has(g)) {
+          activeHideGroups.delete(g);
+        } else {
+          activeHideGroups.add(g);
+        }
+      }
+    }
+  }
+
+  updateOccToggleUI();
+  renderCurrentStudyCard();
+  if (wasFlipped) document.getElementById("activeStudyCard")?.classList.add("is-flipped");
+};
+
+function getActiveStudyCardObject() {
+  const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
+  return isBrowseMode ? studyDeck[currentStudyIndex] : activeChunk[currentStudyIndex];
+}
+
+window.studyEditCurrentCard = function() {
+  const cardData = getActiveStudyCardObject();
+  if (!cardData || !cardData.point) {
+    showToast("No active card to edit.");
+    return;
+  }
+  const secCfg = TCM_SECTIONS.find(s => s.label === cardData.sectionLabel);
+  let fieldKey = "Notes";
+  if (secCfg) {
+    fieldKey = (secCfg.label === "Location" && !cardData.point.hasOwnProperty("Location ")) ? "Location" : secCfg.key;
+  }
+  openEditModal(cardData.point, fieldKey);
+};
+
+window.studyPeekCurrentCard = function() {
+  const cardData = getActiveStudyCardObject();
+  if (cardData && cardData.point) {
+    openQuickPeekPointObject(cardData.point);
+  } else {
+    openQuickPeekSearch("");
+  }
+};
+
+// --- CARD-LEVEL SRS STATUS / RESET / REMOVE MODAL LOGIC ---
+let activeSrsModalTarget = null; // { pointId, sectionLabel }
+
+window.openSrsCardModal = function(pointId, sectionLabel) {
+  const p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+  const cardSrs = getVirtualSRS(p, sectionLabel);
+  if (!cardSrs) return;
+
+  activeSrsModalTarget = { pointId, sectionLabel };
+  document.getElementById("srsCardModalTitle").textContent = `${pointId} • ${sectionLabel}`;
+
+  const interval = Number(cardSrs[0]) || 0;
+  const dueTs = Number(cardSrs[1]) || 0;
+  const streak = cardSrs.length > 2 ? (Number(cardSrs[2]) || 0) : 0;
+
+  let statusText = "";
+  if (interval === 0) {
+    statusText = `Status: <strong>Learning</strong> (Streak: ${streak}/3)<br>Needs ${Math.max(1, 3 - streak)} more correct review${(3 - streak) === 1 ? '' : 's'} to graduate.`;
+  } else {
+    const diffDays = Math.ceil((dueTs - Date.now()) / 86400000);
+    const dueStr = diffDays <= 0 ? "<strong>Due Now</strong>" : `Due in <strong>${diffDays} day${diffDays === 1 ? '' : 's'}</strong>`;
+    statusText = `Status: <strong>Graduated</strong> (Interval: ${interval}d • Streak: ${streak})<br>${dueStr}`;
+  }
+
+  document.getElementById("srsCardModalInfo").innerHTML = statusText;
+  document.getElementById("srsCardModal").style.display = "flex";
+};
+
+window.closeSrsCardModal = function() {
+  document.getElementById("srsCardModal").style.display = "none";
+  activeSrsModalTarget = null;
+};
+
+window.resetSingleCardSRS = async function() {
+  if (!activeSrsModalTarget) return;
+  const { pointId, sectionLabel } = activeSrsModalTarget;
+  const p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+
+  const cardId = pointId + "::" + sectionLabel;
+  pendingSRSUpdates = pendingSRSUpdates.filter(u => u.cardId !== cardId);
+  saveSRSQueueLocal();
+  updateStudySyncBadge();
+
+  let srsData = {};
+  try { srsData = JSON.parse(p["SRS Data"] || "{}"); } catch(e) {}
+  srsData[sectionLabel] = [0, Date.now(), 0];
+  p["SRS Data"] = JSON.stringify(srsData);
+
+  await saveSinglePointToVault(p);
+  if (navigator.onLine) {
+    fetch(writeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ id: pointId, field: "SRS Data", value: p["SRS Data"] })
+    }).catch(e => console.log("SRS reset sync failed", e));
+  }
+
+  closeSrsCardModal();
+  updateSheetUI(false, true);
+  showToast(`🔄 Reset "${sectionLabel}" streak to 0`);
+};
+
+window.removeSingleCardSRS = async function() {
+  if (!activeSrsModalTarget) return;
+  const { pointId, sectionLabel } = activeSrsModalTarget;
+  const p = points.find(x => x["Short Name"] === pointId);
+  if (!p) return;
+
+  const cardId = pointId + "::" + sectionLabel;
+  pendingSRSUpdates = pendingSRSUpdates.filter(u => u.cardId !== cardId);
+  saveSRSQueueLocal();
+  updateStudySyncBadge();
+
+  let srsData = {};
+  try { srsData = JSON.parse(p["SRS Data"] || "{}"); } catch(e) {}
+  delete srsData[sectionLabel];
+  p["SRS Data"] = JSON.stringify(srsData);
+
+  // Also strip from any paused local study session so it doesn't resurrect on resume
+  try {
+    const saved = localStorage.getItem('tcm_saved_session');
+    if (saved) {
+      const session = JSON.parse(saved);
+      if (session.activeChunk) session.activeChunk = session.activeChunk.filter(c => (typeof c === 'string' ? c : c.id) !== cardId);
+      if (session.pendingDeck) session.pendingDeck = session.pendingDeck.filter(id => id !== cardId);
+      if (session.studyDeck) session.studyDeck = session.studyDeck.filter(id => id !== cardId);
+      localStorage.setItem('tcm_saved_session', JSON.stringify(session));
+    }
+  } catch(e) {}
+
+  await saveSinglePointToVault(p);
+  if (navigator.onLine) {
+    fetch(writeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ id: pointId, field: "SRS Data", value: p["SRS Data"] })
+    }).catch(e => console.log("SRS remove sync failed", e));
+  }
+
+  closeSrsCardModal();
+  updateSheetUI(false, true);
+  showToast(`🗑️ Removed "${sectionLabel}" from Global Deck`);
+};
+
 function finalizeDeckLaunch(order, isBrowseMode, isResuming = false) {
   if (!isResuming) {
     if (order === "random") studyDeck.sort(() => Math.random() - 0.5);
@@ -8033,12 +8674,7 @@ function finalizeDeckLaunch(order, isBrowseMode, isResuming = false) {
   }
   
   studyHistory = []; 
-  
-  const hintBar = document.getElementById("studyHintBar");
-  if (hintBar) {
-    if (isBrowseMode) hintBar.innerHTML = `<span>← Prev Card</span><span>[Space] Flip</span><span>Next Card →</span>`;
-    else hintBar.innerHTML = `<span>← Correct (Streak +1)</span><span>↑ Strong (Instant Pass)</span><span>↓ Wrong (Streak 0)</span><span>[Space] Flip</span>`;
-  }
+  renderStudyHintBar(isBrowseMode, false);
 
   updateStudySyncBadge(); 
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
@@ -8273,8 +8909,10 @@ function renderCurrentStudyCard() {
      counter.innerHTML = `Review ${cardsReviewedInChunk + 1} &bull; ${activeChunk.length} in Hand &bull; ${completedCards}/${studyDeck.length} ${finishTerm} ${streakHtml}`;
   }
 
-  // 1. END OF DECK SCREEN
+// 1. END OF DECK SCREEN
   if ((isBrowseMode && currentStudyIndex >= studyDeck.length) || (!isBrowseMode && activeChunk.length === 0)) {
+    renderStudyOccBar(null);
+    renderStudyHintBar(isBrowseMode, true);
     container.innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: ${isBrowseMode ? '#007aff' : '#34c759'}; margin-bottom: 5px;">${isBrowseMode ? 'End of Deck' : 'Deck Complete!'}</h2>
@@ -8290,8 +8928,10 @@ function renderCurrentStudyCard() {
     return;
   }
 
-// 2. CHUNK INTERMISSION SCREEN
+  // 2. CHUNK INTERMISSION SCREEN
   if (cardsReviewedInChunk >= studyChunkSize && !isBrowseMode) {
+    renderStudyOccBar(null);
+    renderStudyHintBar(isBrowseMode, true);
     container.innerHTML = `
       <div style="text-align: center; color: #888; display: flex; flex-direction: column; align-items: center;">
         <h2 style="color: #cc5500; font-size: 28px; margin-bottom: 5px;">Take a breath.</h2>
@@ -8305,11 +8945,11 @@ function renderCurrentStudyCard() {
       </div>`;
     return;
   }
-  
-
 
   // 3. RENDER NORMAL CARD
   const cardData = isBrowseMode ? studyDeck[currentStudyIndex] : activeChunk[currentStudyIndex];
+  renderStudyOccBar(cardData.point);
+  renderStudyHintBar(isBrowseMode, false);
   
   let formattedBack = formatTextWithTables(highlightText(cardData.content));
   formattedBack = applyWordOcclusionToHTML(formattedBack, cardData.point["Short Name"]);
@@ -8699,7 +9339,7 @@ document.addEventListener('keydown', (e) => {
   // Yield keyboard control if typing in an input or if Quick Peek / Lightbox is open above Study Modal
   const activeEl = document.activeElement;
   if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.isContentEditable)) return;
-  if (isQuickPeekOpen() || document.getElementById("lightbox").style.display === "flex") return;
+  if (isQuickPeekOpen() || document.getElementById("lightbox").style.display === "flex" || document.getElementById("editModal").style.display === "flex") return;
   
   const cardEl = document.getElementById("activeStudyCard");
   const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
