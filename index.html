@@ -1344,17 +1344,21 @@ mark.shared-term-mark {
 
 
 /* --- SRS STUDY MODAL STYLES --- */
-  /* --- SRS STUDY MODAL STYLES --- */
+    #studyCardContainer {
+      min-height: 0; /* Allows flex child to shrink cleanly on iPhone */
+      padding: 8px 14px !important;
+    }
+
     .study-card {
       width: 100%;
-      height: 75vh; /* Taller card */
+      height: 100%;
       max-width: 500px;
-      min-height: 450px; /* Locks the front from collapsing */
-      max-height: 700px; /* Expands maximum height */
+      min-height: 0;
+      max-height: 100%;
       margin: 0 auto; 
       position: relative;
       transform-style: preserve-3d;
-      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Faster flip */
+      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       cursor: pointer;
       will-change: transform;
     }
@@ -1490,6 +1494,8 @@ mark.shared-term-mark {
     /* Wrapper handles animations so the 3D flip isn't interrupted */
     .study-card-wrapper {
       width: 100%;
+      height: 100%;
+      max-height: 680px;
       max-width: 500px;
       margin: 0 auto;
       position: relative;
@@ -1562,29 +1568,37 @@ mark.shared-term-mark {
 
     /* Embedded Study Modal Occlusion Bar */
     .study-occ-bar {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 6px 12px 2px 12px; overflow-x: auto; scrollbar-width: none;
+      display: flex; align-items: center; justify-content: flex-start; gap: 5px;
+      padding: 4px 12px 2px 12px; overflow-x: auto; scrollbar-width: none;
       -webkit-overflow-scrolling: touch; flex-shrink: 0;
+    }
+    @media (min-width: 500px) {
+      .study-occ-bar { justify-content: center; }
     }
     .study-occ-bar::-webkit-scrollbar { display: none; }
 
     /* Interactive Touch-Grading Bar in Study Modal */
     #studyHintBar {
-      display: flex; gap: 8px; align-items: stretch; justify-content: center;
-      padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;
+      display: flex; gap: 6px; align-items: stretch; justify-content: center;
+      padding: 8px 10px calc(8px + env(safe-area-inset-bottom)) 10px;
       background: white; border-top: 1px solid #d1d1d6; flex-shrink: 0;
     }
     .study-grade-btn {
       flex: 1; max-width: 115px; border: none; border-radius: 10px;
-      padding: 10px 6px; font-size: 13px; font-weight: 800;
+      padding: 8px 4px; font-size: 12.5px; font-weight: 800;
       cursor: pointer; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 2px;
       transition: transform 0.1s, opacity 0.15s; user-select: none;
-      -webkit-tap-highlight-color: transparent;
+      -webkit-tap-highlight-color: transparent; white-space: nowrap;
     }
     .study-grade-btn:active { transform: scale(0.95); opacity: 0.8; }
     .study-grade-btn small {
       font-size: 10px; font-weight: 600; opacity: 0.75;
+    }
+    /* Hide keyboard shortcut sub-labels on mobile phones to save vertical space */
+    @media (max-width: 767px) {
+      .study-grade-btn small { display: none; }
+      #studyCounterDisplay { padding-top: 4px !important; font-size: 12px !important; }
     }
     .grade-btn-wrong { background: rgba(255, 59, 48, 0.12); color: #ff3b30; }
     .grade-btn-undo { background: #e3e3e8; color: #555; flex: 0.75; }
@@ -2359,7 +2373,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "10.28.26.v1";
+const APP_VERSION = "10.28.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -8705,8 +8719,8 @@ function renderStudyHintBar(isBrowseMode, isSessionOver = false) {
   }
 }
 
-// Remembers which occlusion engines you prefer so turning Cloze Off -> On doesn't force all 3 on
-let lastStudyOccTypes = { line: false, word: true, phrase: true };
+// Defaults to Phrase only when activating a group from Off
+let lastStudyOccTypes = { line: false, word: false, phrase: true };
 
 function rememberActiveOccTypes() {
   if (lineOccState === 'hide' || wordOccState === 'hide' || phraseOccState === 'hide') {
@@ -8720,7 +8734,7 @@ function rememberActiveOccTypes() {
 
 function restorePreferredOccTypes() {
   if (!lastStudyOccTypes.line && !lastStudyOccTypes.word && !lastStudyOccTypes.phrase) {
-    lastStudyOccTypes = { line: false, word: true, phrase: true };
+    lastStudyOccTypes = { line: false, word: false, phrase: true };
   }
   lineOccState = lastStudyOccTypes.line ? 'hide' : 'off';
   wordOccState = lastStudyOccTypes.word ? 'hide' : 'off';
