@@ -2,8 +2,8 @@
    TCM UNIFIED QUIZ & STUDY HUB ENGINE (tcm-quiz.js)
    Tracks:
    1. 'location'        -> Point Location Quiz (Standard MCQ + FITB Lvl 1-4)
-   2. 'clinical_points' -> Point Actions & Indications Differentiation Quiz
-   3. 'patterns'        -> Zang-Fu & Pattern Differentiation Quiz (160+ rows)
+   2. 'clinical_points' -> Point Actions, Indications & Combinations Quiz
+   3. 'patterns'        -> Zang-Fu & Pattern Differentiation Mastery Quiz
    ============================================================================ */
 
 (function () {
@@ -67,6 +67,7 @@
       .quiz-pill-btn:active { transform: scale(0.96); }
       .quiz-score-badge {
         font-size: 13px; font-weight: 800; color: #cc5500; letter-spacing: 0.3px;
+        white-space: nowrap;
       }
 
       /* Settings Drawer inside Quiz */
@@ -93,10 +94,20 @@
         background: #ffffff; border: 1px solid #d1d1d6; border-radius: 12px;
         padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
       }
+      .quiz-q-header-row {
+        display: flex; justify-content: space-between; align-items: center; gap: 8px;
+        margin-bottom: 10px;
+      }
       .quiz-q-label {
         font-size: 11.5px; font-weight: 800; text-transform: uppercase;
-        color: #cc5500; letter-spacing: 0.6px; margin-bottom: 10px; display: block;
+        color: #cc5500; letter-spacing: 0.6px; display: block;
       }
+      .quiz-clue-btn {
+        background: rgba(255, 149, 0, 0.15); color: #cc5500; border: 1px solid rgba(204, 85, 0, 0.3);
+        border-radius: 14px; padding: 3px 10px; font-size: 11.5px; font-weight: 800;
+        cursor: pointer; white-space: nowrap;
+      }
+      .quiz-clue-btn:active { transform: scale(0.95); }
       .quiz-q-body {
         font-size: 15px; line-height: 1.5; color: #2c2c2e; font-weight: 500;
       }
@@ -131,6 +142,25 @@
         background: rgba(255, 59, 48, 0.12); border-color: #ff3b30; color: #d70015; opacity: 0.85;
       }
 
+      /* Post-Answer Clinical Anchor & Side-by-Side Diff Digest */
+      .quiz-digest-card {
+        display: none; flex-direction: column; gap: 10px;
+        background: #ffffff; border: 1px solid #d1d1d6; border-left: 4px solid #34c759;
+        border-radius: 10px; padding: 12px 14px; font-size: 13.5px; line-height: 1.45;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      }
+      .quiz-digest-card.missed { border-left-color: #ff3b30; }
+      .quiz-diff-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        margin-top: 4px; padding-top: 8px; border-top: 1px dashed #d1d1d6;
+      }
+      @media (max-width: 520px) {
+        .quiz-diff-grid { grid-template-columns: 1fr; }
+      }
+      .quiz-diff-col {
+        background: #f8f8fa; border-radius: 8px; padding: 8px 10px; border: 1px solid #e5e5ea;
+      }
+
       /* Post-Answer Quick Inspection Bar */
       .quiz-inspect-bar {
         display: none; flex-wrap: wrap; gap: 8px; align-items: center;
@@ -161,19 +191,12 @@
         display: none; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 34px;
       }
       .qf-points-list.open { display: flex; }
-      
-      
-      .quiz-score-badge { white-space: nowrap; }
-      @media (max-width: 767px) {
-        .quiz-kb-hint { display: none; }
-      }
+
       @media (max-width: 430px) {
         .quiz-top-bar { padding-left: 10px; padding-right: 10px; gap: 4px; }
         .quiz-track-tab { padding: 6px 7px; font-size: 11px; }
         .quiz-score-badge { font-size: 12px; }
       }
-      
-      
 
       @media (prefers-color-scheme: dark) {
         #quizModal { background: #000000; }
@@ -189,8 +212,11 @@
         .quiz-pill-btn { background: #2c2c2e; color: #0a84ff; }
         .quiz-score-badge { color: #ff9f0a; }
         .quiz-select { background: #2c2c2e; color: #ffffff; border-color: #38383a; }
-        .quiz-question-card { background: #1c1c1e; border-color: #38383a; }
+        .quiz-question-card, .quiz-digest-card { background: #1c1c1e; border-color: #38383a; color: #f2f2f7; }
+        .quiz-diff-grid { border-top-color: #38383a; }
+        .quiz-diff-col { background: #2c2c2e; border-color: #38383a; }
         .quiz-q-label { color: #ff9f0a; }
+        .quiz-clue-btn { background: rgba(255, 159, 10, 0.2); color: #ff9f0a; border-color: rgba(255, 159, 10, 0.4); }
         .quiz-q-body { color: #f2f2f7; }
         .quiz-fitb-blank { color: #64b5f6; }
         .quiz-diag-box { background: #2c2c2e; border-left-color: #ff9f0a; }
@@ -215,11 +241,11 @@
             <button onclick="closeToolsHubModal()" style="background:transparent; border:none; font-size:26px; color:#8e8e93; cursor:pointer; line-height:1;">&times;</button>
           </div>
 
-          <button class="hub-card-btn" onclick="closeToolsHubModal(); openQuizModal('location');">
-            <div class="hub-card-icon">📍</div>
+          <button class="hub-card-btn" onclick="closeToolsHubModal(); openQuizModal('patterns');">
+            <div class="hub-card-icon">☯️</div>
             <div>
-              <div class="hub-card-title">Point Location Quiz</div>
-              <div class="hub-card-sub">Standard MCQ & Level 1–4 Fill-in-the-Blank (Cun, Anatomy, Landmarks)</div>
+              <div class="hub-card-title">Pattern Differentiation Quiz</div>
+              <div class="hub-card-sub" id="hubPatternCountSub">Vignettes, Cardinal Triads, Sibling Contrast, Tongue/Pulse & Rx</div>
             </div>
           </button>
 
@@ -227,15 +253,15 @@
             <div class="hub-card-icon">⚡</div>
             <div>
               <div class="hub-card-title">Actions & Indications Quiz</div>
-              <div class="hub-card-sub">Point clinical differentiation, vignette matching & action/indication blanks</div>
+              <div class="hub-card-sub">Point differentiation, Odd-Indication-Out, Combinations & FITB</div>
             </div>
           </button>
 
-          <button class="hub-card-btn" onclick="closeToolsHubModal(); openQuizModal('patterns');">
-            <div class="hub-card-icon">☯️</div>
+          <button class="hub-card-btn" onclick="closeToolsHubModal(); openQuizModal('location');">
+            <div class="hub-card-icon">📍</div>
             <div>
-              <div class="hub-card-title">Pattern Differentiation Quiz</div>
-              <div class="hub-card-sub" id="hubPatternCountSub">Zang-Fu clinical manifestations, Tongue/Pulse & sibling contrast</div>
+              <div class="hub-card-title">Point Location Quiz</div>
+              <div class="hub-card-sub">Standard MCQ & Level 1–4 Fill-in-the-Blank (Cun, Anatomy, Landmarks)</div>
             </div>
           </button>
 
@@ -261,9 +287,9 @@
       <div id="quizModal">
         <div class="quiz-top-bar">
           <div class="quiz-track-tabs">
-            <button class="quiz-track-tab active" id="tabQuizLocation" onclick="switchQuizTrack('location')">📍 Location</button>
+            <button class="quiz-track-tab" id="tabQuizLocation" onclick="switchQuizTrack('location')">📍 Location</button>
             <button class="quiz-track-tab" id="tabQuizClinical" onclick="switchQuizTrack('clinical_points')">⚡ Act/Ind</button>
-            <button class="quiz-track-tab" id="tabQuizPatterns" onclick="switchQuizTrack('patterns')">☯️ Patterns</button>
+            <button class="quiz-track-tab active" id="tabQuizPatterns" onclick="switchQuizTrack('patterns')">☯️ Patterns</button>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
             <span class="quiz-score-badge" id="quizTopScore">0/0 • 0%</span>
@@ -289,27 +315,34 @@
           </div>
           <div class="quiz-settings-row">
             <select id="qzLimitSelect" class="quiz-select" onchange="retakeQuizWholePool()">
-              <option value="all">All Cards in Pool</option>
-              <option value="10" selected>10 Random Cards</option>
-              <option value="15">15 Random Cards</option>
-              <option value="20">20 Random Cards</option>
-              <option value="25">25 Random Cards</option>
+              <option value="all">All Cards in Filtered Pool</option>
+              <option value="10" selected>10 Cards per Batch</option>
+              <option value="15">15 Cards per Batch</option>
+              <option value="20">20 Cards per Batch</option>
+              <option value="25">25 Cards per Batch</option>
             </select>
             <button class="quiz-pill-btn" style="flex:1; padding:9px;" onclick="openQuizDistractorModal()">🛡️ Answer Pool</button>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; padding-top:4px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding-top:4px; gap:10px; flex-wrap:wrap;">
             <label style="font-size:13px; font-weight:700; color:#666; display:flex; align-items:center; gap:8px; cursor:pointer;">
               <input type="checkbox" id="qzRequireRevealToggle" checked onchange="qzRequireReveal = this.checked;">
               Hide choices until "Reveal Options" is tapped
             </label>
-            <button class="quiz-pill-btn" style="background:#cc5500; color:#fff;" onclick="toggleQuizSettings()">Done</button>
+            <label style="font-size:13px; font-weight:700; color:#666; display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input type="checkbox" id="qzShowDigestToggle" checked onchange="qzShowDigest = this.checked;">
+              Show Clinical Digest after answering
+            </label>
+            <button class="quiz-pill-btn" style="background:#cc5500; color:#fff; margin-left:auto;" onclick="toggleQuizSettings()">Done</button>
           </div>
         </div>
 
         <!-- Active Quiz View -->
         <div class="quiz-scroll-body" id="qzActiveView">
           <div class="quiz-question-card" id="qzQuestionCard">
-            <span class="quiz-q-label" id="qzQuestionLabel">Loading...</span>
+            <div class="quiz-q-header-row">
+              <span class="quiz-q-label" id="qzQuestionLabel">Loading...</span>
+              <button type="button" class="quiz-clue-btn" id="qzClueBtn" style="display:none;" onclick="revealNextQuizClue()">💡 +1 Clue</button>
+            </div>
             <div class="quiz-q-body" id="qzQuestionBody"></div>
           </div>
 
@@ -317,23 +350,27 @@
 
           <div class="quiz-options-grid" id="qzOptionsGrid"></div>
 
+          <!-- Post-Answer Clinical Anchor & Side-by-Side Diff Digest -->
+          <div class="quiz-digest-card" id="qzDigestCard"></div>
+
           <div class="quiz-inspect-bar" id="qzInspectBar"></div>
         </div>
 
         <!-- Summary View -->
         <div class="quiz-scroll-body" id="qzSummaryView" style="display:none;">
           <div class="quiz-question-card" style="text-align:center; padding:24px 16px;">
-            <h2 style="margin:0 0 8px 0; color:#cc5500;">Session Complete!</h2>
+            <h2 style="margin:0 0 8px 0; color:#cc5500;">Batch Complete!</h2>
             <div style="font-size:38px; font-weight:900; color:#34c759; margin:8px 0;" id="qzFinalPct">0%</div>
             <div style="font-size:15px; color:#8e8e93; font-weight:600;">
-  Correct: <strong id="qzFinalScore">0</strong> of <strong id="qzFinalTotal">0</strong>
-</div>
+              Correct: <strong id="qzFinalScore">0</strong> of <strong id="qzFinalTotal">0</strong>
+            </div>
+            <div id="qzSummaryPoolNote" style="font-size:12.5px; color:#8e8e93; margin-top:6px;"></div>
           </div>
 
           <div style="display:flex; flex-direction:column; gap:10px;">
             <button class="quiz-main-action-btn" id="qzRetakeMissedBtn" style="background:#ff3b30; display:none;" onclick="retakeQuizMissedOnly()">🔁 Retake Missed Only</button>
             <button class="quiz-main-action-btn secondary" id="qzCompareMissedBtn" style="display:none;" onclick="compareAllQuizMissed()">⚖️ Send Missed to Compare Matrix</button>
-            <button class="quiz-main-action-btn" style="background:#007aff;" onclick="retakeQuizWholePool()">🔄 Start Next Batch / Restart Pool</button>
+            <button class="quiz-main-action-btn" style="background:#007aff;" onclick="retakeQuizWholePool()">🔄 Start Next Batch / Cycle Pool</button>
           </div>
 
           <div class="quiz-question-card" id="qzMissedContainer" style="display:none;">
@@ -347,11 +384,11 @@
         </div>
       </div>
 
-      <!-- 3. FILTER POOL MODAL (Preserves Exact Sheet Channel Order) -->
+      <!-- 3. FILTER POOL MODAL (Preserves Exact Sheet Channel Order + Live Counter) -->
       <div id="quizFilterModal" onclick="if(event.target===this) closeQuizFilterModal()">
         <div class="modal-content" style="height:78vh; max-height:700px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <h3 class="modal-title">Filter Quiz Pool</h3>
+            <h3 class="modal-title" id="qzFilterModalTitle">Filter Quiz Pool</h3>
             <button onclick="closeQuizFilterModal()" style="background:transparent; border:none; font-size:26px; color:#8e8e93; cursor:pointer; line-height:1;">&times;</button>
           </div>
 
@@ -359,10 +396,11 @@
           <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
             <button class="quiz-pill-btn" onclick="useMainFilteredInQuiz()">🔍 Use Main Search Set</button>
             <button class="quiz-pill-btn" onclick="useCompareBasketInQuiz()">⚖️ Use Compare Basket</button>
+            <button class="quiz-pill-btn" onclick="resetQuizFilterToAll()">🔄 Reset to All</button>
           </div>
 
           <div style="margin-bottom:8px;">
-            <select id="qzImpFilter" class="quiz-select" style="width:100%;">
+            <select id="qzImpFilter" class="quiz-select" style="width:100%;" onchange="updateFilterModalLiveCount()">
               <option value="all" selected>All Importance Levels</option>
               <option value="any">Any Important (!, !!, !!!)</option>
               <option value="!">! Only</option>
@@ -372,7 +410,7 @@
           </div>
 
           <div style="display:flex; gap:8px; margin-bottom:8px;">
-            <input type="text" id="qzPointSearchInput" class="search-box" style="padding:8px 12px; font-size:16px;" placeholder="e.g. st36, lu7, heart qi..." oninput="filterQuizModalTree()">
+            <input type="text" id="qzPointSearchInput" class="search-box" style="padding:8px 12px; font-size:16px;" placeholder="Search e.g. spleen, liver, st36..." oninput="filterQuizModalTree()">
             <button class="quiz-pill-btn" style="background:#cc5500; color:#fff; white-space:nowrap;" onclick="selectSearchedQuizItems()">Select Shown</button>
           </div>
 
@@ -380,7 +418,7 @@
 
           <div class="modal-buttons">
             <button class="cancel-btn" onclick="closeQuizFilterModal()">Cancel</button>
-            <button class="save-btn" onclick="applyQuizPoolFilter()">Apply & Restart Quiz</button>
+            <button class="save-btn" id="qzApplyFilterBtn" onclick="applyQuizPoolFilter()">Apply & Restart Quiz</button>
           </div>
         </div>
       </div>
@@ -423,10 +461,11 @@
   }
 
   // --- 2. STATE & CONSTANTS ---
-  let currentTrack = "location"; // 'location' | 'clinical_points' | 'patterns'
-  let qzSubMode = "standard";
+  let currentTrack = "patterns"; // 'location' | 'clinical_points' | 'patterns'
+  let qzSubMode = "mixed_mastery";
   let qzDifficulty = "medium";
   let qzRequireReveal = true;
+  let qzShowDigest = true;
 
   let trackEligiblePoints = [];
   let trackFilteredPoints = [];
@@ -438,10 +477,12 @@
   let currentCorrectAnswer = "";
   let currentPickedWrongPointId = null;
   let currentContrastPointId = null;
+  let currentDecoySourceNote = null;
+  let currentClueQueue = [];
   let qzScore = 0;
   let qzTotalAnswered = 0;
 
-  // Location Blank Categories (from pointquiz.html)
+  // Location Blank Categories
   const locBlankCategories = {
     cunNumbers: ['0.1', '0.2', '0.3', '0.4', '0.5', '0.7', '0.8', '1', '1.3', '1.5', '2', '2.5', '3', '3.5', '4', '4.3', '4.5', '5', '5.5', '6', '7', '8', '9', '12'],
     pointNumbers: Array.from({ length: 67 }, (_, i) => String(i + 1)),
@@ -455,7 +496,7 @@
   const locNumRegexGlobal = new RegExp("\\b(" + locNumRegexStr + ")\\b", "gi");
   const locSpecificWordsRegex = new RegExp("\\b(" + locDirRegexStr + "|" + locAnatRegexStr + ")\\b", "gi");
 
-  // Clinical & Pattern Diagnostic Blank Categories (for Actions/Indications & Pattern FITB/Mutator)
+  // Clinical & Pattern Diagnostic Blank Categories
   const clinicalBlankCategories = {
     verbs: ['tonifies', 'nourishes', 'clears', 'drains', 'cools', 'warms', 'expels', 'scatters', 'resolves', 'transforms', 'calms', 'pacifies', 'subdues', 'descends', 'raises', 'lifts', 'regulates', 'harmonizes', 'invigorates', 'activates', 'stops', 'alleviates', 'benefits', 'opens', 'unbinds', 'moistens', 'astringes', 'consolidates', 'releases', 'extinguishes'],
     pathogens: ['wind', 'heat', 'cold', 'dampness', 'damp', 'phlegm', 'fire', 'dryness', 'summerheat', 'stagnation', 'stasis', 'rebellious', 'deficiency', 'excess', 'collapse', 'sinking'],
@@ -493,7 +534,7 @@
     return arr;
   }
 
-  // --- 3. SELF-SPOILER SCRUBBER (Prevents prompts from giving away the point/pattern name) ---
+  // --- 3. SELF-SPOILER SCRUBBER ---
   function maskSelfSpoilers(rawHtmlOrText, pointObj) {
     if (!rawHtmlOrText || !pointObj) return "";
     let terms = [];
@@ -509,8 +550,9 @@
     }
     if (fullName && fullName.length > 3) {
       terms.push(fullName.toLowerCase());
-      fullName.split(/[()\/,]/).map(s => s.trim().toLowerCase()).forEach(part => {
-        if (part.length > 3) terms.push(part);
+      // Only split on parentheses so standalone words after commas/slashes aren't over-masked
+      fullName.split(/[()]/).map(s => s.trim().toLowerCase()).forEach(part => {
+        if (part.length > 5) terms.push(part);
       });
     }
 
@@ -527,18 +569,35 @@
     }).join("");
   }
 
-  // --- 4. ADAPTIVE 2-TIER CLINICAL MANIFESTATIONS PARSER (Handles all 160+ Pattern rows) ---
+  // --- 4. MULTI-SECTION PATTERN PARSER (Manifestations, Triad, Tx Principle, Rx, Evolution) ---
   const patternParseCache = new Map();
+
+  function cleanSectionLines(rawVal) {
+    if (!rawVal) return [];
+    let clean = stripBBCode(String(rawVal)).replace(/\r\n/g, "\n").trim();
+    return clean
+      .split(/\n|;;/)
+      .filter(line => !/^\|(?:[\s\-:]+\|)+$/.test(line.trim()))
+      .map(line => {
+        let t = line.trim();
+        if (t.startsWith("|") && t.endsWith("|")) {
+          return t.slice(1, -1).split("|").map(c => c.trim()).filter(Boolean).join(" -- ");
+        }
+        return t.replace(/^(?:➣|•|-|\*|\d+\.)\s*/, "").trim();
+      })
+      .filter(l => l.length > 2);
+  }
 
   function parseManifestationRecord(pointObj) {
     const id = pointObj["Short Name"];
     const raw = pointObj["Clinical Manifestations"] || "";
-    const cacheKey = id + "::" + raw.length;
+    const txRaw = pointObj["Treatment Principle"] || "";
+    const rxRaw = (pointObj["Point Prescription"] || "") + "\n" + (pointObj["Supplementary Points"] || "");
+    const cacheKey = `${id}::${raw.length}::${txRaw.length}::${rxRaw.length}`;
     if (patternParseCache.has(cacheKey)) return patternParseCache.get(cacheKey);
 
     let clean = stripBBCode(String(raw)).replace(/\r\n/g, "\n").trim();
 
-    // Remove markdown table separator lines and convert pipe rows to clean lines
     clean = clean
       .split("\n")
       .filter(line => !/^\|(?:[\s\-:]+\|)+$/.test(line.trim()))
@@ -551,7 +610,6 @@
       })
       .join("\n");
 
-    // Tier 1: Look for explicit Structured Headers
     const keyMatch = clean.match(/(?:Key|Cardinal|Main)\s+Symptoms?\s*:\s*(.+?)(?=\n\s*\n|\n\s*(?:Tongue|Pulse|All Clinical|Other|Secondary|Key|Clinical)|$)/is);
     const tongueMatch = clean.match(/(?:^|\n)\s*(?:➣|•|-|\*)?\s*Tongue\s*:\s*(.+?)(?=\n\s*\n|\n\s*(?:Key|Pulse|All Clinical|Other|➣|•)|$)/is);
     const pulseMatch = clean.match(/(?:^|\n)\s*(?:➣|•|-|\*)?\s*Pulse\s*:\s*(.+?)(?=\n\s*\n|\n\s*(?:Key|Tongue|All Clinical|Other|➣|•)|$)/is);
@@ -560,12 +618,10 @@
     let tongue = tongueMatch ? tongueMatch[1].replace(/\s+/g, " ").trim() : "";
     let pulse = pulseMatch ? pulseMatch[1].replace(/\s+/g, " ").trim() : "";
 
-    // Extract explicit ➣ / • / - bullets
     let bullets = [...clean.matchAll(/(?:^|\n)\s*(?:➣|•|\*)\s*([^\n]+)/g)]
       .map(m => m[1].trim())
       .filter(Boolean);
 
-    // Tier 2 Fallback: If unstructured (no explicit Tongue:, Pulse:, or ➣ bullets)
     const rawLines = clean
       .split(/\n|;;/)
       .map(l => l.replace(/^(?:➣|•|-|\*|\d+\.)\s*/, "").trim())
@@ -573,25 +629,19 @@
 
     if (!tongue) {
       const tLine = rawLines.find(l => /\btongue\b/i.test(l) && !/^key\s+symptoms?/i.test(l));
-      if (tLine) {
-        tongue = tLine.replace(/^tongue\s*[:\-–]?\s*/i, "").trim();
-      }
+      if (tLine) tongue = tLine.replace(/^tongue\s*[:\-–]?\s*/i, "").trim();
     }
     if (!pulse) {
       const pLine = rawLines.find(l => /\bpulse\b/i.test(l) && !/^key\s+symptoms?/i.test(l));
-      if (pLine) {
-        pulse = pLine.replace(/^pulse\s*[:\-–]?\s*/i, "").trim();
-      }
+      if (pLine) pulse = pLine.replace(/^pulse\s*[:\-–]?\s*/i, "").trim();
     }
 
     if (bullets.length === 0) {
-      // Split remaining lines or semicolon/comma clauses into discrete symptom items
       rawLines.forEach(line => {
         if (/^(?:Key|Cardinal|Main)\s+Symptoms?\s*:/i.test(line)) return;
         if (/^Tongue\s*:/i.test(line) || /^Pulse\s*:/i.test(line)) return;
         if (line === tongue || line === pulse) return;
 
-        // If a single long paragraph has semicolons or commas, break it into digestible symptom phrases
         if (rawLines.length <= 2 && (line.includes(";") || line.split(",").length >= 4)) {
           const sep = line.includes(";") ? ";" : ",";
           line.split(sep).map(s => s.trim()).filter(s => s.length > 2).forEach(s => {
@@ -602,11 +652,9 @@
         }
       });
     } else {
-      // Filter out any bullet that is purely a Tongue: or Pulse: line
       bullets = bullets.filter(b => !/^Tongue\s*:/i.test(b) && !/^Pulse\s*:/i.test(b));
     }
 
-    // Parse Key Symptoms array (or synthesize from top 3 bullets if unstructured)
     let keySymptoms = [];
     if (keyRaw) {
       keySymptoms = keyRaw
@@ -623,6 +671,26 @@
       bullets = [...keySymptoms];
     }
 
+    // Parse Treatment Principle, Point Prescription, and Evolution / Pathology sections
+    const txLines = cleanSectionLines(pointObj["Treatment Principle"]);
+    const txPrinciple = txLines.join("; ");
+
+    const rxLines = cleanSectionLines(pointObj["Point Prescription"]);
+    const pointCodes = [];
+    const ptRx = /\b(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*(\d+)\b/gi;
+    rxLines.forEach(l => {
+      let m;
+      while ((m = ptRx.exec(l)) !== null) {
+        const norm = normalizePointCode(m[1] + m[2]);
+        if (!pointCodes.includes(norm)) pointCodes.push(norm);
+      }
+    });
+
+    const aetiologyLines = cleanSectionLines(pointObj["Aetiology"]);
+    const precursorLines = cleanSectionLines(pointObj["Precursors of Pattern"]);
+    const developmentLines = cleanSectionLines(pointObj["Developments From Pattern"]);
+    const analysisLines = cleanSectionLines(pointObj["Analysis"] || pointObj["Diagnosis & Differentiation"] || pointObj["Explanation"]);
+
     const parsed = {
       isStructured: Boolean(keyMatch || tongueMatch || pulseMatch),
       keyRaw,
@@ -630,36 +698,67 @@
       tongue,
       pulse,
       symptoms: bullets,
+      txPrinciple,
+      txLines,
+      rxLines,
+      pointCodes,
+      aetiologyLines,
+      precursorLines,
+      developmentLines,
+      analysisLines,
       rawClean: clean
     };
     patternParseCache.set(cacheKey, parsed);
     return parsed;
   }
 
-  // --- 5. PARSER FOR POINT ACTIONS & INDICATIONS ---
+  // --- 5. PARSER FOR POINT ACTIONS, INDICATIONS & COMBINATIONS ---
   function parsePointClinicalLines(pointObj, mode) {
     let rawAct = pointObj["Actions"] || "";
     let rawInd = pointObj["Indications"] || "";
+    let rawComb = [pointObj["Combinations"], pointObj["SS Combo"]].filter(Boolean).join("\n");
     let combinedRaw = "";
 
     if (mode === "actions") combinedRaw = rawAct;
     else if (mode === "indications") combinedRaw = rawInd;
+    else if (mode === "combinations") combinedRaw = rawComb;
     else combinedRaw = [rawAct, rawInd].filter(Boolean).join("\n");
 
-    let clean = stripBBCode(combinedRaw).replace(/\r\n/g, "\n");
-    let lines = clean
-      .split(/\n|;;/)
-      .map(l => l.replace(/^(?:➣|•|-|\*|\d+\.)\s*/, "").trim())
-      .filter(l => l.length > 2 && !/^\|(?:[\s\-:]+\|)+$/.test(l));
-
-    // If a card has only 1 giant semicolon-separated line, split by semicolon
+    let lines = cleanSectionLines(combinedRaw);
     if (lines.length === 1 && lines[0].includes(";")) {
       lines = lines[0].split(";").map(s => s.trim()).filter(s => s.length > 2);
     }
     return { lines, rawText: combinedRaw };
   }
 
-  // --- 6. HUB & MODAL NAVIGATION ---
+  // --- 6. SUB-MODE ELIGIBILITY FILTER (Prevents Silent Skipping & Score Desync) ---
+  function getSubModeEligiblePool(poolArray) {
+    if (!Array.isArray(poolArray)) return [];
+    return poolArray.filter(p => {
+      if (currentTrack === "location") {
+        const loc = p["Location "] || p["Location"] || "";
+        return String(loc).trim().length > 0;
+      }
+      if (currentTrack === "clinical_points") {
+        if (qzSubMode === "actions_mcq") return parsePointClinicalLines(p, "actions").lines.length > 0;
+        if (qzSubMode === "indications_mcq") return parsePointClinicalLines(p, "indications").lines.length > 0;
+        if (qzSubMode === "combinations_mcq") return parsePointClinicalLines(p, "combinations").lines.length > 0;
+        return parsePointClinicalLines(p, "both").lines.length > 0;
+      }
+      if (currentTrack === "patterns") {
+        const pr = parseManifestationRecord(p);
+        if (qzSubMode === "tongue_pulse") return Boolean(pr.tongue || pr.pulse);
+        if (qzSubMode === "tx_prescription") return Boolean(pr.txPrinciple || pr.rxLines.length > 0);
+        if (qzSubMode === "pathology_chain") {
+          return pr.aetiologyLines.length > 0 || pr.precursorLines.length > 0 || pr.developmentLines.length > 0 || pr.analysisLines.length > 0;
+        }
+        return pr.symptoms.length > 0 || Boolean(pr.tongue || pr.pulse);
+      }
+      return true;
+    });
+  }
+
+  // --- 7. HUB & MODAL NAVIGATION ---
   window.openToolsHubModal = function () {
     injectQuizHubDOM();
     if (typeof closeBottomSheet === "function") closeBottomSheet();
@@ -669,7 +768,7 @@
     ).length;
     const subEl = document.getElementById("hubPatternCountSub");
     if (subEl && patternCount > 0) {
-      subEl.textContent = `${patternCount} pattern records • Manifestations, Tongue/Pulse & sibling contrast`;
+      subEl.textContent = `${patternCount} patterns • Vignettes, Triads, Sibling Contrast, Tongue/Pulse & Rx`;
     }
 
     document.getElementById("toolsHubModal").style.display = "flex";
@@ -680,7 +779,7 @@
     if (el) el.style.display = "none";
   };
 
-  window.openQuizModal = function (track = "location") {
+  window.openQuizModal = function (track = "patterns") {
     injectQuizHubDOM();
     if (typeof closeBottomSheet === "function") closeBottomSheet();
     document.getElementById("quizModal").style.display = "flex";
@@ -697,20 +796,22 @@
     document.getElementById("quizSettingsPanel").classList.toggle("open");
   };
 
-  // --- 7. TRACK INITIALIZATION & DROPDOWN CONFIGURATION ---
+  // --- 8. TRACK INITIALIZATION & DROPDOWN CONFIGURATION ---
   window.switchQuizTrack = function (track) {
     currentTrack = track;
     document.getElementById("tabQuizLocation").classList.toggle("active", track === "location");
     document.getElementById("tabQuizClinical").classList.toggle("active", track === "clinical_points");
     document.getElementById("tabQuizPatterns").classList.toggle("active", track === "patterns");
 
-    // Filter eligible database rows while preserving exact Google Sheet order
     const masterPoints = typeof points !== "undefined" ? points : [];
     if (track === "location") {
       trackEligiblePoints = masterPoints.filter(p => p["Short Name"] && (p["Location "] || p["Location"]));
     } else if (track === "clinical_points") {
       trackEligiblePoints = masterPoints.filter(
-        p => p["Short Name"] && (p["Location "] || p["Location"]) && ((p["Actions"] && String(p["Actions"]).trim()) || (p["Indications"] && String(p["Indications"]).trim()))
+        p => p["Short Name"] && (p["Location "] || p["Location"]) &&
+             ((p["Actions"] && String(p["Actions"]).trim()) ||
+              (p["Indications"] && String(p["Indications"]).trim()) ||
+              (p["Combinations"] && String(p["Combinations"]).trim()))
       );
     } else {
       trackEligiblePoints = masterPoints.filter(
@@ -740,15 +841,21 @@
       subSel.add(new Option("Identify Location / Point (MCQ)", "standard", true, true));
       subSel.add(new Option("Fill in the Blank (Location)", "fitb"));
     } else if (currentTrack === "clinical_points") {
-      subSel.add(new Option("Actions + Indications (Diff MCQ)", "both_mcq", true, true));
-      subSel.add(new Option("Actions Only (Diff MCQ)", "actions_mcq"));
-      subSel.add(new Option("Indications Only (Diff MCQ)", "indications_mcq"));
+      subSel.add(new Option("All Clinical Modes (Vignette, Diff & EXCEPT)", "both_mcq", true, true));
+      subSel.add(new Option("Actions Only (Diff & EXCEPT)", "actions_mcq"));
+      subSel.add(new Option("Indications Only (Diff & EXCEPT)", "indications_mcq"));
+      subSel.add(new Option("Odd Action/Indication Out (EXCEPT Only)", "except_mcq"));
+      subSel.add(new Option("Point Combinations & Synergy", "combinations_mcq"));
       subSel.add(new Option("Clinical Fill in the Blank", "fitb_clinical"));
     } else if (currentTrack === "patterns") {
-      subSel.add(new Option("Clinical Vignette ➔ Pattern", "vignette", true, true));
-      subSel.add(new Option("Sibling Differential & Missing Sign", "differential"));
-      subSel.add(new Option("Tongue & Pulse Differentiation", "tongue_pulse"));
-      subSel.add(new Option("Diagnostic Fill in the Blank", "fitb_pattern"));
+      subSel.add(new Option("☯️ Comprehensive Mastery (All Pattern Modes)", "mixed_mastery", true, true));
+      subSel.add(new Option("🩺 Clinical Vignette ➔ Pattern (+Clue Ladder)", "vignette"));
+      subSel.add(new Option("🎯 Cardinal Triad (Key Symptoms ⇄ Pattern)", "cardinal_triad"));
+      subSel.add(new Option("⚖️ Sibling Differential & Odd-Sign-Out (EXCEPT)", "differential"));
+      subSel.add(new Option("👅 Tongue & Pulse Differentiation (2-Way)", "tongue_pulse"));
+      subSel.add(new Option("🌿 Treatment Principle & Point Prescription", "tx_prescription"));
+      subSel.add(new Option("🔗 Pattern Evolution (Aetiology / Precursors / Dev)", "pathology_chain"));
+      subSel.add(new Option("📝 Diagnostic Fill in the Blank (Lvl 1–4)", "fitb_pattern"));
     }
 
     qzSubMode = subSel.value;
@@ -766,10 +873,10 @@
       diffSel.add(new Option("Lvl 3 (1 Blank ➔ Identify Card)", "fitb3"));
       diffSel.add(new Option("Lvl 4 (Max Blanks ➔ Identify Card)", "fitb4"));
     } else {
-      diffSel.add(new Option("Easy (Broad / Full Clues)", "easy"));
-      diffSel.add(new Option("Medium (Standard Vignette)", "medium", true, true));
-      diffSel.add(new Option("Hard (Subtle Clues / Close Siblings)", "hard"));
-      diffSel.add(new Option("Insane (High-Overlap Interference)", "insane"));
+      diffSel.add(new Option("Easy (Full Clues / Broad Contrast)", "easy"));
+      diffSel.add(new Option("Medium (Standard Vignette / Siblings)", "medium", true, true));
+      diffSel.add(new Option("Hard (Partial Clues / Close Siblings)", "hard"));
+      diffSel.add(new Option("Insane (Minimal Clues / High Interference)", "insane"));
     }
     qzDifficulty = diffSel.value;
   }
@@ -786,14 +893,36 @@
     retakeQuizWholePool();
   };
 
+  // Fixed Pool Banner: Clearly distinguishes Batch Size, Filtered Pool Size (with Unseen count), and Total Track Size
   function updatePoolSummaryBanner() {
     const el = document.getElementById("quizPoolSummaryLabel");
-    if (el) {
-      el.textContent = `Pool: ${activeQuizPool.length} of ${trackEligiblePoints.length}`;
+    if (!el) return;
+
+    const eligibleFiltered = getSubModeEligiblePool(trackFilteredPoints);
+    const totalTrack = trackEligiblePoints.length;
+    const isFiltered = trackFilteredPoints.length < totalTrack;
+    const limitVal = document.getElementById("qzLimitSelect")?.value || "10";
+
+    if (limitVal === "all") {
+      if (isFiltered) {
+        el.textContent = `Pool: ${activeQuizPool.length} Filtered (of ${totalTrack} Total)`;
+      } else {
+        el.textContent = `Pool: All ${activeQuizPool.length}`;
+      }
+    } else {
+      let seenIds = [];
+      try { seenIds = JSON.parse(localStorage.getItem(getSeenKey()) || "[]"); } catch (e) {}
+      const unseenLeft = eligibleFiltered.filter(p => !seenIds.includes(p["Short Name"])).length;
+
+      if (isFiltered) {
+        el.textContent = `Batch: ${activeQuizPool.length} • Filtered: ${eligibleFiltered.length} (${unseenLeft} left) / ${totalTrack}`;
+      } else {
+        el.textContent = `Batch: ${activeQuizPool.length} of ${eligibleFiltered.length} (${unseenLeft} unseen)`;
+      }
     }
   }
 
-  // --- 8. SMART DISTRACTOR ENGINES (Location, Clinical Points, & Patterns) ---
+  // --- 9. SMART DISTRACTOR ENGINES ---
   function getAnatomicalRegions(locText) {
     if (!locText) return { specific: null, macro: "other" };
     const t = locText.toLowerCase();
@@ -869,7 +998,6 @@
     return mutated;
   }
 
-  // Mutates clinical verbs, organs, or tongue/pulse descriptors to create realistic wrong statements
   function mutateClinicalOrPatternStatement(text) {
     if (!text) return text;
     let out = text;
@@ -899,7 +1027,6 @@
     const targetName = targetPoint["Short Name"];
     const normTargetName = normalizePointCode(targetName);
 
-    // 1. Check hardcodedDistractors from distractors.js if present
     if (typeof hardcodedDistractors !== "undefined" && !window._normalizedDistractors) {
       window._normalizedDistractors = {};
       for (let key in hardcodedDistractors) {
@@ -924,7 +1051,6 @@
 
     const otherPoints = trackDistractorPoints.filter(p => p["Short Name"] !== targetName);
 
-    // 2. If Clinical Points Track (Actions & Indications), rank distractors by shared clinical terms & channel
     if (currentTrack === "clinical_points") {
       const targetClinical = stripBBCode((targetPoint["Actions"] || "") + " " + (targetPoint["Indications"] || "")).toLowerCase();
       const targetChan = targetPoint["Channel Full Name"] || targetPoint[" Channel Full Name"] || "";
@@ -940,7 +1066,7 @@
         const pChan = p["Channel Full Name"] || p[" Channel Full Name"] || "";
         let overlap = 0;
         clinicalTokens.forEach(tok => { if (pText.includes(tok)) overlap += 3; });
-        if (pChan && pChan === targetChan) overlap += 4;
+        if (pChan && pChan === targetChan) overlap += 5;
         return { point: p, score: overlap + Math.random() };
       });
 
@@ -951,11 +1077,10 @@
         return shuffleArr(scored.slice(0, Math.max(count * 3, 15)).map(s => s.point)).slice(0, count);
       } else {
         scored.sort((a, b) => b.score - a.score);
-        return shuffleArr(scored.slice(0, Math.max(count + 3, 8)).map(s => s.point)).slice(0, count);
+        return shuffleArr(scored.slice(0, Math.max(count + 2, 8)).map(s => s.point)).slice(0, count);
       }
     }
 
-    // 3. Location Fallback (Same Channel / Anatomical Region)
     let match = targetName.match(/^([A-Za-z.]+)[-\s]*(\d+)/);
     let prefix = match ? match[1] : "";
     let targetNum = match ? parseInt(match[2], 10) : 0;
@@ -987,7 +1112,6 @@
     return shuffleArr(combined.slice(0, 12)).slice(0, count);
   }
 
-  // Smart Distractors for Zang-Fu & Pattern Differentiation
   function getSmartPatternDistractors(targetPattern, count) {
     const targetName = targetPattern["Short Name"];
     const targetTitleLower = (targetName + " " + (targetPattern["Full Name"] || targetPattern[" Full Name"] || "")).toLowerCase();
@@ -1016,7 +1140,6 @@
 
       let score = 0;
 
-      // 1. Channel Short Name & Channel Full Name Match (High priority group/organ match)
       if (targetChanShort && pChanShort) {
         if (pChanShort === targetChanShort) score += 16;
         else if (pChanShort.includes(targetChanShort) || targetChanShort.includes(pChanShort)) score += 10;
@@ -1025,26 +1148,21 @@
         score += 12;
       }
 
-      // 2. Same Zang-Fu Organ in Pattern Title (e.g., Heart Qi Xu vs Heart Yang Xu vs Heart Blood Xu)
       organs.forEach(org => { if (pTitleLower.includes(org)) score += 15; });
-
-      // 3. Shared Pathogenic Mechanism (e.g., Qi Deficiency, Damp-Heat, Blood Stasis)
       pathogens.forEach(pa => { if (pTitleLower.includes(pa)) score += 6; });
 
-      // 4. Symptom Vocabulary Overlap in Clinical Manifestations
       pParsed.symptoms.forEach(sym => {
         sym.toLowerCase().split(/\W+/).forEach(w => {
           if (w.length > 3 && targetSymWords.has(w)) score += 1.5;
         });
       });
 
-      // 5. High-Yield Importance Boost (!, !!, !!!)
       const imp = String(p.Important || "").trim();
       if (imp === "!!!") score += 4;
       else if (imp === "!!") score += 2.5;
       else if (imp === "!") score += 1.5;
 
-      return { point: p, score: score + (Math.random() * 2) };
+      return { point: p, score: score + (Math.random() * 1.5) };
     });
 
     if (qzDifficulty === "easy") {
@@ -1058,11 +1176,45 @@
     }
   }
 
-  // --- 9. QUESTION GENERATORS FOR ALL 3 TRACKS ---
+  // --- 10. INTERACTIVE CLUE LADDER (Progressive Reveal for Vignettes) ---
+  function setupClueLadder(cluesArray) {
+    currentClueQueue = Array.isArray(cluesArray) ? [...cluesArray] : [];
+    const clueBtn = document.getElementById("qzClueBtn");
+    if (!clueBtn) return;
+    if (currentClueQueue.length > 0) {
+      clueBtn.style.display = "inline-block";
+      clueBtn.textContent = `💡 +1 Clue (${currentClueQueue.length})`;
+    } else {
+      clueBtn.style.display = "none";
+    }
+  }
+
+  window.revealNextQuizClue = function () {
+    if (currentClueQueue.length === 0) return;
+    const nextClueHtml = currentClueQueue.shift();
+    const bodyEl = document.getElementById("qzQuestionBody");
+    if (bodyEl) {
+      const clueDiv = document.createElement("div");
+      clueDiv.style.cssText = "margin-top:6px; padding:6px 10px; background:rgba(255,149,0,0.1); border-left:3px solid #ff9f0a; border-radius:4px; animation: fadeIn 0.2s ease;";
+      clueDiv.innerHTML = nextClueHtml;
+      bodyEl.appendChild(clueDiv);
+    }
+    const clueBtn = document.getElementById("qzClueBtn");
+    if (clueBtn) {
+      if (currentClueQueue.length > 0) {
+        clueBtn.textContent = `💡 +1 Clue (${currentClueQueue.length})`;
+      } else {
+        clueBtn.style.display = "none";
+      }
+    }
+  };
+
+  // --- 11. QUESTION GENERATORS FOR ALL 3 TRACKS ---
   window.generateNextQuizQuestion = function () {
     const nextBtn = document.getElementById("qzNextBtn");
     const bottomBar = document.getElementById("qzBottomBar");
     const inspectBar = document.getElementById("qzInspectBar");
+    const digestCard = document.getElementById("qzDigestCard");
     const optionsGrid = document.getElementById("qzOptionsGrid");
     const revealBtn = document.getElementById("qzRevealBtn");
 
@@ -1070,15 +1222,22 @@
     bottomBar.style.display = "none";
     inspectBar.style.display = "none";
     inspectBar.innerHTML = "";
+    if (digestCard) {
+      digestCard.style.display = "none";
+      digestCard.innerHTML = "";
+    }
     optionsGrid.innerHTML = "";
     currentPickedWrongPointId = null;
     currentContrastPointId = null;
+    currentDecoySourceNote = null;
+    setupClueLadder([]);
+
     const activeView = document.getElementById("qzActiveView");
     if (activeView) activeView.scrollTop = 0;
 
     if (activeQuizPool.length === 0) {
-      document.getElementById("qzQuestionLabel").textContent = "Empty Pool";
-      document.getElementById("qzQuestionBody").innerHTML = "No records match your current filter. Tap <b>🎯 Filter Pool</b> above.";
+      document.getElementById("qzQuestionLabel").textContent = "Empty Pool for This Mode";
+      document.getElementById("qzQuestionBody").innerHTML = "No records in your current filter have data for this quiz mode. Tap <b>🎯 Filter Pool</b> or switch the Sub-Mode in <b>⚙️ Settings</b>.";
       return;
     }
 
@@ -1115,8 +1274,6 @@
   // --- TRACK 1 BUILDER: POINT LOCATION ---
   function buildLocationQuestion(targetPoint) {
     const rawText = targetPoint["Location "] || targetPoint["Location"] || "";
-    if (!String(rawText).trim()) return generateNextQuizQuestion();
-
     const labelEl = document.getElementById("qzQuestionLabel");
     const bodyEl = document.getElementById("qzQuestionBody");
     let qDiff = qzDifficulty;
@@ -1203,7 +1360,6 @@
       }
     }
 
-    // Standard Location MCQ (Alternates Location -> Point and Point -> Location with Mutated Distractors)
     const distractors = getSmartPointDistractors(targetPoint, 6);
     if (Math.random() < 0.55) {
       labelEl.textContent = "Identify the Point from Location";
@@ -1219,7 +1375,6 @@
       currentCorrectAnswer = stripBBCode(rawText).trim();
       let opts = [{ text: bbcodeToHtml(rawText), rawCompare: currentCorrectAnswer, pointId: targetPoint["Short Name"] }];
 
-      // Add 2 mutated versions of the target location (e.g. 1.5 cun -> 2 cun, medial -> lateral)
       for (let i = 0; i < 3 && opts.length < 3; i++) {
         let mut = mutateLocationText(rawText);
         if (stripBBCode(mut).trim() !== currentCorrectAnswer && !opts.some(o => o.rawCompare === stripBBCode(mut).trim())) {
@@ -1239,17 +1394,37 @@
     renderQuizOptionButtons(optionsData);
   }
 
-  // --- TRACK 2 BUILDER: POINT ACTIONS & INDICATIONS (DIFFERENTIATION STYLE) ---
+  // --- TRACK 2 BUILDER: POINT ACTIONS, INDICATIONS & COMBINATIONS ---
   function buildClinicalPointsQuestion(targetPoint) {
     const labelEl = document.getElementById("qzQuestionLabel");
     const bodyEl = document.getElementById("qzQuestionBody");
-    const fieldMode = qzSubMode === "actions_mcq" ? "actions" : (qzSubMode === "indications_mcq" ? "indications" : "both");
-    const parsed = parsePointClinicalLines(targetPoint, fieldMode);
-
-    if (parsed.lines.length === 0) return generateNextQuizQuestion();
     const distractors = getSmartPointDistractors(targetPoint, 6);
 
-    // Clinical FITB Mode for Actions & Indications
+    // 1. POINT COMBINATIONS SUB-MODE
+    if (qzSubMode === "combinations_mcq") {
+      const combParsed = parsePointClinicalLines(targetPoint, "combinations");
+      if (combParsed.lines.length > 0) {
+        const chosenLine = combParsed.lines[Math.floor(Math.random() * combParsed.lines.length)];
+        labelEl.textContent = "Point Combinations & Clinical Synergy";
+        bodyEl.innerHTML = `
+          <div style="font-size:13px; color:#8e8e93; margin-bottom:6px;">Which point completes this clinical combination?</div>
+          <div class="quiz-diag-box">${maskSelfSpoilers(bbcodeToHtml(chosenLine), targetPoint)}</div>
+        `;
+        currentCorrectAnswer = targetPoint["Short Name"];
+        const opts = [
+          { text: targetPoint["Short Name"], pointId: targetPoint["Short Name"] },
+          ...distractors.slice(0, 5).map(d => ({ text: d["Short Name"], pointId: d["Short Name"] }))
+        ];
+        renderQuizOptionButtons(shuffleArr(opts));
+        return;
+      }
+    }
+
+    const fieldMode = qzSubMode === "actions_mcq" ? "actions" : (qzSubMode === "indications_mcq" ? "indications" : "both");
+    const parsed = parsePointClinicalLines(targetPoint, fieldMode);
+    const fallbackParsed = parsed.lines.length > 0 ? parsed : parsePointClinicalLines(targetPoint, "both");
+
+    // 2. CLINICAL FILL-IN-THE-BLANK SUB-MODE
     if (qzSubMode === "fitb_clinical") {
       const allClinicalTerms = [
         ...clinicalBlankCategories.verbs,
@@ -1259,7 +1434,7 @@
       ].sort((a, b) => b.length - a.length);
       const termRx = new RegExp("\\b(" + allClinicalTerms.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")\\b", "gi");
 
-      const sampleLines = parsed.lines.slice(0, 4).join("\n• ");
+      const sampleLines = fallbackParsed.lines.slice(0, 4).join("\n• ");
       const cleanSample = "• " + sampleLines;
       const matches = [...cleanSample.matchAll(termRx)];
 
@@ -1304,26 +1479,65 @@
       }
     }
 
-    // Standard Differentiation Modes for Actions & Indications
-    const shuffledLines = shuffleArr(parsed.lines);
-    let visibleCount = parsed.lines.length;
-    if (qzDifficulty === "medium") visibleCount = Math.min(3, Math.max(2, Math.ceil(parsed.lines.length / 2)));
-    else if (qzDifficulty === "hard") visibleCount = Math.min(2, parsed.lines.length);
+    const lines = fallbackParsed.lines;
+    const shuffledLines = shuffleArr(lines);
+    const targetAllNorm = new Set(lines.map(l => stripBBCode(l).trim().toLowerCase()));
+
+    // 3. "EXCEPT" (ODD ACTION/INDICATION OUT) QUESTION
+    if ((qzSubMode === "except_mcq" || (qzSubMode === "both_mcq" && Math.random() < 0.25)) && lines.length >= 3 && distractors.length > 0) {
+      let decoyLine = null;
+      let decoyPoint = null;
+      for (let d of distractors) {
+        const dLines = parsePointClinicalLines(d, fieldMode).lines;
+        const found = shuffleArr(dLines).find(l => !targetAllNorm.has(stripBBCode(l).trim().toLowerCase()));
+        if (found) {
+          decoyLine = found;
+          decoyPoint = d;
+          break;
+        }
+      }
+
+      if (decoyLine && decoyPoint) {
+        currentContrastPointId = decoyPoint["Short Name"];
+        currentDecoySourceNote = `That action/indication actually belongs to <b>${escapeHTML(decoyPoint["Short Name"])}</b>.`;
+        labelEl.textContent = `Odd Clinical Feature Out (EXCEPT) • ${targetPoint["Short Name"]}`;
+        bodyEl.innerHTML = `
+          <div style="font-size:20px; font-weight:900; color:#cc5500; margin-bottom:6px;">${escapeHTML(targetPoint["Short Name"])}</div>
+          <div style="color:#007aff; font-weight:700;">All of the following are Actions or Indications for <u>${escapeHTML(targetPoint["Short Name"])}</u> <b>EXCEPT</b>:</div>
+        `;
+        currentCorrectAnswer = stripBBCode(decoyLine).trim();
+        const trueOpts = shuffledLines.slice(0, 4).map(l => ({
+          text: bbcodeToHtml(l),
+          rawCompare: stripBBCode(l).trim(),
+          pointId: targetPoint["Short Name"]
+        }));
+        const opts = [
+          { text: bbcodeToHtml(decoyLine), rawCompare: currentCorrectAnswer, pointId: decoyPoint["Short Name"] },
+          ...trueOpts
+        ];
+        renderQuizOptionButtons(shuffleArr(opts));
+        return;
+      }
+    }
+
+    // 4. STANDARD CLINICAL VIGNETTE ➔ POINT OR POINT ➔ ACTION/INDICATION
+    let visibleCount = lines.length;
+    if (qzDifficulty === "medium") visibleCount = Math.min(3, Math.max(2, Math.ceil(lines.length / 2)));
+    else if (qzDifficulty === "hard") visibleCount = Math.min(2, lines.length);
     else if (qzDifficulty === "insane") visibleCount = 1;
 
-    // Alternate between: (1) Clinical Profile -> Identify Point, and (2) Point -> Identify Correct Action/Indication
-    const askForPoint = parsed.lines.length === 1 || Math.random() < 0.6;
+    const askForPoint = lines.length === 1 || Math.random() < 0.6;
 
     if (askForPoint) {
       const shownLines = shuffledLines.slice(0, visibleCount);
+      const hiddenLines = shuffledLines.slice(visibleCount, visibleCount + 3);
       const fieldTitle = fieldMode === "actions" ? "Actions" : (fieldMode === "indications" ? "Indications" : "Actions & Indications");
       labelEl.textContent = `Identify the Point from ${fieldTitle}`;
 
       let html = shownLines.map(l => `<div style="margin-bottom:6px;">➣ ${maskSelfSpoilers(bbcodeToHtml(l), targetPoint)}</div>`).join("");
-      if (visibleCount < parsed.lines.length) {
-        html += `<div style="font-size:12px; color:#8e8e93; font-style:italic; margin-top:6px;">(+ ${parsed.lines.length - visibleCount} other clinical lines hidden)</div>`;
-      }
       bodyEl.innerHTML = html;
+
+      setupClueLadder(hiddenLines.map(l => `➣ ${maskSelfSpoilers(bbcodeToHtml(l), targetPoint)}`));
 
       currentCorrectAnswer = targetPoint["Short Name"];
       const opts = [
@@ -1345,10 +1559,8 @@
       bodyEl.innerHTML = html;
 
       currentCorrectAnswer = stripBBCode(targetLine).trim();
-      const targetAllNorm = parsed.lines.map(l => stripBBCode(l).trim().toLowerCase());
       let opts = [{ text: bbcodeToHtml(targetLine), rawCompare: currentCorrectAnswer, pointId: targetPoint["Short Name"] }];
 
-      // On Hard/Insane, include a mutated version of the target action/indication
       if (qzDifficulty === "hard" || qzDifficulty === "insane") {
         const mut = mutateClinicalOrPatternStatement(targetLine);
         if (stripBBCode(mut).trim().toLowerCase() !== currentCorrectAnswer.toLowerCase()) {
@@ -1360,7 +1572,7 @@
         if (opts.length >= 6) break;
         const dParsed = parsePointClinicalLines(d, fieldMode);
         const candidates = shuffleArr(dParsed.lines).filter(
-          l => !targetAllNorm.includes(stripBBCode(l).trim().toLowerCase()) && !opts.some(o => o.rawCompare.toLowerCase() === stripBBCode(l).trim().toLowerCase())
+          l => !targetAllNorm.has(stripBBCode(l).trim().toLowerCase()) && !opts.some(o => o.rawCompare.toLowerCase() === stripBBCode(l).trim().toLowerCase())
         );
         if (candidates.length > 0) {
           opts.push({ text: bbcodeToHtml(candidates[0]), rawCompare: stripBBCode(candidates[0]).trim(), pointId: d["Short Name"] });
@@ -1370,19 +1582,27 @@
     }
   }
 
-  // --- TRACK 3 BUILDER: ZANG-FU & PATTERN DIFFERENTIATION (160+ ROWS) ---
+  // --- TRACK 3 BUILDER: ZANG-FU & PATTERN DIFFERENTIATION MASTERY ---
   function buildPatternDifferentiationQuestion(targetPattern) {
     const labelEl = document.getElementById("qzQuestionLabel");
     const bodyEl = document.getElementById("qzQuestionBody");
     const parsed = parseManifestationRecord(targetPattern);
     const distractors = getSmartPatternDistractors(targetPattern, 6);
 
-    if (parsed.symptoms.length === 0 && !parsed.tongue && !parsed.pulse) {
-      return generateNextQuizQuestion();
+    // Choose effective sub-mode (if 'mixed_mastery', dynamically pick from available modes for this pattern)
+    let effectiveMode = qzSubMode;
+    if (qzSubMode === "mixed_mastery") {
+      const candidateModes = ["vignette", "vignette", "cardinal_triad", "differential"];
+      if (parsed.tongue || parsed.pulse) candidateModes.push("tongue_pulse");
+      if (parsed.txPrinciple || parsed.rxLines.length > 0) candidateModes.push("tx_prescription");
+      if (parsed.aetiologyLines.length > 0 || parsed.precursorLines.length > 0 || parsed.developmentLines.length > 0) {
+        candidateModes.push("pathology_chain");
+      }
+      effectiveMode = candidateModes[Math.floor(Math.random() * candidateModes.length)];
     }
 
-    // SUB-MODE A: PATTERN DIAGNOSTIC FILL-IN-THE-BLANK (fitb_pattern)
-    if (qzSubMode === "fitb_pattern") {
+    // SUB-MODE 1: PATTERN DIAGNOSTIC FILL-IN-THE-BLANK
+    if (effectiveMode === "fitb_pattern") {
       const diagVocab = [
         ...clinicalBlankCategories.keySignSwaps,
         ...clinicalBlankCategories.tongueBody,
@@ -1441,8 +1661,157 @@
       }
     }
 
-    // SUB-MODE B: TONGUE & PULSE DIFFERENTIATION
-    if (qzSubMode === "tongue_pulse" && (parsed.tongue || parsed.pulse)) {
+    // SUB-MODE 2: CARDINAL TRIAD (Key Symptoms ⇄ Pattern)
+    if (effectiveMode === "cardinal_triad" && parsed.keyRaw) {
+      const askForKey = Math.random() < 0.5;
+      if (askForKey) {
+        labelEl.textContent = "Cardinal Triad • Identify Key Symptoms";
+        let html = `<div style="font-size:20px; font-weight:900; color:#cc5500; margin-bottom:6px;">${escapeHTML(targetPattern["Short Name"])}</div>`;
+        if (parsed.tongue || parsed.pulse) {
+          html += `<div class="quiz-diag-box" style="margin-bottom:8px;">`;
+          if (parsed.tongue) html += `<div><strong>Tongue:</strong> ${escapeHTML(parsed.tongue)}</div>`;
+          if (parsed.pulse) html += `<div><strong>Pulse:</strong> ${escapeHTML(parsed.pulse)}</div>`;
+          html += `</div>`;
+        }
+        html += `<div style="color:#007aff; font-weight:700;">Select the classic <u>Key Symptoms</u> for this pattern:</div>`;
+        bodyEl.innerHTML = html;
+
+        currentCorrectAnswer = parsed.keyRaw;
+        let opts = [{ text: escapeHTML(parsed.keyRaw), rawCompare: parsed.keyRaw, pointId: targetPattern["Short Name"] }];
+
+        if (qzDifficulty === "hard" || qzDifficulty === "insane") {
+          const mutKey = mutateClinicalOrPatternStatement(parsed.keyRaw);
+          if (mutKey.toLowerCase() !== parsed.keyRaw.toLowerCase()) {
+            opts.push({ text: escapeHTML(mutKey), rawCompare: mutKey, pointId: targetPattern["Short Name"] });
+          }
+        }
+        for (let d of distractors) {
+          if (opts.length >= 6) break;
+          const dPr = parseManifestationRecord(d);
+          if (dPr.keyRaw && !opts.some(o => o.rawCompare.toLowerCase() === dPr.keyRaw.toLowerCase())) {
+            opts.push({ text: escapeHTML(dPr.keyRaw), rawCompare: dPr.keyRaw, pointId: d["Short Name"] });
+          }
+        }
+        if (opts.length >= 4) {
+          renderQuizOptionButtons(shuffleArr(opts));
+          return;
+        }
+      } else {
+        labelEl.textContent = "Cardinal Triad • Key Symptoms ➔ Pattern";
+        let html = `<div style="font-size:15.5px; font-weight:700; margin-bottom:8px;"><span style="color:#cc5500;">Key Symptoms:</span> ${maskSelfSpoilers(escapeHTML(parsed.keyRaw), targetPattern)}</div>`;
+        const extraClues = [];
+        if (parsed.tongue) extraClues.push(`<strong>Tongue:</strong> ${escapeHTML(parsed.tongue)}`);
+        if (parsed.pulse) extraClues.push(`<strong>Pulse:</strong> ${escapeHTML(parsed.pulse)}`);
+        if (qzDifficulty === "easy" || qzDifficulty === "medium") {
+          if (extraClues.length > 0) html += `<div class="quiz-diag-box">${extraClues.join(" • ")}</div>`;
+        } else {
+          setupClueLadder(extraClues);
+        }
+        bodyEl.innerHTML = html;
+        currentCorrectAnswer = targetPattern["Short Name"];
+        renderQuizOptionButtons(shuffleArr([
+          { text: targetPattern["Short Name"], pointId: targetPattern["Short Name"] },
+          ...distractors.slice(0, 5).map(d => ({ text: d["Short Name"], pointId: d["Short Name"] }))
+        ]));
+        return;
+      }
+    }
+
+    // SUB-MODE 3: TREATMENT PRINCIPLE & POINT PRESCRIPTION
+    if (effectiveMode === "tx_prescription" && (parsed.txPrinciple || parsed.rxLines.length > 0)) {
+      const useTx = parsed.txPrinciple && (parsed.rxLines.length === 0 || Math.random() < 0.55);
+      if (useTx) {
+        const askPatternFromTx = Math.random() < 0.45;
+        if (askPatternFromTx) {
+          labelEl.textContent = "Treatment Principle ➔ Identify Pattern";
+          let html = `<div class="quiz-diag-box" style="font-size:15.5px;"><strong>Treatment Principle:</strong> ${maskSelfSpoilers(escapeHTML(parsed.txPrinciple), targetPattern)}</div>`;
+          if (parsed.keyRaw && qzDifficulty !== "insane") {
+            setupClueLadder([`<strong>Key Signs:</strong> ${maskSelfSpoilers(escapeHTML(parsed.keyRaw), targetPattern)}`]);
+          }
+          bodyEl.innerHTML = html;
+          currentCorrectAnswer = targetPattern["Short Name"];
+          renderQuizOptionButtons(shuffleArr([
+            { text: targetPattern["Short Name"], pointId: targetPattern["Short Name"] },
+            ...distractors.slice(0, 5).map(d => ({ text: d["Short Name"], pointId: d["Short Name"] }))
+          ]));
+          return;
+        } else {
+          labelEl.textContent = "Select the Treatment Principle";
+          let html = `<div style="font-size:19px; font-weight:900; color:#cc5500; margin-bottom:6px;">${escapeHTML(targetPattern["Short Name"])}</div>`;
+          if (parsed.keyRaw && qzDifficulty !== "insane") {
+            html += `<div style="font-size:13.5px; color:#666; margin-bottom:8px;"><b>Key Signs:</b> ${escapeHTML(parsed.keyRaw)}</div>`;
+          }
+          html += `<div style="color:#007aff; font-weight:700;">Select the appropriate Treatment Principle:</div>`;
+          bodyEl.innerHTML = html;
+
+          currentCorrectAnswer = parsed.txPrinciple;
+          let opts = [{ text: escapeHTML(parsed.txPrinciple), rawCompare: parsed.txPrinciple, pointId: targetPattern["Short Name"] }];
+
+          const mutTx = mutateClinicalOrPatternStatement(parsed.txPrinciple);
+          if (mutTx.toLowerCase() !== parsed.txPrinciple.toLowerCase()) {
+            opts.push({ text: escapeHTML(mutTx), rawCompare: mutTx, pointId: targetPattern["Short Name"] });
+          }
+          for (let d of distractors) {
+            if (opts.length >= 6) break;
+            const dPr = parseManifestationRecord(d);
+            if (dPr.txPrinciple && !opts.some(o => o.rawCompare.toLowerCase() === dPr.txPrinciple.toLowerCase())) {
+              opts.push({ text: escapeHTML(dPr.txPrinciple), rawCompare: dPr.txPrinciple, pointId: d["Short Name"] });
+            }
+          }
+          if (opts.length >= 3) {
+            renderQuizOptionButtons(shuffleArr(opts));
+            return;
+          }
+        }
+      } else if (parsed.rxLines.length > 0) {
+        const rxSummary = parsed.pointCodes.length >= 2 ? parsed.pointCodes.join(", ") : parsed.rxLines.slice(0, 3).join("; ");
+        labelEl.textContent = "Point Prescription ➔ Identify Pattern";
+        let html = `
+          <div style="font-size:13px; color:#8e8e93; margin-bottom:4px;">Which pattern is treated by the following Point Prescription?</div>
+          <div class="quiz-diag-box" style="font-size:15px;">${maskSelfSpoilers(escapeHTML( parsed.rxLines.slice(0, 4).join(" • ") || rxSummary ), targetPattern)}</div>
+        `;
+        if (parsed.txPrinciple) {
+          setupClueLadder([`<strong>Tx Principle:</strong> ${maskSelfSpoilers(escapeHTML(parsed.txPrinciple), targetPattern)}`]);
+        }
+        bodyEl.innerHTML = html;
+        currentCorrectAnswer = targetPattern["Short Name"];
+        renderQuizOptionButtons(shuffleArr([
+          { text: targetPattern["Short Name"], pointId: targetPattern["Short Name"] },
+          ...distractors.slice(0, 5).map(d => ({ text: d["Short Name"], pointId: d["Short Name"] }))
+        ]));
+        return;
+      }
+    }
+
+    // SUB-MODE 4: PATTERN EVOLUTION & PATHOLOGY CHAIN (Aetiology, Precursors, Developments)
+    if (effectiveMode === "pathology_chain") {
+      const chainBlocks = [];
+      if (parsed.precursorLines.length > 0) chainBlocks.push({ label: "Precursors of Pattern", text: parsed.precursorLines.slice(0, 3).join("; ") });
+      if (parsed.developmentLines.length > 0) chainBlocks.push({ label: "Developments From Pattern", text: parsed.developmentLines.slice(0, 3).join("; ") });
+      if (parsed.aetiologyLines.length > 0) chainBlocks.push({ label: "Aetiology", text: parsed.aetiologyLines.slice(0, 3).join("; ") });
+      if (parsed.analysisLines.length > 0) chainBlocks.push({ label: "Pathology & Analysis", text: parsed.analysisLines.slice(0, 2).join("; ") });
+
+      if (chainBlocks.length > 0) {
+        const chosen = chainBlocks[Math.floor(Math.random() * chainBlocks.length)];
+        labelEl.textContent = `Pattern Pathology • ${chosen.label}`;
+        bodyEl.innerHTML = `
+          <div style="font-size:13px; color:#8e8e93; margin-bottom:6px;">Identify the Pattern associated with this ${escapeHTML(chosen.label)}:</div>
+          <div class="quiz-diag-box">${maskSelfSpoilers(escapeHTML(chosen.text), targetPattern)}</div>
+        `;
+        if (parsed.keyRaw) {
+          setupClueLadder([`<strong>Key Symptoms:</strong> ${maskSelfSpoilers(escapeHTML(parsed.keyRaw), targetPattern)}`]);
+        }
+        currentCorrectAnswer = targetPattern["Short Name"];
+        renderQuizOptionButtons(shuffleArr([
+          { text: targetPattern["Short Name"], pointId: targetPattern["Short Name"] },
+          ...distractors.slice(0, 5).map(d => ({ text: d["Short Name"], pointId: d["Short Name"] }))
+        ]));
+        return;
+      }
+    }
+
+    // SUB-MODE 5: TONGUE & PULSE DIFFERENTIATION (Bidirectional)
+    if (effectiveMode === "tongue_pulse" && (parsed.tongue || parsed.pulse)) {
       const formatTP = (pObj) => {
         const pr = parseManifestationRecord(pObj);
         let parts = [];
@@ -1453,65 +1822,112 @@
 
       const targetTP = formatTP(targetPattern);
       if (targetTP) {
-        labelEl.textContent = "Tongue & Pulse Differentiation";
-        const keyPreview = parsed.keySymptoms.slice(0, 3).join(", ");
-        let html = `<div style="font-size:18px; font-weight:800; color:#cc5500; margin-bottom:6px;">${escapeHTML(targetPattern["Short Name"])}</div>`;
-        if (keyPreview && qzDifficulty !== "insane") {
-          html += `<div style="font-size:13.5px; color:#666; margin-bottom:8px;"><b>Cardinal Signs:</b> ${escapeHTML(keyPreview)}</div>`;
-        }
-        html += `<div style="color:#007aff; font-weight:700;">Select the classic Tongue & Pulse presentation for this pattern:</div>`;
-        bodyEl.innerHTML = html;
-
-        currentCorrectAnswer = targetTP;
-        let opts = [{ text: escapeHTML(targetTP), rawCompare: targetTP, pointId: targetPattern["Short Name"] }];
-
-        // Add mutated Tongue/Pulse option on Hard/Insane
-        const mutatedTP = mutateClinicalOrPatternStatement(targetTP);
-        if (mutatedTP !== targetTP) {
-          opts.push({ text: escapeHTML(mutatedTP), rawCompare: mutatedTP, pointId: targetPattern["Short Name"] });
-        }
-
-        for (let d of distractors) {
-          if (opts.length >= 6) break;
-          const dTP = formatTP(d);
-          if (dTP && !opts.some(o => o.rawCompare.toLowerCase() === dTP.toLowerCase())) {
-            opts.push({ text: escapeHTML(dTP), rawCompare: dTP, pointId: d["Short Name"] });
+        // Alternate: Pattern -> Tongue/Pulse OR Tongue/Pulse + 1 Key Sign -> Pattern
+        if (Math.random() < 0.65) {
+          labelEl.textContent = "Tongue & Pulse Differentiation";
+          const keyPreview = parsed.keySymptoms.slice(0, 3).join(", ");
+          let html = `<div style="font-size:18px; font-weight:800; color:#cc5500; margin-bottom:6px;">${escapeHTML(targetPattern["Short Name"])}</div>`;
+          if (keyPreview && qzDifficulty !== "insane") {
+            html += `<div style="font-size:13.5px; color:#666; margin-bottom:8px;"><b>Cardinal Signs:</b> ${escapeHTML(keyPreview)}</div>`;
+          } else if (keyPreview) {
+            setupClueLadder([`<strong>Cardinal Signs:</strong> ${escapeHTML(keyPreview)}`]);
           }
-        }
-        if (opts.length >= 4) {
-          renderQuizOptionButtons(shuffleArr(opts));
+          html += `<div style="color:#007aff; font-weight:700;">Select the classic Tongue & Pulse presentation for this pattern:</div>`;
+          bodyEl.innerHTML = html;
+
+          currentCorrectAnswer = targetTP;
+          let opts = [{ text: escapeHTML(targetTP), rawCompare: targetTP, pointId: targetPattern["Short Name"] }];
+
+          const mutatedTP = mutateClinicalOrPatternStatement(targetTP);
+          if (mutatedTP !== targetTP) {
+            opts.push({ text: escapeHTML(mutatedTP), rawCompare: mutatedTP, pointId: targetPattern["Short Name"] });
+          }
+
+          for (let d of distractors) {
+            if (opts.length >= 6) break;
+            const dTP = formatTP(d);
+            if (dTP && !opts.some(o => o.rawCompare.toLowerCase() === dTP.toLowerCase())) {
+              opts.push({ text: escapeHTML(dTP), rawCompare: dTP, pointId: d["Short Name"] });
+            }
+          }
+          if (opts.length >= 4) {
+            renderQuizOptionButtons(shuffleArr(opts));
+            return;
+          }
+        } else {
+          labelEl.textContent = "Tongue & Pulse + Anchor Sign ➔ Pattern";
+          const anchorSign = parsed.keySymptoms[0] || parsed.symptoms[0] || "";
+          let html = `<div class="quiz-diag-box" style="font-size:15px;"><strong>${escapeHTML(targetTP)}</strong></div>`;
+          if (anchorSign) {
+            html += `<div style="margin-top:8px;"><strong>Presenting Sign:</strong> ${maskSelfSpoilers(escapeHTML(anchorSign), targetPattern)}</div>`;
+          }
+          if (parsed.symptoms.length > 1) {
+            setupClueLadder(parsed.symptoms.slice(1, 3).map(s => `➣ ${maskSelfSpoilers(escapeHTML(s), targetPattern)}`));
+          }
+          bodyEl.innerHTML = html;
+          currentCorrectAnswer = targetPattern["Short Name"];
+          renderQuizOptionButtons(shuffleArr([
+            { text: targetPattern["Short Name"], pointId: targetPattern["Short Name"] },
+            ...distractors.slice(0, 5).map(d => ({ text: d["Short Name"], pointId: d["Short Name"] }))
+          ]));
           return;
         }
       }
     }
 
-    // SUB-MODE C: SIBLING DIFFERENTIAL & MISSING MANIFESTATION ("What differentiates Pattern A from Pattern B?")
-    if (qzSubMode === "differential" && parsed.symptoms.length >= 2 && distractors.length > 0) {
+    // SUB-MODE 6: SIBLING DIFFERENTIAL & "EXCEPT" (ODD SIGN OUT)
+    if (effectiveMode === "differential" && parsed.symptoms.length >= 2 && distractors.length > 0) {
       const sibling = distractors[0];
       const sibParsed = parseManifestationRecord(sibling);
       const sibSet = new Set(sibParsed.symptoms.map(s => s.toLowerCase()));
+      const targetAllLower = new Set(parsed.symptoms.map(s => s.toLowerCase()));
 
-      // Find manifestations unique to targetPattern compared to its closest sibling pattern
+      // Variant A: "EXCEPT" (Odd Manifestation Out -- 3 real signs from Target + 1 hallmark sign from Sibling)
+      const sibUnique = sibParsed.symptoms.filter(s => !targetAllLower.has(s.toLowerCase()));
+      if (parsed.symptoms.length >= 3 && sibUnique.length > 0 && Math.random() < 0.45) {
+        const decoySym = sibUnique[Math.floor(Math.random() * sibUnique.length)];
+        currentContrastPointId = sibling["Short Name"];
+        currentDecoySourceNote = `"${escapeHTML(decoySym)}" is a manifestation of <b>${escapeHTML(sibling["Short Name"])}</b>, not ${escapeHTML(targetPattern["Short Name"])}.`;
+
+        labelEl.textContent = "Pattern Exclusion • Odd Manifestation Out (EXCEPT)";
+        bodyEl.innerHTML = `
+          <div style="font-size:19px; font-weight:900; color:#cc5500; margin-bottom:6px;">${escapeHTML(targetPattern["Short Name"])}</div>
+          <div style="color:#007aff; font-weight:700;">All of the following are clinical manifestations of <u>${escapeHTML(targetPattern["Short Name"])}</u> <b>EXCEPT</b>:</div>
+        `;
+        currentCorrectAnswer = decoySym;
+        const trueSyms = shuffleArr(parsed.symptoms).slice(0, 4).map(s => ({
+          text: escapeHTML(s),
+          rawCompare: s,
+          pointId: targetPattern["Short Name"]
+        }));
+        const opts = [
+          { text: escapeHTML(decoySym), rawCompare: decoySym, pointId: sibling["Short Name"] },
+          ...trueSyms
+        ];
+        renderQuizOptionButtons(shuffleArr(opts));
+        return;
+      }
+
+      // Variant B: Sibling Contrast ("Which manifestation specifically belongs to Pattern A vs Pattern B?")
       const uniqueToTarget = parsed.symptoms.filter(s => !sibSet.has(s.toLowerCase()));
       const sharedWithSibling = parsed.symptoms.filter(s => sibSet.has(s.toLowerCase()));
 
       if (uniqueToTarget.length > 0) {
         const chosenUnique = uniqueToTarget[Math.floor(Math.random() * uniqueToTarget.length)];
-        labelEl.textContent = "Pattern Differential Diagnosis";
+        currentContrastPointId = sibling["Short Name"];
+        labelEl.textContent = "Sibling Pattern Differential Diagnosis";
 
         let html = "";
         if (sharedWithSibling.length > 0) {
-          currentContrastPointId = sibling["Short Name"];
-          html += `<div style="margin-bottom:8px;">Both <b>${escapeHTML(targetPattern["Short Name"])}</b> and <b>${escapeHTML(sibling["Short Name"])}</b> can present with: <i>${escapeHTML(sharedWithSibling.slice(0, 2).join(", "))}</i>.</div>`;
+          html += `<div style="margin-bottom:8px;">Both <b>${escapeHTML(targetPattern["Short Name"])}</b> and <b>${escapeHTML(sibling["Short Name"])}</b> share: <i>${escapeHTML(sharedWithSibling.slice(0, 2).join(", "))}</i>.</div>`;
         } else {
           const contextSyms = parsed.symptoms.filter(s => s !== chosenUnique).slice(0, 2);
-          html += `<div style="margin-bottom:8px;">Pattern: <b style="color:#cc5500;">${escapeHTML(targetPattern["Short Name"])}</b> (${escapeHTML(contextSyms.join(", "))})</div>`;
+          html += `<div style="margin-bottom:8px;">Comparing <b style="color:#cc5500;">${escapeHTML(targetPattern["Short Name"])}</b> (${escapeHTML(contextSyms.join(", "))}) vs. <b>${escapeHTML(sibling["Short Name"])}</b>:</div>`;
         }
         html += `<div style="color:#007aff; font-weight:700;">Which of the following manifestations specifically belongs to <u>${escapeHTML(targetPattern["Short Name"])}</u>?</div>`;
         bodyEl.innerHTML = html;
 
         currentCorrectAnswer = chosenUnique;
-        const targetAllLower = new Set(parsed.symptoms.map(s => s.toLowerCase()));
         let opts = [{ text: escapeHTML(chosenUnique), rawCompare: chosenUnique, pointId: targetPattern["Short Name"] }];
 
         for (let d of distractors) {
@@ -1532,9 +1948,11 @@
       }
     }
 
-    // SUB-MODE D (DEFAULT): PROGRESSIVE CLINICAL VIGNETTE -> IDENTIFY THE PATTERN
+    // SUB-MODE 7 (DEFAULT): PROGRESSIVE CLINICAL VIGNETTE ➔ IDENTIFY THE PATTERN (+Clue Ladder)
     labelEl.textContent = "Identify the Pattern from Clinical Manifestations";
     let html = "";
+    const clueQueue = [];
+    const shuffledSyms = shuffleArr(parsed.symptoms);
 
     if (qzDifficulty === "easy") {
       if (parsed.keyRaw) {
@@ -1550,8 +1968,7 @@
         html += `</div>`;
       }
     } else if (qzDifficulty === "medium") {
-      // Medium hides the "Key Symptoms:" header summary and shows 4 manifestations + Tongue & Pulse
-      const pool = parsed.symptoms.length > 0 ? shuffleArr(parsed.symptoms).slice(0, 4) : parsed.keySymptoms;
+      const pool = shuffledSyms.length > 0 ? shuffledSyms.slice(0, 4) : parsed.keySymptoms;
       html += pool.map(s => `<div style="margin-bottom:4px;">➣ ${maskSelfSpoilers(escapeHTML(s), targetPattern)}</div>`).join("");
       if (parsed.tongue || parsed.pulse) {
         html += `<div class="quiz-diag-box">`;
@@ -1559,25 +1976,33 @@
         if (parsed.pulse) html += `<div><strong>Pulse:</strong> ${escapeHTML(parsed.pulse)}</div>`;
         html += `</div>`;
       }
+      if (parsed.keyRaw) clueQueue.push(`<strong>Key Symptoms:</strong> ${maskSelfSpoilers(escapeHTML(parsed.keyRaw), targetPattern)}`);
+      if (parsed.txPrinciple) clueQueue.push(`<strong>Tx Principle:</strong> ${maskSelfSpoilers(escapeHTML(parsed.txPrinciple), targetPattern)}`);
     } else if (qzDifficulty === "hard") {
-      // Hard shows 3 manifestations + ONLY Tongue OR Pulse (not both)
-      const pool = parsed.symptoms.length > 0 ? shuffleArr(parsed.symptoms).slice(0, 3) : parsed.keySymptoms.slice(0, 2);
+      const pool = shuffledSyms.length > 0 ? shuffledSyms.slice(0, 3) : parsed.keySymptoms.slice(0, 2);
       html += pool.map(s => `<div style="margin-bottom:4px;">➣ ${maskSelfSpoilers(escapeHTML(s), targetPattern)}</div>`).join("");
       const showTongue = Math.random() < 0.5;
       if (showTongue && parsed.tongue) {
         html += `<div class="quiz-diag-box"><strong>Tongue:</strong> ${escapeHTML(parsed.tongue)}</div>`;
+        if (parsed.pulse) clueQueue.push(`<strong>Pulse:</strong> ${escapeHTML(parsed.pulse)}`);
       } else if (parsed.pulse) {
         html += `<div class="quiz-diag-box"><strong>Pulse:</strong> ${escapeHTML(parsed.pulse)}</div>`;
+        if (parsed.tongue) clueQueue.push(`<strong>Tongue:</strong> ${escapeHTML(parsed.tongue)}`);
       }
+      if (parsed.keyRaw) clueQueue.push(`<strong>Key Symptoms:</strong> ${maskSelfSpoilers(escapeHTML(parsed.keyRaw), targetPattern)}`);
     } else {
-      // Insane shows 2-3 non-obvious manifestations with Tongue/Pulse hidden
       const nonCardinal = parsed.symptoms.length > 3 ? parsed.symptoms.slice(1) : parsed.symptoms;
-      const pool = shuffleArr(nonCardinal).slice(0, Math.min(3, nonCardinal.length));
+      const pool = shuffleArr(nonCardinal).slice(0, Math.min(2, nonCardinal.length));
       html += pool.map(s => `<div style="margin-bottom:4px;">➣ ${maskSelfSpoilers(escapeHTML(s), targetPattern)}</div>`).join("");
-      html += `<div style="font-size:12px; color:#8e8e93; font-style:italic; margin-top:8px;">(Tongue & Pulse withheld -- Insane Mode)</div>`;
+      html += `<div style="font-size:12px; color:#8e8e93; font-style:italic; margin-top:6px;">(Key Signs, Tongue & Pulse withheld -- tap 💡 +1 Clue if needed)</div>`;
+      if (parsed.tongue || parsed.pulse) {
+        clueQueue.push(`<strong>Tongue:</strong> ${escapeHTML(parsed.tongue || "--")} • <strong>Pulse:</strong> ${escapeHTML(parsed.pulse || "--")}`);
+      }
+      if (parsed.keyRaw) clueQueue.push(`<strong>Key Symptoms:</strong> ${maskSelfSpoilers(escapeHTML(parsed.keyRaw), targetPattern)}`);
     }
 
     bodyEl.innerHTML = html;
+    setupClueLadder(clueQueue);
     currentCorrectAnswer = targetPattern["Short Name"];
 
     const opts = [
@@ -1587,7 +2012,7 @@
     renderQuizOptionButtons(shuffleArr(opts));
   }
 
-  // --- 10. RENDER OPTION BUTTONS & GRADE ANSWERS ---
+  // --- 12. RENDER OPTION BUTTONS, CLINICAL DIGEST & GRADE ANSWERS ---
   function renderQuizOptionButtons(optionsData) {
     const grid = document.getElementById("qzOptionsGrid");
     grid.innerHTML = "";
@@ -1609,14 +2034,24 @@
     const allBtns = Array.from(document.querySelectorAll("#qzOptionsGrid .quiz-opt-btn"));
     if (allBtns.some(b => b.disabled)) return;
     allBtns.forEach(b => (b.disabled = true));
+    setupClueLadder([]);
 
     qzTotalAnswered++;
     const pickedVal = (selectedBtn.dataset.compare || "").trim().toLowerCase();
     const targetVal = String(currentCorrectAnswer || "").trim().toLowerCase();
+    const isCorrect = pickedVal === targetVal;
 
-    if (pickedVal === targetVal) {
+    if (isCorrect) {
       selectedBtn.classList.add("correct");
       qzScore++;
+      // Only mark card as "seen" in the cycle when answered correctly!
+      if (currentTargetPoint && document.getElementById("qzLimitSelect")?.value !== "all") {
+        try {
+          const seenSet = new Set(JSON.parse(localStorage.getItem(getSeenKey()) || "[]"));
+          seenSet.add(currentTargetPoint["Short Name"]);
+          localStorage.setItem(getSeenKey(), JSON.stringify([...seenSet]));
+        } catch (e) {}
+      }
     } else {
       selectedBtn.classList.add("incorrect");
       currentPickedWrongPointId = selectedBtn.dataset.pointId || null;
@@ -1638,6 +2073,7 @@
     }
 
     updateQuizScoreUI();
+    renderPostAnswerDigest(isCorrect);
     renderPostAnswerInspectionBar();
 
     const nextBtn = document.getElementById("qzNextBtn");
@@ -1647,6 +2083,79 @@
       : `Next Question ➔ <span style="font-size:12px; opacity:0.85;">(Enter / Space)</span>`;
     nextBtn.style.display = "block";
     bottomBar.style.display = "block";
+  }
+
+  // Renders an immediate Clinical Anchor & Differential Comparison Card right beneath the options
+  function renderPostAnswerDigest(isCorrect) {
+    const card = document.getElementById("qzDigestCard");
+    if (!card || !qzShowDigest || !currentTargetPoint) return;
+
+    card.className = "quiz-digest-card" + (isCorrect ? "" : " missed");
+    let html = "";
+
+    if (currentDecoySourceNote) {
+      html += `<div style="color:#cc5500; font-weight:700;">💡 ${currentDecoySourceNote}</div>`;
+    }
+
+    const otherId = (!isCorrect && currentPickedWrongPointId && currentPickedWrongPointId !== currentTargetPoint["Short Name"])
+      ? currentPickedWrongPointId
+      : (currentContrastPointId && currentContrastPointId !== currentTargetPoint["Short Name"] ? currentContrastPointId : null);
+    const otherPoint = otherId ? (typeof points !== "undefined" ? points.find(p => p["Short Name"] === otherId) : null) : null;
+
+    if (currentTrack === "patterns") {
+      const buildPatternAnchorHtml = (pObj, badgeHtml) => {
+        const pr = parseManifestationRecord(pObj);
+        let box = `<div style="font-weight:800; font-size:14.5px; color:#cc5500; margin-bottom:4px;">${badgeHtml} ${escapeHTML(pObj["Short Name"])}</div>`;
+        if (pr.keyRaw) box += `<div><b>Key Signs:</b> ${escapeHTML(pr.keyRaw)}</div>`;
+        else if (pr.symptoms.length > 0) box += `<div><b>Signs:</b> ${escapeHTML(pr.symptoms.slice(0, 3).join("; "))}</div>`;
+        if (pr.tongue) box += `<div><b>Tongue:</b> ${escapeHTML(pr.tongue)}</div>`;
+        if (pr.pulse) box += `<div><b>Pulse:</b> ${escapeHTML(pr.pulse)}</div>`;
+        if (pr.txPrinciple) box += `<div style="margin-top:3px; color:#007aff;"><b>Tx Principle:</b> ${escapeHTML(pr.txPrinciple)}</div>`;
+        if (pr.pointCodes.length > 0) box += `<div><b>Points:</b> ${escapeHTML(pr.pointCodes.slice(0, 8).join(", "))}</div>`;
+        return box;
+      };
+
+      if (otherPoint) {
+        const otherBadge = (!isCorrect && currentPickedWrongPointId === otherId) ? "❌ Your Pick:" : "⚖️ Sibling Contrast:";
+        html += `
+          <div class="quiz-diff-grid">
+            <div class="quiz-diff-col">${buildPatternAnchorHtml(currentTargetPoint, "✅ Target:")}</div>
+            <div class="quiz-diff-col">${buildPatternAnchorHtml(otherPoint, otherBadge)}</div>
+          </div>
+        `;
+      } else {
+        html += buildPatternAnchorHtml(currentTargetPoint, "☯️ Pattern Anchor:");
+      }
+    } else if (currentTrack === "clinical_points") {
+      const buildPointAnchorHtml = (pObj, badgeHtml) => {
+        const act = parsePointClinicalLines(pObj, "actions").lines.slice(0, 3).join("; ");
+        const ind = parsePointClinicalLines(pObj, "indications").lines.slice(0, 3).join("; ");
+        let box = `<div style="font-weight:800; font-size:14.5px; color:#cc5500; margin-bottom:4px;">${badgeHtml} ${escapeHTML(pObj["Short Name"])}</div>`;
+        if (act) box += `<div><b>Actions:</b> ${bbcodeToHtml(act)}</div>`;
+        if (ind) box += `<div><b>Indications:</b> ${bbcodeToHtml(ind)}</div>`;
+        return box;
+      };
+
+      if (otherPoint) {
+        const otherBadge = (!isCorrect && currentPickedWrongPointId === otherId) ? "❌ Your Pick:" : "⚖️ Contrast:";
+        html += `
+          <div class="quiz-diff-grid">
+            <div class="quiz-diff-col">${buildPointAnchorHtml(currentTargetPoint, "✅ Target:")}</div>
+            <div class="quiz-diff-col">${buildPointAnchorHtml(otherPoint, otherBadge)}</div>
+          </div>
+        `;
+      } else {
+        html += buildPointAnchorHtml(currentTargetPoint, "⚡ Clinical Summary:");
+      }
+    } else {
+      const loc = currentTargetPoint["Location "] || currentTargetPoint["Location"] || "";
+      html += `<div><strong style="color:#cc5500;">📍 ${escapeHTML(currentTargetPoint["Short Name"])}:</strong> ${bbcodeToHtml(loc)}</div>`;
+    }
+
+    if (html) {
+      card.innerHTML = html;
+      card.style.display = "flex";
+    }
   }
 
   function renderPostAnswerInspectionBar() {
@@ -1662,39 +2171,49 @@
                          currentPickedWrongPointId !== targetId &&
                          currentPickedWrongPointId !== currentContrastPointId;
 
-    // 1. If the question contrasted two patterns (e.g., Spleen Qi Xu vs Spleen Yang Xu), show the sibling Peek button
     if (hasContrast) {
       const safeContrast = currentContrastPointId.replace(/'/g, "\\'");
       html += `<button class="quiz-pill-btn" onclick="openQuickPeekById('${safeContrast}')">⚡ Peek ${escapeHTML(currentContrastPointId)}</button>`;
     }
 
-    // 2. If you clicked an option belonging to another pattern (e.g., Spleen Qi Sinking), show its Peek button too
     if (hasWrongPick) {
       const safeWrong = currentPickedWrongPointId.replace(/'/g, "\\'");
       const pickLabel = hasContrast ? `${currentPickedWrongPointId} (Your Pick)` : currentPickedWrongPointId;
       html += `<button class="quiz-pill-btn" onclick="openQuickPeekById('${safeWrong}')">⚡ Peek ${escapeHTML(pickLabel)}</button>`;
     }
 
-    // 3. Build the Compare button(s)
     if (hasContrast && hasWrongPick) {
-      // Both a prompt pair AND a 3rd wrong pick exist: offer Compare Pair (2) and Compare All 3
       const safeContrast = currentContrastPointId.replace(/'/g, "\\'");
       const safeWrong = currentPickedWrongPointId.replace(/'/g, "\\'");
       html += `<button class="quiz-pill-btn" style="background:#cc5500; color:#fff;" onclick="compareQuizItems(['${safeTarget}', '${safeContrast}'])">⚖️ Compare Pair (2)</button>`;
       html += `<button class="quiz-pill-btn" style="background:#007aff; color:#fff;" onclick="compareQuizItems(['${safeTarget}', '${safeContrast}', '${safeWrong}'])">⚖️ Compare All 3</button>`;
     } else if (hasContrast) {
-      // Prompt contrasted 2 patterns (whether you got it right or picked the contrast pattern's symptom)
       const safeContrast = currentContrastPointId.replace(/'/g, "\\'");
       html += `<button class="quiz-pill-btn" style="background:#cc5500; color:#fff;" onclick="compareQuizItems(['${safeTarget}', '${safeContrast}'])">⚖️ Compare Both</button>`;
     } else if (hasWrongPick) {
-      // Standard question where you picked a wrong pattern/point
       const safeWrong = currentPickedWrongPointId.replace(/'/g, "\\'");
       html += `<button class="quiz-pill-btn" style="background:#cc5500; color:#fff;" onclick="compareQuizItems(['${safeTarget}', '${safeWrong}'])">⚖️ Compare Both</button>`;
     }
 
+    const srsSec = currentTrack === "patterns" ? "Clinical Manifestations" : (currentTrack === "clinical_points" ? "Actions" : "Location");
+    html += `<button class="quiz-pill-btn" style="margin-left:auto; background:#34c759; color:#fff;" onclick="enrollQuizCardInSRS('${safeTarget}', '${srsSec}')">🧠 +SRS (${srsSec})</button>`;
+
     bar.innerHTML = html;
     bar.style.display = "flex";
   }
+
+  window.enrollQuizCardInSRS = function (pointId, sectionLabel) {
+    if (typeof points === "undefined") return;
+    const p = points.find(x => x["Short Name"] === pointId);
+    if (!p) return;
+    const cardId = pointId + "::" + sectionLabel;
+    if (typeof pendingSRSUpdates !== "undefined") {
+      pendingSRSUpdates.push({ cardId: cardId, rating: "swipe-wrong" });
+      if (typeof saveSRSQueueLocal === "function") saveSRSQueueLocal();
+      if (typeof updateStudySyncBadge === "function") updateStudySyncBadge();
+      if (typeof showToast === "function") showToast(`🧠 Added ${pointId} (${sectionLabel}) to SRS Queue`);
+    }
+  };
 
   window.compareQuizItems = function (idsArray) {
     if (typeof compareList !== "undefined" && Array.isArray(idsArray)) {
@@ -1710,27 +2229,35 @@
     document.getElementById("quizTopScore").textContent = `${qzTotalAnswered}/${activeQuizPool.length} • ${pct}%`;
   }
 
-  // --- 11. POOL MANAGEMENT, RETAKE MISSED & SUMMARY ---
+  // --- 13. POOL MANAGEMENT, RETAKE MISSED & SUMMARY ---
   function getSeenKey() { return `tcmSeen_${currentTrack}`; }
   function getStateKey() { return `tcmQuizState_${currentTrack}`; }
 
   window.retakeQuizWholePool = function () {
     const limitVal = document.getElementById("qzLimitSelect").value;
+    const eligibleFiltered = getSubModeEligiblePool(trackFilteredPoints);
+
+    if (eligibleFiltered.length === 0) {
+      activeQuizPool = [];
+      startQuizRound();
+      return;
+    }
+
     if (limitVal === "all") {
-      activeQuizPool = [...trackFilteredPoints];
+      activeQuizPool = [...eligibleFiltered];
       localStorage.removeItem(getSeenKey());
     } else {
       const limit = parseInt(limitVal, 10);
-      let seenIds = JSON.parse(localStorage.getItem(getSeenKey()) || "[]");
-      let unseen = trackFilteredPoints.filter(p => !seenIds.includes(p["Short Name"]));
+      let seenIds = [];
+      try { seenIds = JSON.parse(localStorage.getItem(getSeenKey()) || "[]"); } catch (e) {}
+      let unseen = eligibleFiltered.filter(p => !seenIds.includes(p["Short Name"]));
 
       if (unseen.length === 0) {
-        if (typeof showToast === "function") showToast("🎉 Completed all cards in pool! Cycling fresh.");
+        if (typeof showToast === "function") showToast("🎉 Completed all cards in filtered pool! Cycling fresh.");
         seenIds = [];
-        unseen = [...trackFilteredPoints];
+        unseen = [...eligibleFiltered];
       }
       activeQuizPool = shuffleArr(unseen).slice(0, Math.min(limit, unseen.length));
-      localStorage.setItem(getSeenKey(), JSON.stringify([...seenIds, ...activeQuizPool.map(p => p["Short Name"])]));
     }
     startQuizRound();
   };
@@ -1780,6 +2307,15 @@
     document.getElementById("qzFinalScore").textContent = qzScore;
     document.getElementById("qzFinalTotal").textContent = qzTotalAnswered;
 
+    const eligibleFiltered = getSubModeEligiblePool(trackFilteredPoints);
+    let seenIds = [];
+    try { seenIds = JSON.parse(localStorage.getItem(getSeenKey()) || "[]"); } catch (e) {}
+    const unseenLeft = eligibleFiltered.filter(p => !seenIds.includes(p["Short Name"])).length;
+    const poolNote = document.getElementById("qzSummaryPoolNote");
+    if (poolNote) {
+      poolNote.textContent = `Filtered Pool: ${eligibleFiltered.length} cards (${unseenLeft} unseen remaining in cycle)`;
+    }
+
     const missedBtn = document.getElementById("qzRetakeMissedBtn");
     const compBtn = document.getElementById("qzCompareMissedBtn");
     const missedBox = document.getElementById("qzMissedContainer");
@@ -1811,7 +2347,7 @@
     }
   }
 
-  // --- 12. FILTER & DISTRACTOR TREES (Exact Source Channel Order Preserved) ---
+  // --- 14. FILTER & DISTRACTOR TREES (Exact Sheet Order + Live Match Counter) ---
   function initQuizFilterTree() {
     const container = document.getElementById("qzChannelTree");
     container.innerHTML = "";
@@ -1819,7 +2355,6 @@
     let channelsMap = {};
     let channelOrder = [];
 
-    // Preserve exact Google Sheet order of channels and points
     trackEligiblePoints.forEach(p => {
       let chan = p["Channel Full Name"] || p[" Channel Full Name"] || "Other";
       if (!channelsMap[chan]) {
@@ -1859,6 +2394,7 @@
       chanCb.onchange = e => {
         groupDiv.querySelectorAll(".qz-pt-cb").forEach(cb => (cb.checked = e.target.checked));
         syncQuizGlobalCheckbox();
+        updateFilterModalLiveCount();
       };
 
       const titleSpan = document.createElement("span");
@@ -1882,10 +2418,14 @@
         cb.className = "qz-pt-cb";
         cb.value = p["Short Name"];
         cb.checked = true;
-        cb.onchange = () => syncSingleQuizGroup(groupDiv);
+        cb.onchange = () => {
+          syncSingleQuizGroup(groupDiv);
+          updateFilterModalLiveCount();
+        };
 
+        const imp = String(p.Important || "").trim();
         const span = document.createElement("span");
-        span.textContent = p["Short Name"];
+        span.textContent = p["Short Name"] + (imp ? ` (${imp})` : "");
         lbl.appendChild(cb);
         lbl.appendChild(span);
         ptsList.appendChild(lbl);
@@ -1894,13 +2434,60 @@
       groupDiv.appendChild(ptsList);
       container.appendChild(groupDiv);
     });
+
+    updateFilterModalLiveCount();
   }
+
+  function computeCurrentModalFilteredPoints() {
+    const impVal = document.getElementById("qzImpFilter")?.value || "all";
+    const checkedSet = new Set(
+      Array.from(document.querySelectorAll("#qzChannelTree .qz-pt-cb"))
+        .filter(cb => cb.checked)
+        .map(cb => cb.value)
+    );
+
+    let base = trackEligiblePoints.filter(p => checkedSet.has(p["Short Name"]));
+    if (impVal === "any") {
+      base = base.filter(p => ["!", "!!", "!!!"].includes(String(p.Important || "").trim()));
+    } else if (impVal !== "all") {
+      base = base.filter(p => String(p.Important || "").trim() === impVal);
+    }
+    return base;
+  }
+
+  window.updateFilterModalLiveCount = function () {
+    const matched = computeCurrentModalFilteredPoints();
+    const eligibleCount = getSubModeEligiblePool(matched).length;
+    const applyBtn = document.getElementById("qzApplyFilterBtn");
+    const titleEl = document.getElementById("qzFilterModalTitle");
+    if (applyBtn) {
+      applyBtn.textContent = `Apply & Restart (${eligibleCount} Cards)`;
+    }
+    if (titleEl) {
+      titleEl.textContent = `Filter Quiz Pool (${eligibleCount} / ${trackEligiblePoints.length})`;
+    }
+  };
 
   window.toggleAllQuizFilter = function (cb) {
     document.querySelectorAll("#qzChannelTree .qz-chan-cb, #qzChannelTree .qz-pt-cb").forEach(b => {
       b.checked = cb.checked;
       b.indeterminate = false;
     });
+    updateFilterModalLiveCount();
+  };
+
+  window.resetQuizFilterToAll = function () {
+    const impEl = document.getElementById("qzImpFilter");
+    if (impEl) impEl.value = "all";
+    const searchEl = document.getElementById("qzPointSearchInput");
+    if (searchEl) searchEl.value = "";
+    filterQuizModalTree();
+    const allCb = document.getElementById("qzSelectAllGlobal");
+    if (allCb) {
+      allCb.checked = true;
+      allCb.indeterminate = false;
+    }
+    toggleAllQuizFilter({ checked: true });
   };
 
   function syncSingleQuizGroup(groupDiv) {
@@ -1917,7 +2504,7 @@
     const allChan = Array.from(document.querySelectorAll("#qzChannelTree .qz-chan-cb"));
     const globalCb = document.getElementById("qzSelectAllGlobal");
     if (!globalCb) return;
-    const allChecked = allChan.every(b => b.checked);
+    const allChecked = allChan.every(b => b.checked && !b.indeterminate);
     const someChecked = allChan.some(b => b.checked || b.indeterminate);
     globalCb.checked = allChecked;
     globalCb.indeterminate = someChecked && !allChecked;
@@ -1969,6 +2556,7 @@
     document.querySelectorAll("#qzChannelTree .qf-group").forEach(g => {
       if (!g.querySelector("#qzSelectAllGlobal")) syncSingleQuizGroup(g);
     });
+    updateFilterModalLiveCount();
   };
 
   window.useMainFilteredInQuiz = function () {
@@ -1980,6 +2568,7 @@
     document.querySelectorAll("#qzChannelTree .qf-group").forEach(g => {
       if (!g.querySelector("#qzSelectAllGlobal")) syncSingleQuizGroup(g);
     });
+    updateFilterModalLiveCount();
     applyQuizPoolFilter();
   };
 
@@ -1995,10 +2584,12 @@
     document.querySelectorAll("#qzChannelTree .qf-group").forEach(g => {
       if (!g.querySelector("#qzSelectAllGlobal")) syncSingleQuizGroup(g);
     });
+    updateFilterModalLiveCount();
     applyQuizPoolFilter();
   };
 
   window.openQuizFilterModal = function () {
+    updateFilterModalLiveCount();
     document.getElementById("quizFilterModal").style.display = "flex";
   };
 
@@ -2007,30 +2598,8 @@
   };
 
   window.applyQuizPoolFilter = function () {
-    const globalAll = document.getElementById("qzSelectAllGlobal");
-    const impVal = document.getElementById("qzImpFilter").value;
+    trackFilteredPoints = computeCurrentModalFilteredPoints();
 
-    let base = [];
-    if (globalAll && globalAll.checked) {
-      base = [...trackEligiblePoints];
-    } else {
-      const checkedSet = new Set(
-        Array.from(document.querySelectorAll("#qzChannelTree .qz-pt-cb"))
-          .filter(cb => cb.checked)
-          .map(cb => cb.value)
-      );
-      base = trackEligiblePoints.filter(p => checkedSet.has(p["Short Name"]));
-    }
-
-    if (impVal === "any") {
-      trackFilteredPoints = base.filter(p => ["!", "!!", "!!!"].includes(String(p.Important || "").trim()));
-    } else if (impVal !== "all") {
-      trackFilteredPoints = base.filter(p => String(p.Important || "").trim() === impVal);
-    } else {
-      trackFilteredPoints = base;
-    }
-
-    // Dismiss both the Filter Modal and Settings Panel cleanly
     closeQuizFilterModal();
     document.getElementById("quizSettingsPanel").classList.remove("open");
     localStorage.removeItem(getSeenKey());
@@ -2080,12 +2649,14 @@
     closeQuizDistractorModal();
   };
 
-  // --- 13. SESSION SAVE & RESUME ---
+  // --- 15. SESSION SAVE & RESUME (Persists Filtered Pool IDs) ---
   function saveQuizSessionState() {
     if (remainingQuizQueue.length === 0 && !currentTargetPoint) return;
     const state = {
       subMode: qzSubMode,
       difficulty: qzDifficulty,
+      limitVal: document.getElementById("qzLimitSelect")?.value || "10",
+      filteredIds: trackFilteredPoints.map(p => p["Short Name"]),
       activeIds: activeQuizPool.map(p => p["Short Name"]),
       remainingIds: remainingQuizQueue.map(p => p["Short Name"]),
       currentTargetId: currentTargetPoint ? currentTargetPoint["Short Name"] : null,
@@ -2130,8 +2701,26 @@
       populateDifficultySelect();
       qzDifficulty = state.difficulty || qzDifficulty;
       document.getElementById("qzDifficultySelect").value = qzDifficulty;
+      if (state.limitVal && document.getElementById("qzLimitSelect")) {
+        document.getElementById("qzLimitSelect").value = state.limitVal;
+      }
 
       const byId = id => trackEligiblePoints.find(p => p["Short Name"] === id);
+
+      if (Array.isArray(state.filteredIds) && state.filteredIds.length > 0) {
+        const restoredFiltered = state.filteredIds.map(byId).filter(Boolean);
+        if (restoredFiltered.length > 0) {
+          trackFilteredPoints = restoredFiltered;
+          const fSet = new Set(state.filteredIds);
+          document.querySelectorAll("#qzChannelTree .qz-pt-cb").forEach(cb => {
+            cb.checked = fSet.has(cb.value);
+          });
+          document.querySelectorAll("#qzChannelTree .qf-group").forEach(g => {
+            if (!g.querySelector("#qzSelectAllGlobal")) syncSingleQuizGroup(g);
+          });
+        }
+      }
+
       activeQuizPool = (state.activeIds || []).map(byId).filter(Boolean);
       remainingQuizQueue = (state.remainingIds || []).map(byId).filter(Boolean);
       const target = state.currentTargetId ? byId(state.currentTargetId) : null;
@@ -2161,10 +2750,10 @@
     retakeQuizWholePool();
   };
 
-  // --- 14. KEYBOARD SHORTCUTS FOR IPAD / DESKTOP ---
-  // • Cmd/Ctrl + K  OR  "[" (left bracket, next to "]" for Quick Peek) toggles the Study & Tools Hub
+  // --- 16. KEYBOARD SHORTCUTS FOR IPAD / DESKTOP ---
+  // • Cmd/Ctrl + K  OR  "[" toggles the Study & Tools Hub
   // • Keys 1–5 inside the Hub launch each tool directly
-  // • Keys 1–6, Space, and Enter control the active Quiz (while yielding to Compare & Quick Peek)
+  // • Keys 1–6, Space, Enter, and "c" (for +1 Clue) control the active Quiz
   document.addEventListener("keydown", e => {
     const activeEl = document.activeElement;
     const isTyping = activeEl && (
@@ -2177,7 +2766,6 @@
     const hub = document.getElementById("toolsHubModal");
     const isHubOpen = hub && hub.style.display === "flex";
 
-    // 1. GLOBAL SHORTCUT TO OPEN/CLOSE STUDY & TOOLS HUB: Cmd/Ctrl + K  OR  "["
     if (((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") || (!isTyping && e.key === "[")) {
       e.preventDefault();
       if (isHubOpen) {
@@ -2188,23 +2776,20 @@
       return;
     }
 
-    // 2. WHEN HUB IS OPEN: Keys 1-5 launch tools directly
     if (isHubOpen) {
       if (!isTyping) {
-        if (e.key === "1") { e.preventDefault(); closeToolsHubModal(); openQuizModal("location"); return; }
+        if (e.key === "1") { e.preventDefault(); closeToolsHubModal(); openQuizModal("patterns"); return; }
         if (e.key === "2") { e.preventDefault(); closeToolsHubModal(); openQuizModal("clinical_points"); return; }
-        if (e.key === "3") { e.preventDefault(); closeToolsHubModal(); openQuizModal("patterns"); return; }
+        if (e.key === "3") { e.preventDefault(); closeToolsHubModal(); openQuizModal("location"); return; }
         if (e.key === "4") { e.preventDefault(); closeToolsHubModal(); openStudySettingsModal(); return; }
         if (e.key === "5") { e.preventDefault(); closeToolsHubModal(); openIntakeModal(); return; }
       }
       return;
     }
 
-    // 3. QUIZ MODAL CONTROLS
     const qzModal = document.getElementById("quizModal");
     if (!qzModal || qzModal.style.display !== "flex") return;
 
-    // Yield if Quick Peek, Compare Modal, Lightbox, Edit Modal, or Filter Modals are open on top
     if (typeof isQuickPeekOpen === "function" && isQuickPeekOpen()) return;
     if (document.getElementById("compareModal")?.style.display === "flex") return;
     if (document.getElementById("lightbox")?.style.display === "flex") return;
@@ -2214,6 +2799,16 @@
     if (document.getElementById("quizResumeModal")?.style.display === "flex") return;
 
     if (isTyping) return;
+
+    // Press "c" to reveal +1 Clue when available
+    if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === "c") {
+      const clueBtn = document.getElementById("qzClueBtn");
+      if (clueBtn && clueBtn.style.display !== "none") {
+        e.preventDefault();
+        revealNextQuizClue();
+        return;
+      }
+    }
 
     const revealBtn = document.getElementById("qzRevealBtn");
     const nextBtn = document.getElementById("qzNextBtn");
@@ -2231,7 +2826,6 @@
       }
     }
 
-    // Number keys 1-6 select multiple choice options
     if (/^[1-6]$/.test(e.key)) {
       const idx = parseInt(e.key, 10) - 1;
       const grid = document.getElementById("qzOptionsGrid");
