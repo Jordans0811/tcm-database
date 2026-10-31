@@ -44,11 +44,15 @@
         display: flex; justify-content: space-between; align-items: center; gap: 8px;
         padding: calc(10px + env(safe-area-inset-top)) 15px 10px 15px;
         background: #ffffff; border-bottom: 1px solid #d1d1d6; flex-shrink: 0;
-        flex-wrap: wrap;
+      }
+      .quiz-top-bar > div:last-child {
+        flex-shrink: 0; /* Keeps the score and X button from being squished */
       }
       .quiz-track-tabs {
         display: flex; background: #e3e3e8; border-radius: 10px; padding: 3px; gap: 2px;
+        overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
       }
+      .quiz-track-tabs::-webkit-scrollbar { display: none; }
       .quiz-track-tab {
         border: none; background: transparent; padding: 6px 10px; border-radius: 8px;
         font-size: 12px; font-weight: 800; color: #555; cursor: pointer; white-space: nowrap;
@@ -57,13 +61,24 @@
         background: #ffffff; color: #cc5500; box-shadow: 0 1px 4px rgba(0,0,0,0.12);
       }
       .quiz-subtoolbar {
-        display: flex; justify-content: space-between; align-items: center; gap: 8px;
+        display: flex; justify-content: flex-start; align-items: center; gap: 8px;
         padding: 8px 15px; background: rgba(240,240,245,0.95);
-        border-bottom: 1px solid #d1d1d6; flex-shrink: 0; flex-wrap: wrap;
+        border-bottom: 1px solid #d1d1d6; flex-shrink: 0; 
+        overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      }
+      .quiz-subtoolbar::-webkit-scrollbar { display: none; }
+      .quiz-subtoolbar > div {
+        flex-wrap: nowrap !important; /* Overrides inline HTML wrapping */
+        flex-shrink: 0;
+      }
+      .quiz-subtoolbar > div:last-child {
+        margin-left: auto; /* Pins the "Pool: All" label to the right */
+        padding-left: 15px;
       }
       .quiz-pill-btn {
         background: #e3e3e8; color: #007aff; border: none; border-radius: 8px;
         padding: 6px 11px; font-size: 12.5px; font-weight: 800; cursor: pointer;
+        white-space: nowrap; /* Stops button text from wrapping */
       }
       .quiz-pill-btn:active { transform: scale(0.96); }
       .quiz-score-badge {
@@ -206,8 +221,7 @@
 
       @media (max-width: 430px) {
         .quiz-top-bar { padding-left: 10px; padding-right: 10px; gap: 8px; }
-        .quiz-track-tabs { width: 100%; display: flex; }
-        .quiz-track-tab { padding: 6px 4px; font-size: 11.5px; flex: 1; text-align: center; }
+        .quiz-track-tab { font-size: 11.5px; }
         .quiz-score-badge { font-size: 12px; }
       }
 
