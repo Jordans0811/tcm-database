@@ -14,7 +14,7 @@
     const style = document.createElement("style");
     style.textContent = `
       #toolsHubModal, #quizModal, #quizFilterModal, #quizDistractorModal, #quizResumeModal {
-        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; height: 100dvh;
         z-index: 10016; justify-content: center; align-items: center;
         background: rgba(0,0,0,0.6);
       }
@@ -44,6 +44,7 @@
         display: flex; justify-content: space-between; align-items: center; gap: 8px;
         padding: calc(10px + env(safe-area-inset-top)) 15px 10px 15px;
         background: #ffffff; border-bottom: 1px solid #d1d1d6; flex-shrink: 0;
+        flex-wrap: wrap;
       }
       .quiz-track-tabs {
         display: flex; background: #e3e3e8; border-radius: 10px; padding: 3px; gap: 2px;
@@ -87,7 +88,7 @@
       /* Main Quiz Scroll Body */
       .quiz-scroll-body {
         flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-        padding: 15px; max-width: 760px; width: 100%; margin: 0 auto; box-sizing: border-box;
+        padding: 15px 15px 50px 15px; max-width: 760px; width: 100%; margin: 0 auto; box-sizing: border-box;
         display: flex; flex-direction: column; gap: 14px;
       }
       .quiz-question-card {
@@ -204,8 +205,9 @@
       .qf-points-list.open { display: flex; }
 
       @media (max-width: 430px) {
-        .quiz-top-bar { padding-left: 10px; padding-right: 10px; gap: 4px; }
-        .quiz-track-tab { padding: 6px 7px; font-size: 11px; }
+        .quiz-top-bar { padding-left: 10px; padding-right: 10px; gap: 8px; }
+        .quiz-track-tabs { width: 100%; display: flex; }
+        .quiz-track-tab { padding: 6px 4px; font-size: 11.5px; flex: 1; text-align: center; }
         .quiz-score-badge { font-size: 12px; }
       }
 
