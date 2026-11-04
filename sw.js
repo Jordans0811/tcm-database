@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v110';
+const CACHE_VERSION = 'v111';
 const APP_CACHE = `tcm-app-${CACHE_VERSION}`;
 const IMAGE_CACHE = `tcm-images-${CACHE_VERSION}`;
 
@@ -13,6 +13,7 @@ const INITIAL_CACHED_RESOURCES = [
   './tcm-graph.js',
   './tcm-inference-engine.js',
   './tcm-quiz.js',
+  './tcm-occlusion.js',
   './distractors.js'
 ];
 

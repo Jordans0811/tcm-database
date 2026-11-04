@@ -301,6 +301,14 @@
             </div>
           </button>
 
+          <button class="hub-card-btn" onclick="closeToolsHubModal(); openOcclusionStudioModal();">
+            <div class="hub-card-icon">🖼️</div>
+            <div>
+              <div class="hub-card-title">Visual Occlusion Studio</div>
+              <div class="hub-card-sub">Image & PDF box occlusions, diagrams, tables & Google Sheets sync</div>
+            </div>
+          </button>
+
           <button class="hub-card-btn" onclick="closeToolsHubModal(); openIntakeModal();">
             <div class="hub-card-icon">📋</div>
             <div>
@@ -3488,7 +3496,12 @@
     const hub = document.getElementById("toolsHubModal");
     const isHubOpen = hub && hub.style.display === "flex";
 
-    if (((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") || (!isTyping && e.key === "[")) {
+    const anyFullToolOpen = ['quizModal', 'studyModal', 'occStudioModal', 'compareModal', 'editModal'].some(id => {
+  const el = document.getElementById(id);
+  return el && el.style.display === 'flex';
+});
+
+if (!anyFullToolOpen && (((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") || (!isTyping && e.key === "["))) {
       e.preventDefault();
       if (isHubOpen) {
         closeToolsHubModal();
@@ -3504,8 +3517,9 @@
         if (e.key === "2") { e.preventDefault(); closeToolsHubModal(); openQuizModal("clinical_points"); return; }
         if (e.key === "3") { e.preventDefault(); closeToolsHubModal(); openQuizModal("location"); return; }
         if (e.key === "4") { e.preventDefault(); closeToolsHubModal(); openStudySettingsModal(); return; }
-        if (e.key === "5") { e.preventDefault(); closeToolsHubModal(); openIntakeModal(); return; }
-      }
+        if (e.key === "5") { e.preventDefault(); closeToolsHubModal(); openOcclusionStudioModal(); return; }
+        if (e.key === "6") { e.preventDefault(); closeToolsHubModal(); openIntakeModal(); return; }
+        }
       return;
     }
 

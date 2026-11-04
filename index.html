@@ -2400,7 +2400,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "11.03.26.v1";
+const APP_VERSION = "11.03.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -5974,7 +5974,13 @@ function handleGlobalEnter(e) {
   if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
 
   // Don't fire if a modal is open
-  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal', 'channelModal', 'sectionModal', 'occlusionModal', 'devModal', 'studyModal', 'intakeModal', 'studySettingsModal', 'resumeSessionModal', 'srsCardModal', 'toolsHubModal', 'quizModal', 'quizFilterModal', 'quizDistractorModal', 'quizResumeModal'].some(id => { const el = document.getElementById(id); return el && el.style.display === 'flex'; });
+  const isOverlayActive = [
+  'editModal', 'quickPeekModal', 'compareModal', 'printModal', 'channelModal',
+  'sectionModal', 'occlusionModal', 'devModal', 'studyModal', 'intakeModal',
+  'studySettingsModal', 'resumeSessionModal', 'srsCardModal', 'toolsHubModal',
+  'quizModal', 'quizFilterModal', 'quizDistractorModal', 'quizResumeModal',
+  'occStudioModal', 'occSearchModal', 'occLibraryModal'
+].some(id => { const el = document.getElementById(id); return el && el.style.display === 'flex'; });
   if (isOverlayActive) return;
 
   // Don't fire if the bottom sheet is already open
@@ -6007,9 +6013,15 @@ function handleGlobalEnter(e) {
 
 // --- MASTER KEYBOARD LISTENER ---
 document.addEventListener('keydown', (e) => {
+
+// Guard: Do not trigger main-screen search/filter hotkeys when a full-screen study/quiz/occlusion modal is open
+const isFullScreenToolOpen = ['studyModal', 'quizModal', 'occStudioModal', 'compareModal', 'printModal', 'intakeModal'].some(id => {
+  const el = document.getElementById(id);
+  return el && el.style.display === 'flex';
+});
   
   // 1. MAIN SEARCH SHORTCUTS (Cmd/Ctrl + F  OR  "/")
-  if (((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f') || e.key === '/') {
+if (!isFullScreenToolOpen && (((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f') || e.key === '/')) {
     const activeEl = document.activeElement;
     // Only trigger if we aren't already actively typing in a text box
     if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA' && !activeEl.isContentEditable)) {
@@ -6034,7 +6046,7 @@ document.addEventListener('keydown', (e) => {
     }
   }
     // 1b. FILTER SHORTCUT (Cmd/Ctrl + Shift + l)
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
+if (!isFullScreenToolOpen && (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
     const activeEl = document.activeElement;
     if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA' && !activeEl.isContentEditable)) {
       e.preventDefault();
@@ -6044,7 +6056,7 @@ document.addEventListener('keydown', (e) => {
   }
 
     // 1c. CLEAR SEARCH SHORTCUT (Cmd/Ctrl + Shift + X)
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'x') {
+if (!isFullScreenToolOpen && (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'x') {
     const activeEl = document.activeElement;
     if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA' && !activeEl.isContentEditable)) {
       e.preventDefault();
@@ -6121,6 +6133,9 @@ document.addEventListener('keydown', (e) => {
     if (document.getElementById('quizResumeModal')?.style.display === 'flex') { stop(); abandonSavedQuizSession(); return; }
     if (document.getElementById('studyModal')?.style.display === 'flex') { stop(); closeStudyModal(); return; }
     if (document.getElementById('resumeSessionModal')?.style.display === 'flex') { stop(); document.getElementById('resumeSessionModal').style.display = 'none'; return; }
+    if (document.getElementById('occSearchModal')?.style.display === 'flex') { stop(); closeOccSearchModal(); return; }
+if (document.getElementById('occLibraryModal')?.style.display === 'flex') { stop(); closeOccLibraryModal(); return; }
+if (document.getElementById('occStudioModal')?.style.display === 'flex') { stop(); closeOcclusionStudioModal(); return; }
     if (document.getElementById('quizModal')?.style.display === 'flex') { stop(); closeQuizModal(); return; }
     if (document.getElementById('toolsHubModal')?.style.display === 'flex') { stop(); closeToolsHubModal(); return; }
     if (document.getElementById('studySettingsModal')?.style.display === 'flex') { stop(); closeStudySettingsModal(); return; }
@@ -6206,7 +6221,13 @@ document.getElementById("lightbox-img").src = getImagePath(point);
 
   // 7. BOTTOM SHEET NAVIGATION
   const sheet = document.getElementById('bottomSheet');
-  const isOverlayActive = ['editModal', 'quickPeekModal', 'compareModal', 'printModal', 'channelModal', 'sectionModal', 'occlusionModal', 'devModal', 'studyModal', 'intakeModal', 'studySettingsModal', 'resumeSessionModal', 'srsCardModal', 'toolsHubModal', 'quizModal', 'quizFilterModal', 'quizDistractorModal', 'quizResumeModal'].some(id => { const el = document.getElementById(id); return el && el.style.display === 'flex'; });
+  const isOverlayActive = [
+  'editModal', 'quickPeekModal', 'compareModal', 'printModal', 'channelModal',
+  'sectionModal', 'occlusionModal', 'devModal', 'studyModal', 'intakeModal',
+  'studySettingsModal', 'resumeSessionModal', 'srsCardModal', 'toolsHubModal',
+  'quizModal', 'quizFilterModal', 'quizDistractorModal', 'quizResumeModal',
+  'occStudioModal', 'occSearchModal', 'occLibraryModal'
+].some(id => { const el = document.getElementById(id); return el && el.style.display === 'flex'; });
   
   if (sheet && sheet.classList.contains('open') && !isOverlayActive) {
     const sheetContent = document.getElementById('sheetContent');
@@ -8273,8 +8294,9 @@ function processIntake() {
     }
 
         // 2. OPEN MODAL (Cmd + i) - Explicitly ignores Shift so it doesn't conflict with Lightbox
-    if (isCmd && !event.shiftKey && event.key.toLowerCase() === 'i') {
-      event.preventDefault(); 
+if (isCmd && !event.shiftKey && event.key.toLowerCase() === 'i') {
+  if (['studyModal', 'quizModal', 'occStudioModal', 'compareModal', 'editModal'].some(id => document.getElementById(id)?.style.display === 'flex')) return;
+  event.preventDefault(); 
       
       if (intakeModal.style.display === 'none' || intakeModal.style.display === '') {
 
@@ -9895,6 +9917,7 @@ document.addEventListener('wheel', (e) => {
 
 <script src="./distractors.js"></script>
 <script src="./tcm-quiz.js"></script>
+<script src="./tcm-occlusion.js"></script>
 </body>
 </html>
 
