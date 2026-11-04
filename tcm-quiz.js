@@ -21,7 +21,10 @@
       #quizModal {
         background: #f0f0f5; z-index: 10018; flex-direction: column;
         justify-content: flex-start; align-items: stretch;
+        caret-color: transparent;
       }
+      #quizModal input, #quizModal textarea { caret-color: auto; }
+      #quizModal .quiz-scroll-body { outline: none; }
       #quizFilterModal, #quizDistractorModal, #quizResumeModal { z-index: 10019; }
 
       .hub-card-btn {
@@ -566,6 +569,7 @@
   function standardizeTCMTerminology(str) {
     if (!str) return "";
     return String(str)
+      .replace(/\u00A0/g, " ")
       .replace(/\b(?:T\.B\.|TB|TE|TH)(?=\s*-?\s*\d+\b)/gi, "SJ")
       .replace(/\bTriple\s+Burner\b/gi, "San Jiao")
       .replace(/\bL\.I\.(?=\s*-?\s*\d+\b)/gi, "LI")
@@ -687,12 +691,96 @@
   const patternParseCache = new Map();
   const pointClinicalCache = new Map();
 
+  function normalizeSymptomClause(str) {
+    return String(str || "")
+      .toLowerCase()
+      .replace(/\[\/?(?:b|i|u|color(?:=[^\]]+)?)\]/gi, "")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/^(?:a|an|the|slight|very\s+slight|possibly|in\s+severe\s+cases|in\s+women|in\s+children|in\s+adults)\s+/i, "")
+      .replace(/^(?:feeling|sensation)\s+of\s+/i, "")
+      .replace(/\bdiarrhoea\b/g, "diarrhea")
+      .replace(/\boedema\b/g, "edema")
+      .replace(/\bamenorrhoea\b/g, "amenorrhea")
+      .replace(/\bspermatorrhoea\b/g, "spermatorrhea")
+      .replace(/\bleucorrhoea\b/g, "leukorrhea")
+      .replace(/\bhaemoptysis\b/g, "hemoptysis")
+      .replace(/\bhaematemesis\b/g, "hematemesis")
+      .replace(/\bhaemorrhoids\b/g, "hemorrhoids")
+      .replace(/\bcolour\b/g, "color")
+      .replace(/\bodour\b/g, "odor")
+      .replace(/\bbehaviour\b/g, "behavior")
+      .replace(/\bcentre\b/g, "center")
+      .replace(/\blustre\b/g, "luster")
+      .replace(/['".,;:!?\/\\\-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function extractAtomicClauses(line) {
+    if (!line) return [];
+    const clean = stripBBCode(String(line)).replace(/\([^)]*\)/g, " ").trim();
+    const rawParts = clean.split(/,|;|\s+or\s+|\s+and\/or\s+/i);
+    const clauses = [];
+    const fullNorm = normalizeSymptomClause(clean);
+    if (fullNorm.length > 2) clauses.push(fullNorm);
+    rawParts.forEach(part => {
+      const norm = normalizeSymptomClause(part);
+      if (norm.length >= 3 && !clauses.includes(norm)) {
+        clauses.push(norm);
+      }
+    });
+    return clauses;
+  }
+
+  function hasSymptomOverlap(candidateLine, referenceLines, mode = "any") {
+    const candClauses = extractAtomicClauses(candidateLine);
+    if (candClauses.length === 0) return false;
+
+    const refClauses = new Set();
+    referenceLines.forEach(rLine => {
+      extractAtomicClauses(rLine).forEach(c => refClauses.add(c));
+    });
+
+    const clauseMatchesRef = (c) => {
+      if (refClauses.has(c)) return true;
+      for (let ref of refClauses) {
+        if (c.length >= 5 && ref.length >= 5) {
+          if (ref.includes(c) || c.includes(ref)) return true;
+        }
+      }
+      return false;
+    };
+
+    const subClauses = candClauses.length > 1 ? candClauses.slice(1) : candClauses;
+    if (mode === "all") {
+      return subClauses.every(clauseMatchesRef);
+    }
+    return candClauses.some(clauseMatchesRef);
+  }
+
+  function arePatternTitlesEquivalent(nameA, nameB) {
+    const clean = (s) => {
+      const base = String(s || "").toLowerCase().split(/\baka\b|\(/i)[0];
+      return base
+        .replace(/\brebellious\s+liver[\s\-]*qi\s+invading\s+the\s+stomach\b/g, "liver qi invading stomach")
+        .replace(/\bliver[\s\-]*qi\s+invading\s+the\s+stomach\b/g, "liver qi invading stomach")
+        .split(/[^a-z0-9]+/)
+        .filter(w => w.length > 2 && !["and", "the", "with", "from", "deriving", "pattern", "patterns", "syndrome"].includes(w))
+        .sort()
+        .join(" ");
+    };
+    const sigA = clean(nameA);
+    const sigB = clean(nameB);
+    return sigA.length > 0 && sigA === sigB;
+  }
+
   // Matches all bullet/chevron variants in the CSV: ➣ (\u27A3), ➢ (\u27A2), ➔ (\u2794), • (\u2022), -, *
   function cleanSectionLines(rawVal) {
     if (!rawVal) return [];
     let clean = standardizeTCMTerminology(stripBBCode(String(rawVal)))
       .replace(/\r\n/g, "\n")
       .replace(/`+/g, "")
+      .replace(/\s*([\u27A2\u27A3\u2794])\s*/g, "\n$1 ")
       .trim();
     return clean
       .split(/\n|;;/)
@@ -708,15 +796,20 @@
   }
 
   // Fast linear-time splitter for single or multi-point rationale lines (zero backtracking)
-  const RX_ACTION_SPLIT_RX = /\b(is\s+the\b|are\s+the\b|is\s+used\b|are\s+used\b|is\s+a\b|also\s+|with\s+direct\s+moxa|with\s+moxa|in\s+combination|tonifies|tonify|nourishes|nourish|clears|clear|drains|drain|moves|move|calms|calm|opens|open|resolves|resolve|subdues|subdue|regulates|regulate|strengthens|strengthen|warms|warm|cools|cool|rescues|rescue|stops|stop|promotes|promote|pacifies|pacify|relieves|relieve|harmonizes|harmonize|makes|make|helps|help|smooths|smooth|smoothes|eliminates|eliminate|expels|expel|disperses|disperse|activates|activate|descends|descend|lifts|lift|raises|raise|conducts|conduct|stimulates|stimulate|restores|restore)\b/i;
+  const RX_ACTION_SPLIT_RX = /\b(is\s+the\b|are\s+the\b|is\s+used\b|are\s+used\b|is\s+an?\b|is\s+reinforced\b|is\s+reduced\b|are\s+points\b|are\s+all\b|can\s+all\b|can\s+be\b|can\b|combined\s+together|also\s+|with\s+direct\s+moxa|with\s+moxa|with\s+reducing\s+method|in\s+combination|tonifies|tonify|nourishes|nourish|clears|clear|drains|drain|moves|move|calms|calm|opens|open|resolves|resolve|subdues|subdue|regulates|regulate|strengthens|strengthen|warms|warm|cools|cool|rescues|rescue|stops|stop|promotes|promote|pacifies|pacify|relieves|relieve|harmonizes|harmonize|makes|make|helps|help|smooths|smooth|smoothes|eliminates|eliminate|expels|expel|disperses|disperse|activates|activate|invigorates|invigorate|extinguishes|extinguish|releases|release|descends|descend|lifts|lift|raises|raise|conducts|conduct|stimulates|stimulate|restores|restore|treats|treat|benefits|benefit)\b/i;
 
   function extractPointRationaleFromLine(line) {
-    // Must start with a point code (or SP4/PC6 combo)
-    if (!/^(?:LU|LI|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*\d+/i.test(line)) {
+    const cleanLine = line.replace(/^The\s+(?=Shixuan\b)/i, "").trim();
+    if (!/^(?:LU|LI|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+|(?:extra\s+point\s+)?(?:Yintang|Taiyang|Dannangxue|Lanweixue|Shixuan|Yuyao|Zigong|Bafeng|Baxie|Dingchuan))\b/i.test(cleanLine)) {
       return null;
     }
-    // 1. Check for explicit colon or spaced-dash delimiter (e.g. "GB20 (Fengchi): Number one point..." or "Ren-17, PC-6 - Move Qi...")
-    const delimMatch = line.match(/^([^:]+?)\s*(?::|\s+[\-\u2013\u2014]\s+)\s*(.+)$/);
+
+    const normalizedLine = cleanLine.replace(
+      /^((?:[A-Za-z]+\s*-?\s*\d+(?:\s+[A-Z][a-z]+)?(?:,\s*|\s+and\s+|\s+with\s+)?)+),\s*(?:respectively\s+)?(?:Front-Collecting|Back-Transporting|Accumulation|Connecting|Source|Lower\s+Sea)[^,]*,\s*/i,
+      "$1 "
+    );
+
+    const delimMatch = normalizedLine.match(/^([^:]+?)\s*(?::|\s+[\-\u2013\u2014]\s+)\s*(.+)$/);
     if (delimMatch && delimMatch[1].length <= 65 && delimMatch[2].length > 6) {
       const ptLabel = delimMatch[1].trim();
       const cMatch = ptLabel.match(/([A-Za-z]+)\s*-?\s*(\d+)/);
@@ -724,20 +817,22 @@
         pointCode: cMatch ? normalizePointCode(cMatch[1] + cMatch[2]) : ptLabel,
         pointLabel: ptLabel,
         explanation: delimMatch[2].trim(),
+        normExplanation: normalizeSymptomClause(delimMatch[2]),
         fullLine: line
       };
     }
-    // 2. Otherwise split at the first clinical verb/phrase
-    const verbMatch = RX_ACTION_SPLIT_RX.exec(line);
-    if (verbMatch && verbMatch.index > 2 && verbMatch.index <= 75) {
-      const ptLabel = line.slice(0, verbMatch.index).replace(/[,;\s]+$/, "").trim();
-      const expBody = line.slice(verbMatch.index).trim();
+
+    const verbMatch = RX_ACTION_SPLIT_RX.exec(normalizedLine);
+    if (verbMatch && verbMatch.index > 1 && verbMatch.index <= 75) {
+      const ptLabel = normalizedLine.slice(0, verbMatch.index).replace(/[,;\s]+$/, "").trim();
+      const expBody = normalizedLine.slice(verbMatch.index).trim();
       if (expBody.length > 6) {
         const cMatch = ptLabel.match(/([A-Za-z]+)\s*-?\s*(\d+)/);
         return {
           pointCode: cMatch ? normalizePointCode(cMatch[1] + cMatch[2]) : ptLabel,
           pointLabel: ptLabel,
           explanation: expBody,
+          normExplanation: normalizeSymptomClause(expBody),
           fullLine: line
         };
       }
@@ -754,7 +849,12 @@
     const cacheKey = `${id}::${raw.length}::${txRaw.length}::${rxRaw.length}::${descRaw.length}`;
     if (patternParseCache.has(cacheKey)) return patternParseCache.get(cacheKey);
 
-    let clean = standardizeTCMTerminology(stripBBCode(String(raw))).replace(/\r\n/g, "\n").replace(/`+/g, "").trim();
+    let clean = standardizeTCMTerminology(stripBBCode(String(raw)))
+      .replace(/\r\n/g, "\n")
+      .replace(/`+/g, "")
+      .replace(/\s*((?:[\u27A2\u27A3\u2794]\s*)?(?:(?:Key|Cardinal|Main)\s+Symptoms?\s*:|Tongue\s*&\s*Pulse\s*:|Tongue\s*:|Pulse\s*:|(?:All\s+)?Clinical\s+Manifestations?\s*:|Aetiology\s*(?:&\s*Precursors)?\s*:))/gi, "\n$1")
+      .replace(/\s*([\u27A2\u27A3\u2794])\s*/g, "\n$1 ")
+      .trim();
 
     clean = clean
       .split("\n")
@@ -912,6 +1012,23 @@
       const parsedSupp = extractPointRationaleFromLine(line);
       if (parsedSupp) rxExplanations.push(parsedSupp);
     });
+
+    // Combine points in the same pattern that share an identical explanation (e.g., Du-9 & GB-34 -> "resolves Damp-Heat.")
+    const mergedRxMap = new Map();
+    rxExplanations.forEach(item => {
+      const key = item.normExplanation || normalizeSymptomClause(item.explanation);
+      if (!mergedRxMap.has(key)) {
+        mergedRxMap.set(key, Object.assign({}, item, { allLabels: [item.pointLabel] }));
+      } else {
+        const existing = mergedRxMap.get(key);
+        if (!existing.allLabels.includes(item.pointLabel)) {
+          existing.allLabels.push(item.pointLabel);
+          existing.pointLabel = existing.allLabels.join(" & ");
+        }
+      }
+    });
+    rxExplanations.length = 0;
+    rxExplanations.push(...mergedRxMap.values());
 
     if (!rxPointsLine && pointCodes.length > 0) {
       rxPointsLine = pointCodes.join(", ");
@@ -1447,7 +1564,9 @@
     const targetChanFull = (targetPattern["Channel Full Name"] || targetPattern[" Channel Full Name"] || "").trim().toLowerCase();
     const targetChanShort = (targetPattern["Channel Short Name"] || targetPattern[" Channel Short Name"] || "").trim().toLowerCase();
 
-    const otherPatterns = trackDistractorPoints.filter(p => p["Short Name"] !== targetName);
+    const otherPatterns = trackDistractorPoints.filter(
+      p => p["Short Name"] !== targetName && !arePatternTitlesEquivalent(p["Short Name"], targetName)
+    );
     if (otherPatterns.length <= count) return shuffleArr(otherPatterns);
 
     const organs = clinicalBlankCategories.organs.filter(o => targetTitleLower.includes(o));
@@ -1969,7 +2088,7 @@
       let decoyPoint = null;
       for (let d of distractors) {
         const dLines = parsePointClinicalLines(d, fieldMode).lines;
-        const found = shuffleArr(dLines).find(l => !targetAllNorm.has(stripBBCode(l).trim().toLowerCase()));
+        const found = shuffleArr(dLines).find(l => !targetAllNorm.has(stripBBCode(l).trim().toLowerCase()) && !hasSymptomOverlap(l, lines, "any"));
         if (found) {
           decoyLine = found;
           decoyPoint = d;
@@ -1986,14 +2105,18 @@
           <div style="font-size:20px; font-weight:900; color:#cc5500; margin-bottom:6px;">${escapeHTML(stdTargetName)}</div>
           <div style="color:#007aff; font-weight:700;">All of the following are Actions or Indications for <u>${escapeHTML(stdTargetName)}</u> <b>EXCEPT</b>:</div>
         `;
-        currentCorrectAnswer = stripBBCode(decoyLine).trim();
-        const trueOpts = shuffledLines.slice(0, 4).map(l => ({
-          text: bbcodeToHtml(l),
-          rawCompare: stripBBCode(l).trim(),
-          pointId: targetPoint["Short Name"]
-        }));
+        const cleanDecoyHtml = maskSelfSpoilers(bbcodeToHtml(decoyLine), decoyPoint, stdTargetName, true);
+        currentCorrectAnswer = stripBBCode(cleanDecoyHtml).trim();
+        const trueOpts = shuffledLines.slice(0, 4).map(l => {
+          const tHtml = maskSelfSpoilers(bbcodeToHtml(l), targetPoint, stdTargetName, true);
+          return {
+            text: tHtml,
+            rawCompare: stripBBCode(tHtml).trim(),
+            pointId: targetPoint["Short Name"]
+          };
+        });
         const opts = [
-          { text: bbcodeToHtml(decoyLine), rawCompare: currentCorrectAnswer, pointId: decoyPoint["Short Name"] },
+          { text: cleanDecoyHtml, rawCompare: currentCorrectAnswer, pointId: decoyPoint["Short Name"] },
           ...trueOpts
         ];
         renderQuizOptionButtons(shuffleArr(opts));
@@ -2043,11 +2166,12 @@
       html += `<div style="margin-top:10px; color:#007aff; font-weight:700;">Which of the following is ALSO a correct Action/Indication for ${escapeHTML(stdTargetName)}?</div>`;
       bodyEl.innerHTML = html;
 
-      currentCorrectAnswer = stripBBCode(targetLine).trim();
-      let opts = [{ text: bbcodeToHtml(targetLine), rawCompare: currentCorrectAnswer, pointId: targetPoint["Short Name"] }];
+      const cleanTargetHtml = maskSelfSpoilers(bbcodeToHtml(targetLine), targetPoint, stdTargetName, true);
+      currentCorrectAnswer = stripBBCode(cleanTargetHtml).trim();
+      let opts = [{ text: cleanTargetHtml, rawCompare: currentCorrectAnswer, pointId: targetPoint["Short Name"] }];
 
       if (qzDifficulty === "hard" || qzDifficulty === "insane") {
-        const mut = mutateClinicalOrPatternStatement(targetLine);
+        const mut = mutateClinicalOrPatternStatement(cleanTargetHtml);
         if (stripBBCode(mut).trim().toLowerCase() !== currentCorrectAnswer.toLowerCase()) {
           opts.push({ text: bbcodeToHtml(mut), rawCompare: stripBBCode(mut).trim(), pointId: targetPoint["Short Name"] });
         }
@@ -2056,11 +2180,14 @@
       for (let d of distractors) {
         if (opts.length >= 6) break;
         const dParsed = parsePointClinicalLines(d, fieldMode);
-        const candidates = shuffleArr(dParsed.lines).filter(
-          l => !targetAllNorm.has(stripBBCode(l).trim().toLowerCase()) && !opts.some(o => o.rawCompare.toLowerCase() === stripBBCode(l).trim().toLowerCase())
-        );
+        const candidates = shuffleArr(dParsed.lines).filter(l => {
+          const dHtml = maskSelfSpoilers(bbcodeToHtml(l), d, stdTargetName, true);
+          const dRaw = stripBBCode(dHtml).trim().toLowerCase();
+          return !targetAllNorm.has(dRaw) && !hasSymptomOverlap(l, lines, "any") && !opts.some(o => o.rawCompare.toLowerCase() === dRaw);
+        });
         if (candidates.length > 0) {
-          opts.push({ text: bbcodeToHtml(candidates[0]), rawCompare: stripBBCode(candidates[0]).trim(), pointId: d["Short Name"] });
+          const dHtml = maskSelfSpoilers(bbcodeToHtml(candidates[0]), d, stdTargetName, true);
+          opts.push({ text: dHtml, rawCompare: stripBBCode(dHtml).trim(), pointId: d["Short Name"] });
         }
       }
       renderQuizOptionButtons(shuffleArr(opts));
@@ -2250,9 +2377,11 @@
 
         currentCorrectAnswer = expItem.pointLabel;
         let opts = [{ text: escapeHTML(expItem.pointLabel), rawCompare: expItem.pointLabel }];
+        const targetNormExp = expItem.normExplanation || normalizeSymptomClause(expItem.explanation);
 
         parsed.rxExplanations.forEach(otherExp => {
-          if (otherExp.pointLabel !== expItem.pointLabel && !opts.some(o => o.rawCompare === otherExp.pointLabel)) {
+          const otherNorm = otherExp.normExplanation || normalizeSymptomClause(otherExp.explanation);
+          if (otherExp.pointLabel !== expItem.pointLabel && otherNorm !== targetNormExp && !opts.some(o => o.rawCompare === otherExp.pointLabel)) {
             opts.push({ text: escapeHTML(otherExp.pointLabel), rawCompare: otherExp.pointLabel });
           }
         });
@@ -2261,7 +2390,8 @@
           if (opts.length >= 6) break;
           const dPr = parseManifestationRecord(d);
           dPr.rxExplanations.forEach(dExp => {
-            if (opts.length < 6 && dExp.pointLabel !== expItem.pointLabel && !opts.some(o => o.rawCompare === dExp.pointLabel)) {
+            const dNorm = dExp.normExplanation || normalizeSymptomClause(dExp.explanation);
+            if (opts.length < 6 && dExp.pointLabel !== expItem.pointLabel && dNorm !== targetNormExp && !opts.some(o => o.rawCompare === dExp.pointLabel)) {
               opts.push({ text: escapeHTML(dExp.pointLabel), rawCompare: dExp.pointLabel });
             }
           });
@@ -2576,10 +2706,8 @@
     if (effectiveMode === "differential" && parsed.symptoms.length >= 2 && distractors.length > 0) {
       const sibling = distractors[0];
       const sibParsed = parseManifestationRecord(sibling);
-      const sibSet = new Set(sibParsed.symptoms.map(s => s.toLowerCase()));
-      const targetAllLower = new Set(parsed.symptoms.map(s => s.toLowerCase()));
 
-      const sibUnique = sibParsed.symptoms.filter(s => !targetAllLower.has(s.toLowerCase()));
+      const sibUnique = sibParsed.symptoms.filter(s => !hasSymptomOverlap(s, parsed.symptoms, "any"));
       if (parsed.symptoms.length >= 3 && sibUnique.length > 0 && Math.random() < 0.5) {
         const decoySym = sibUnique[Math.floor(Math.random() * sibUnique.length)];
         currentContrastPointId = sibling["Short Name"];
@@ -2604,8 +2732,8 @@
         return;
       }
 
-      const uniqueToTarget = parsed.symptoms.filter(s => !sibSet.has(s.toLowerCase()));
-      const sharedWithSibling = parsed.symptoms.filter(s => sibSet.has(s.toLowerCase()));
+      const uniqueToTarget = parsed.symptoms.filter(s => !hasSymptomOverlap(s, sibParsed.symptoms, "all"));
+      const sharedWithSibling = parsed.symptoms.filter(s => hasSymptomOverlap(s, sibParsed.symptoms, "any"));
 
       if (uniqueToTarget.length > 0) {
         const chosenUnique = uniqueToTarget[Math.floor(Math.random() * uniqueToTarget.length)];
@@ -2629,7 +2757,7 @@
           if (opts.length >= 6) break;
           const dParsed = parseManifestationRecord(d);
           const dUnique = shuffleArr(dParsed.symptoms).find(
-            s => !targetAllLower.has(s.toLowerCase()) && !opts.some(o => o.rawCompare.toLowerCase() === s.toLowerCase())
+            s => !hasSymptomOverlap(s, parsed.symptoms, "any") && !opts.some(o => o.rawCompare.toLowerCase() === s.toLowerCase())
           );
           if (dUnique) {
             opts.push({ text: escapeHTML(dUnique), rawCompare: dUnique, pointId: d["Short Name"] });
@@ -2790,6 +2918,10 @@
       : `Next Question ➔ <span style="font-size:12px; opacity:0.85;">(Enter / Space)</span>`;
     nextBtn.style.display = "block";
     bottomBar.style.display = "block";
+
+    if (document.activeElement && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
   }
 
   // Renders an immediate Clinical Anchor & Differential Comparison Card right beneath the options
@@ -3534,6 +3666,21 @@
     if (document.getElementById("quizResumeModal")?.style.display === "flex") return;
 
     if (isTyping) return;
+
+    if (["ArrowDown", "ArrowUp", "PageDown", "PageUp"].includes(e.key)) {
+      const summaryView = document.getElementById("qzSummaryView");
+      const activeView = document.getElementById("qzActiveView");
+      const scrollTarget = (summaryView && summaryView.style.display !== "none") ? summaryView : activeView;
+      if (scrollTarget) {
+        e.preventDefault();
+        e.stopPropagation();
+        const isPageKey = (e.key === "PageDown" || e.key === "PageUp");
+        const step = isPageKey ? Math.round(scrollTarget.clientHeight * 0.8) : 60;
+        const dir = (e.key === "ArrowDown" || e.key === "PageDown") ? 1 : -1;
+        scrollTarget.scrollBy({ top: dir * step, behavior: isPageKey ? "smooth" : "auto" });
+        return;
+      }
+    }
 
     if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === "c") {
       const clueBtn = document.getElementById("qzClueBtn");
