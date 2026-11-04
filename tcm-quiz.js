@@ -3495,13 +3495,12 @@
 
     const hub = document.getElementById("toolsHubModal");
     const isHubOpen = hub && hub.style.display === "flex";
+    const anyFullToolOpen = ["quizModal", "studyModal", "occStudioModal", "compareModal", "editModal"].some(id => {
+      const el = document.getElementById(id);
+      return el && el.style.display === "flex";
+    });
 
-    const anyFullToolOpen = ['quizModal', 'studyModal', 'occStudioModal', 'compareModal', 'editModal'].some(id => {
-  const el = document.getElementById(id);
-  return el && el.style.display === 'flex';
-});
-
-if (!anyFullToolOpen && (((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") || (!isTyping && e.key === "["))) {
+    if (!anyFullToolOpen && (((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") || (!isTyping && e.key === "["))) {
       e.preventDefault();
       if (isHubOpen) {
         closeToolsHubModal();

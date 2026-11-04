@@ -2400,7 +2400,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "11.03.26.v2";
+const APP_VERSION = "11.04.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2436,10 +2436,15 @@ async function openDevMenu() {
 
 async function checkCacheStatus() {
     if (!window.caches) return;
-    
-    let expectedIds = new Set();
-    points.forEach(p => { if (p["Image ID"]) expectedIds.add(p["Image ID"]); });
-    const totalExpected = expectedIds.size;
+
+    const baseOrigin = new URL('.', document.baseURI).href;
+    let expectedUrlsSet = new Set();
+    points.forEach(p => {
+        if (p["Image ID"] && String(p["Image ID"]).trim() !== "") {
+            expectedUrlsSet.add(new URL(getImagePath(p), baseOrigin).href);
+        }
+    });
+    const totalExpected = expectedUrlsSet.size;
 
     let cachedUrls = new Set();
     const cacheNames = await caches.keys();
@@ -2447,24 +2452,24 @@ async function checkCacheStatus() {
         const cache = await caches.open(name);
         const reqs = await cache.keys();
         reqs.forEach(req => {
-            if (req.url.includes('DeadmanPhotos')) cachedUrls.add(req.url);
+            if (expectedUrlsSet.has(req.url)) cachedUrls.add(req.url);
         });
     }
-    
+
     const cachedCount = cachedUrls.size;
     document.getElementById("devPhotoStatus").textContent = `${cachedCount} / ${totalExpected}`;
     document.getElementById("devProgressBar").style.width = totalExpected === 0 ? "0%" : Math.min(100, (cachedCount / totalExpected * 100)) + "%";
-    
+
     const btn = document.getElementById("devSyncBtn");
-    if (cachedCount >= totalExpected) {
+    if (totalExpected > 0 && cachedCount >= totalExpected) {
         btn.textContent = "All Photos Cached!";
         btn.disabled = true;
     } else {
         btn.textContent = "Download Missing Photos";
         btn.disabled = false;
     }
-    
-    return { expectedIds, cachedUrls };
+
+    return { expectedUrls: Array.from(expectedUrlsSet), cachedUrls, totalExpected };
 }
 
 async function syncMissingPhotos() {
@@ -2473,32 +2478,36 @@ async function syncMissingPhotos() {
     btn.textContent = "Calculating...";
 
     const status = await checkCacheStatus();
-    
-    // Build precise URLs so we can match them against what is cached
-    const baseOrigin = new URL('.', document.baseURI).href;
-    let expectedUrls = Array.from(status.expectedIds).map(id => baseOrigin + getImagePath({ "Image ID": id }));
+    if (!status || status.totalExpected === 0) {
+        btn.textContent = "Waiting for Database...";
+        btn.disabled = false;
+        return;
+    }
 
-    let missingUrls = expectedUrls.filter(url => !status.cachedUrls.has(url));
-
+    let missingUrls = status.expectedUrls.filter(url => !status.cachedUrls.has(url));
     let successCount = status.cachedUrls.size;
-    const totalExpected = status.expectedIds.size;
+    const totalExpected = status.totalExpected;
 
-    // Put them directly in a safe vault compartment so they are ready for offline use
     const photoCache = await caches.open('tcm-vault-photos');
 
-    // We fetch in small batches of 5 so iOS doesn't panic and kill the app
     for (let i = 0; i < missingUrls.length; i += 5) {
         const batch = missingUrls.slice(i, i + 5);
         await Promise.all(batch.map(async (url) => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 8000);
             try {
-                const response = await fetch(url, { cache: 'no-store' }); 
+                const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
                 if (response.ok || response.type === 'opaque') {
                     await photoCache.put(url, response.clone());
                     successCount++;
                 }
-            } catch(e) { console.log("Failed to fetch: " + url); }
+            } catch (e) {
+                console.log("Failed to fetch: " + url);
+            } finally {
+                clearTimeout(timer);
+            }
         }));
-        
+
         document.getElementById("devPhotoStatus").textContent = `${successCount} / ${totalExpected}`;
         document.getElementById("devProgressBar").style.width = (successCount / totalExpected * 100) + "%";
         btn.textContent = `Downloading... ${Math.round(successCount / totalExpected * 100)}%`;

@@ -88,23 +88,6 @@
     });
   }
 
-  // Quietly cache PDF.js in the background once online so future offline sessions have it
-  if ("caches" in window && navigator.onLine) {
-    window.addEventListener("load", () => {
-      setTimeout(async () => {
-        try {
-          const c = await caches.open("tcm-vault-photos");
-          for (const url of [PDFJS_CDN_URL, PDFJS_WORKER_URL]) {
-            const match = await c.match(url);
-            if (!match) {
-              const resp = await fetch(url, { mode: "cors" });
-              if (resp.ok) await c.put(url, resp.clone());
-            }
-          }
-        } catch (e) {}
-      }, 3500);
-    });
-  }
 
   // --- 1. INJECT SCOPED STYLES & MODAL DOM ---
   function injectOcclusionStudioDOM() {
@@ -1008,12 +991,6 @@
     bindOcclusionStudioEvents();
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", injectOcclusionStudioDOM);
-  } else {
-    injectOcclusionStudioDOM();
-  }
-
   // --- 2. MODULE STATE ---
   let docType = null; // 'pdf' | 'images'
   let pdfDoc = null;
@@ -1073,6 +1050,7 @@
     modal.style.display = "flex";
     adjustOccLayout();
 
+    await ensureOccDbOpened();
     if (docType) {
       await renderPage(pageNum);
     } else if (db) {
@@ -2404,19 +2382,28 @@
   };
 
   // --- 9. INDEXEDDB, FILE LOAD, LIBRARY & GOOGLE SHEETS SYNC ---
-  const dbRequest = indexedDB.open("OcclusionProDB", 3);
+  function ensureOccDbOpened() {
+    if (db) return Promise.resolve(db);
+    return new Promise((resolve) => {
+      const dbRequest = indexedDB.open("OcclusionProDB", 3);
 
-  dbRequest.onupgradeneeded = function (e) {
-    db = e.target.result;
-    if (!db.objectStoreNames.contains("pdfCache")) db.createObjectStore("pdfCache");
-    if (!db.objectStoreNames.contains("boxesCache")) db.createObjectStore("boxesCache");
-    if (!db.objectStoreNames.contains("libraryCache")) db.createObjectStore("libraryCache", { keyPath: "name" });
-  };
+      dbRequest.onupgradeneeded = function (e) {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains("pdfCache")) d.createObjectStore("pdfCache");
+        if (!d.objectStoreNames.contains("boxesCache")) d.createObjectStore("boxesCache");
+        if (!d.objectStoreNames.contains("libraryCache")) d.createObjectStore("libraryCache", { keyPath: "name" });
+      };
 
-  dbRequest.onsuccess = function (e) {
-    db = e.target.result;
-    if (isOcclusionModalOpen() && !docType) autoLoadCachedDoc();
-  };
+      dbRequest.onsuccess = function (e) {
+        db = e.target.result;
+        resolve(db);
+      };
+
+      dbRequest.onerror = function () {
+        resolve(null);
+      };
+    });
+  }
 
   async function getBoxesFromVault(fileName) {
     return new Promise(resolve => {
