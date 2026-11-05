@@ -340,6 +340,7 @@
           <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
             <button class="quiz-pill-btn" onclick="toggleQuizSettings()">⚙️ Settings</button>
             <button class="quiz-pill-btn" onclick="openQuizFilterModal()">🎯 Filter Pool</button>
+            <button class="quiz-pill-btn" id="qzCloudSyncBtn" onclick="syncQuizWithCloud(true)" title="Sync quiz pools & progress across devices">☁️ Sync</button>
             <button class="quiz-pill-btn" onclick="openQuickPeekSearch('')">⚡ Peek Search</button>
             <button class="quiz-pill-btn" onclick="if(typeof compareList!=='undefined' && compareList.length>0){openCompareModal();}else if(typeof showToast==='function'){showToast('Compare basket is empty');}">⚖️ Compare</button>
           </div>
@@ -364,15 +365,15 @@
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; padding-top:4px; gap:10px; flex-wrap:wrap;">
             <label style="font-size:13px; font-weight:700; color:#666; display:flex; align-items:center; gap:8px; cursor:pointer;">
-              <input type="checkbox" id="qzRequireRevealToggle" checked onchange="qzRequireReveal = this.checked;">
+              <input type="checkbox" id="qzRequireRevealToggle" checked onchange="window.onQuizSettingToggle('reveal', this.checked)">
               Hide choices until "Reveal Options"
             </label>
             <label style="font-size:13px; font-weight:700; color:#666; display:flex; align-items:center; gap:8px; cursor:pointer;">
-              <input type="checkbox" id="qzShowDigestToggle" checked onchange="qzShowDigest = this.checked;">
+              <input type="checkbox" id="qzShowDigestToggle" checked onchange="window.onQuizSettingToggle('digest', this.checked)">
               Show Clinical Digest
             </label>
             <label style="font-size:13px; font-weight:700; color:#666; display:flex; align-items:center; gap:8px; cursor:pointer;">
-              <input type="checkbox" id="qzMasteryRequeueToggle" checked onchange="qzMasteryRequeue = this.checked;">
+              <input type="checkbox" id="qzMasteryRequeueToggle" checked onchange="window.onQuizSettingToggle('requeue', this.checked)">
               🔁 Re-queue missed cards in batch
             </label>
             <button class="quiz-pill-btn" style="background:#cc5500; color:#fff; margin-left:auto;" onclick="toggleQuizSettings()">Done</button>
@@ -514,6 +515,13 @@
   let qzShowDigest = true;
   let qzMasteryRequeue = true;
 
+  try {
+    const savedPrefs = JSON.parse(localStorage.getItem("tcmQuizPrefs") || "{}");
+    if (typeof savedPrefs.requireReveal === "boolean") qzRequireReveal = savedPrefs.requireReveal;
+    if (typeof savedPrefs.showDigest === "boolean") qzShowDigest = savedPrefs.showDigest;
+    if (typeof savedPrefs.masteryRequeue === "boolean") qzMasteryRequeue = savedPrefs.masteryRequeue;
+  } catch (e) {}
+
   let trackEligiblePoints = [];
   let trackFilteredPoints = [];
   let trackDistractorPoints = [];
@@ -526,12 +534,70 @@
 
   let currentTargetPoint = null;
   let currentCorrectAnswer = "";
+  let currentQuestionSubMode = "";
+  let currentPathologySubLabel = "";
+  let lastAnswerWasCorrect = false;
   let currentPickedWrongPointId = null;
   let currentContrastPointId = null;
   let currentDecoySourceNote = null;
   let currentClueQueue = [];
   let qzScore = 0;
   let qzTotalAnswered = 0;
+
+  function syncQuizSettingCheckboxes() {
+    const revEl = document.getElementById("qzRequireRevealToggle");
+    const digEl = document.getElementById("qzShowDigestToggle");
+    const reqEl = document.getElementById("qzMasteryRequeueToggle");
+    if (revEl) revEl.checked = qzRequireReveal;
+    if (digEl) digEl.checked = qzShowDigest;
+    if (reqEl) reqEl.checked = qzMasteryRequeue;
+  }
+
+  window.onQuizSettingToggle = function (settingKey, isChecked) {
+    if (settingKey === "reveal") qzRequireReveal = Boolean(isChecked);
+    else if (settingKey === "digest") qzShowDigest = Boolean(isChecked);
+    else if (settingKey === "requeue") qzMasteryRequeue = Boolean(isChecked);
+
+    try {
+      localStorage.setItem("tcmQuizPrefs", JSON.stringify({
+        requireReveal: qzRequireReveal,
+        showDigest: qzShowDigest,
+        masteryRequeue: qzMasteryRequeue
+      }));
+    } catch (e) {}
+
+    const allBtns = Array.from(document.querySelectorAll("#qzOptionsGrid .quiz-opt-btn"));
+    const isQuestionAnswered = allBtns.length > 0 && allBtns.some(b => b.disabled);
+
+    if (settingKey === "reveal" && !isQuestionAnswered && allBtns.length > 0) {
+      const optionsGrid = document.getElementById("qzOptionsGrid");
+      const revealBtn = document.getElementById("qzRevealBtn");
+      if (qzRequireReveal) {
+        if (optionsGrid) optionsGrid.style.display = "none";
+        if (revealBtn) revealBtn.style.display = "block";
+      } else {
+        if (optionsGrid) optionsGrid.style.display = "flex";
+        if (revealBtn) revealBtn.style.display = "none";
+      }
+    }
+
+    if (settingKey === "digest" && isQuestionAnswered) {
+      const digestCard = document.getElementById("qzDigestCard");
+      if (!qzShowDigest) {
+        if (digestCard) digestCard.style.display = "none";
+      } else {
+        renderPostAnswerDigest(lastAnswerWasCorrect);
+      }
+    }
+
+    if (settingKey === "requeue" && !qzMasteryRequeue) {
+      const beforeLen = remainingQuizQueue.length;
+      remainingQuizQueue = remainingQuizQueue.filter(item => !(item && item._isRequeuedWrapper));
+      if (remainingQuizQueue.length !== beforeLen) {
+        updateQuizScoreUI();
+      }
+    }
+  };
 
   // Location Blank Categories
   const locBlankCategories = {
@@ -1204,12 +1270,16 @@
   window.openQuizModal = function (track = "patterns") {
     injectQuizHubDOM();
     if (typeof closeBottomSheet === "function") closeBottomSheet();
+    pullQuizLedgerFromCloud(false);
     document.getElementById("quizModal").style.display = "flex";
     switchQuizTrack(track);
   };
 
   window.closeQuizModal = function () {
     saveQuizSessionState();
+    if (qzSyncDirty) {
+      syncQuizWithCloud(false);
+    }
     if (typeof clearCompare === "function") clearCompare();
     document.getElementById("quizModal").style.display = "none";
   };
@@ -1221,6 +1291,7 @@
   // --- 8. TRACK INITIALIZATION & DROPDOWN CONFIGURATION ---
   window.switchQuizTrack = function (track) {
     currentTrack = track;
+    pullQuizLedgerFromCloud(false);
     document.getElementById("tabQuizLocation").classList.toggle("active", track === "location");
     document.getElementById("tabQuizClinical").classList.toggle("active", track === "clinical_points");
     document.getElementById("tabQuizPatterns").classList.toggle("active", track === "patterns");
@@ -1268,6 +1339,7 @@
     initQuizFilterTree();
     initQuizDistractorTree();
     updatePoolSummaryBanner();
+    updateQuizCloudSyncBtnUI();
 
     if (!checkSavedQuizSession()) {
       retakeQuizWholePool();
@@ -1691,6 +1763,8 @@
 
   // --- 11. QUESTION GENERATORS FOR ALL 3 TRACKS ---
   window.generateNextQuizQuestion = function () {
+    syncQuizSettingCheckboxes();
+
     const nextBtn = document.getElementById("qzNextBtn");
     const bottomBar = document.getElementById("qzBottomBar");
     const inspectBar = document.getElementById("qzInspectBar");
@@ -1711,6 +1785,8 @@
     currentPickedWrongPointId = null;
     currentContrastPointId = null;
     currentDecoySourceNote = null;
+    currentQuestionSubMode = qzSubMode;
+    currentPathologySubLabel = "";
     setupClueLadder([]);
 
     const activeView = document.getElementById("qzActiveView");
@@ -1771,6 +1847,7 @@
     const bodyEl = document.getElementById("qzQuestionBody");
     let qDiff = qzDifficulty;
     let optionsData = [];
+    currentQuestionSubMode = "standard_location";
 
     if (qzSubMode === "fitb") {
       let cleanText = stripBBCode(rawText);
@@ -1782,6 +1859,7 @@
       if (allMatches.length === 0) qDiff = "standard";
 
       if (qDiff.startsWith("fitb")) {
+        currentQuestionSubMode = "fitb_location";
         let matchesToReplace = [];
         if (qDiff === "fitb1" || qDiff === "fitb3") {
           matchesToReplace.push(allMatches[Math.floor(Math.random() * allMatches.length)]);
@@ -1914,6 +1992,7 @@
     if (effectivePointMode === "point_categories_mcq") {
       const catParsed = parsePointClinicalLines(targetPoint, "categories");
       if (catParsed.lines.length > 0) {
+        currentQuestionSubMode = "point_categories_mcq";
         const chosenCat = catParsed.lines[Math.floor(Math.random() * catParsed.lines.length)];
         const askWhichPoint = Math.random() < 0.65;
 
@@ -1961,6 +2040,7 @@
     if (effectivePointMode === "needling_cautions_mcq") {
       const needlingLines = parsePointClinicalLines(targetPoint, "needling").lines;
       if (needlingLines.length > 0) {
+        currentQuestionSubMode = "needling_cautions_mcq";
         const cautionLine = needlingLines.find(l => /caution|contraindicated|avoid|pneumothorax|pregnancy|moxibustion|artery/i.test(l)) || needlingLines[0];
         labelEl.textContent = `Needling & Safety Cautions • ${stdTargetName}`;
         bodyEl.innerHTML = `
@@ -1994,6 +2074,7 @@
     if (effectivePointMode === "combinations_mcq") {
       const combParsed = parsePointClinicalLines(targetPoint, "combinations");
       if (combParsed.lines.length > 0) {
+        currentQuestionSubMode = "combinations_mcq";
         const chosenLine = combParsed.lines[Math.floor(Math.random() * combParsed.lines.length)];
         labelEl.textContent = "Point Combinations & Clinical Synergy";
         bodyEl.innerHTML = `
@@ -2029,6 +2110,7 @@
       const matches = [...cleanSample.matchAll(termRx)];
 
       if (matches.length > 0) {
+        currentQuestionSubMode = "fitb_clinical";
         const pickCount = (qzDifficulty === "fitb2" || qzDifficulty === "fitb4") ? Math.min(3, matches.length) : 1;
         const uniqueWordMatches = [];
         const seenLower = new Set();
@@ -2097,6 +2179,7 @@
       }
 
       if (decoyLine && decoyPoint) {
+        currentQuestionSubMode = fieldMode === "actions" ? "actions_mcq" : (fieldMode === "indications" ? "indications_mcq" : "except_mcq");
         const stdDecoyName = standardizeTCMTerminology(decoyPoint["Short Name"]);
         currentContrastPointId = decoyPoint["Short Name"];
         currentDecoySourceNote = `That action/indication actually belongs to <b>${escapeHTML(stdDecoyName)}</b>.`;
@@ -2125,6 +2208,8 @@
     }
 
     // 6. STANDARD CLINICAL VIGNETTE ➔ POINT OR POINT ➔ ACTION/INDICATION
+    currentQuestionSubMode = fieldMode === "actions" ? "actions_mcq" : (fieldMode === "indications" ? "indications_mcq" : "both_mcq");
+
     let visibleCount = lines.length;
     if (qzDifficulty === "medium") visibleCount = Math.min(3, Math.max(2, Math.ceil(lines.length / 2)));
     else if (qzDifficulty === "hard") visibleCount = Math.min(2, lines.length);
@@ -2226,6 +2311,7 @@
       effectiveMode = filteredCandidates[Math.floor(Math.random() * filteredCandidates.length)];
     }
     lastUsedSubModeByCard[cardId] = effectiveMode;
+    currentQuestionSubMode = effectiveMode;
 
     // SUB-MODE 1: PATTERN DIAGNOSTIC FILL-IN-THE-BLANK (Global Replacement so Pulse never spoils Key Symptoms!)
     if (effectiveMode === "fitb_pattern") {
@@ -2247,6 +2333,7 @@
 
       const matches = [...sourceBlock.matchAll(rx)];
       if (matches.length > 0) {
+        currentQuestionSubMode = "fitb_pattern";
         const pickCount = (qzDifficulty === "fitb2" || qzDifficulty === "fitb4") ? Math.min(3, matches.length) : 1;
         const uniqueMatches = [];
         const seenLower = new Set();
@@ -2300,6 +2387,7 @@
 
     // SUB-MODE 2: CARDINAL TRIAD (Key Symptoms ⇄ Pattern, with Tongue/Pulse spoiler protection)
     if (effectiveMode === "cardinal_triad" && parsed.keyRaw) {
+      currentQuestionSubMode = "cardinal_triad";
       const askForKey = Math.random() < 0.55;
       if (askForKey) {
         labelEl.textContent = "Cardinal Triad • Identify Key Symptoms";
@@ -2359,6 +2447,7 @@
 
     // SUB-MODE 3: POINT PRESCRIPTION RATIONALES & MODIFICATIONS (Supports Single & Multi-Point Explanations)
     if (effectiveMode === "rx_rationale" && parsed.rxExplanations.length > 0) {
+      currentQuestionSubMode = "rx_rationale";
       const expItem = parsed.rxExplanations[Math.floor(Math.random() * parsed.rxExplanations.length)];
       const askWhichPoint = parsed.rxExplanations.length >= 2 && Math.random() < 0.65;
 
@@ -2442,7 +2531,8 @@
 
     // SUB-MODE 4: TREATMENT PRINCIPLE, NEEDLING METHOD/MOXA & POINT FORMULA
     if (effectiveMode === "tx_prescription" && (parsed.txPrinciple || parsed.rxPointsLine || parsed.rxMethodLine)) {
-      // Variant A: Needling Method / Moxa / Reinforcing-vs-Reducing Exception Question (if rxMethodLine has specific method/moxa details)
+      currentQuestionSubMode = "tx_prescription";
+      // Variant A: Needling Method / Moxa / Reinforcing-vs-Reducing Exception Question
       if (parsed.rxMethodLine && parsed.rxMethodLine.length > 18 && Math.random() < 0.35) {
         labelEl.textContent = `Needling Method & Moxa Rule • ${targetPattern["Short Name"]}`;
         let html = `<div style="font-size:19px; font-weight:900; color:#cc5500; margin-bottom:6px;">${escapeHTML(targetPattern["Short Name"])}</div>`;
@@ -2573,7 +2663,9 @@
       if (parsed.analysisLines.length > 0) chainBlocks.push({ key: "analysisLines", label: "Pathology & Description", lines: parsed.analysisLines });
 
       if (chainBlocks.length > 0) {
+        currentQuestionSubMode = "pathology_chain";
         const chosen = chainBlocks[Math.floor(Math.random() * chainBlocks.length)];
+        currentPathologySubLabel = chosen.label;
         const chosenLine = chosen.lines[Math.floor(Math.random() * chosen.lines.length)];
         const askForwardFromPattern = Math.random() < 0.55;
 
@@ -2650,6 +2742,7 @@
 
       const targetTP = formatTP(targetPattern);
       if (targetTP) {
+        currentQuestionSubMode = "tongue_pulse";
         if (Math.random() < 0.65) {
           labelEl.textContent = "Tongue & Pulse Differentiation";
           const keyPreview = parsed.keySymptomsNoTP.slice(0, 3).join(", ");
@@ -2709,6 +2802,7 @@
 
       const sibUnique = sibParsed.symptoms.filter(s => !hasSymptomOverlap(s, parsed.symptoms, "any"));
       if (parsed.symptoms.length >= 3 && sibUnique.length > 0 && Math.random() < 0.5) {
+        currentQuestionSubMode = "differential";
         const decoySym = sibUnique[Math.floor(Math.random() * sibUnique.length)];
         currentContrastPointId = sibling["Short Name"];
         currentDecoySourceNote = `"${escapeHTML(decoySym)}" belongs to <b>${escapeHTML(sibling["Short Name"])}</b>, not ${escapeHTML(targetPattern["Short Name"])}.`;
@@ -2736,6 +2830,7 @@
       const sharedWithSibling = parsed.symptoms.filter(s => hasSymptomOverlap(s, sibParsed.symptoms, "any"));
 
       if (uniqueToTarget.length > 0) {
+        currentQuestionSubMode = "differential";
         const chosenUnique = uniqueToTarget[Math.floor(Math.random() * uniqueToTarget.length)];
         currentContrastPointId = sibling["Short Name"];
         labelEl.textContent = "Sibling Pattern Differential Diagnosis";
@@ -2772,6 +2867,7 @@
     }
 
     // SUB-MODE 8 (DEFAULT): PROGRESSIVE CLINICAL VIGNETTE ➔ IDENTIFY THE PATTERN (+Clue Ladder)
+    currentQuestionSubMode = "vignette";
     labelEl.textContent = "Identify the Pattern from Clinical Manifestations";
     let html = "";
     const clueQueue = [];
@@ -2863,17 +2959,22 @@
     const pickedVal = (selectedBtn.dataset.compare || "").trim().toLowerCase();
     const targetVal = String(currentCorrectAnswer || "").trim().toLowerCase();
     const isCorrect = pickedVal === targetVal;
+    lastAnswerWasCorrect = isCorrect;
     const cardId = currentTargetPoint ? currentTargetPoint["Short Name"] : "";
 
     if (isCorrect) {
       selectedBtn.classList.add("correct");
       qzScore++;
-      // Only mark card as "seen" in the cycle when answered correctly without failing first, OR after passing its retry!
-      if (currentTargetPoint && document.getElementById("qzLimitSelect")?.value !== "all") {
+      // Only graduate a card to "Seen" when answered correctly on the FIRST cold attempt of a batch
+      if (currentTargetPoint && !currentIsRequeuedTry && document.getElementById("qzLimitSelect")?.value !== "all") {
         try {
-          const seenSet = new Set(JSON.parse(localStorage.getItem(getSeenKey()) || "[]"));
+          const sKey = getSeenKey();
+          const seenSet = new Set(JSON.parse(localStorage.getItem(sKey) || "[]"));
           seenSet.add(cardId);
-          localStorage.setItem(getSeenKey(), JSON.stringify([...seenSet]));
+          localStorage.setItem(sKey, JSON.stringify([...seenSet]));
+          if (!localStorage.getItem(sKey + "_resetAt")) {
+            localStorage.setItem(sKey + "_resetAt", String(Date.now()));
+          }
         } catch (e) {}
       }
     } else {
@@ -2895,9 +2996,9 @@
         });
       }
 
-      // Intra-Batch Mastery Loop: Re-insert missed card 3–4 questions back in the queue (up to 2 retries per batch)
+      // Intra-Batch Mastery Loop: Re-insert missed card 3 questions back until answered right (up to 5 retries)
       const prevRetries = requeuedCardCounts[cardId] || 0;
-      if (qzMasteryRequeue && currentTargetPoint && prevRetries < 2) {
+      if (qzMasteryRequeue && currentTargetPoint && prevRetries < 5) {
         requeuedCardCounts[cardId] = prevRetries + 1;
         const insertIndex = Math.max(0, remainingQuizQueue.length - 3);
         remainingQuizQueue.splice(insertIndex, 0, {
@@ -2907,6 +3008,8 @@
       }
     }
 
+    markQuizLedgerDirty();
+    saveQuizSessionState();
     updateQuizScoreUI();
     renderPostAnswerDigest(isCorrect);
     renderPostAnswerInspectionBar();
@@ -2924,10 +3027,14 @@
     }
   }
 
-  // Renders an immediate Clinical Anchor & Differential Comparison Card right beneath the options
+  // Renders an immediate Clinical Anchor & Differential Comparison Card tailored to the active sub-group
   function renderPostAnswerDigest(isCorrect) {
     const card = document.getElementById("qzDigestCard");
-    if (!card || !qzShowDigest || !currentTargetPoint) return;
+    if (!card) return;
+    if (!qzShowDigest || !currentTargetPoint) {
+      card.style.display = "none";
+      return;
+    }
 
     card.className = "quiz-digest-card" + (isCorrect ? "" : " missed");
     let html = "";
@@ -2940,40 +3047,86 @@
       ? currentPickedWrongPointId
       : (currentContrastPointId && currentContrastPointId !== currentTargetPoint["Short Name"] ? currentContrastPointId : null);
     const otherPoint = otherId ? (typeof points !== "undefined" ? points.find(p => p["Short Name"] === otherId) : null) : null;
+    const activeMode = currentQuestionSubMode || qzSubMode;
 
     if (currentTrack === "patterns") {
-      const buildPatternAnchorHtml = (pObj, badgeHtml, includeDeepNotes = false) => {
+      const buildPatternAnchorHtml = (pObj, badgeHtml) => {
         const pr = parseManifestationRecord(pObj);
         let box = `<div style="font-weight:800; font-size:14.5px; color:#cc5500; margin-bottom:4px;">${badgeHtml} ${escapeHTML(pObj["Short Name"])}</div>`;
-        if (pr.keyRaw) box += `<div><b>Key Signs:</b> ${escapeHTML(pr.keyRaw)}</div>`;
-        else if (pr.symptoms.length > 0) box += `<div><b>Signs:</b> ${escapeHTML(pr.symptoms.slice(0, 3).join("; "))}</div>`;
-        if (pr.tongue) box += `<div><b>Tongue:</b> ${escapeHTML(pr.tongue)}</div>`;
-        if (pr.pulse) box += `<div><b>Pulse:</b> ${escapeHTML(pr.pulse)}</div>`;
-        if (pr.txPrinciple) box += `<div style="margin-top:3px; color:#007aff;"><b>Tx Principle:</b> ${escapeHTML(pr.txPrinciple)}</div>`;
-        if (pr.rxPointsLine) {
-          box += `<div><b>Prescription:</b> ${escapeHTML(pr.rxPointsLine)}${pr.rxMethodLine ? ` <i>(${escapeHTML(pr.rxMethodLine)})</i>` : ""}</div>`;
-        } else if (pr.pointCodes.length > 0) {
-          box += `<div><b>Points:</b> ${escapeHTML(pr.pointCodes.slice(0, 8).join(", "))}</div>`;
+
+        const keyBlock = pr.keyRaw
+          ? `<div><b>Key Signs:</b> ${escapeHTML(pr.keyRaw)}</div>`
+          : (pr.symptoms.length > 0 ? `<div><b>Signs:</b> ${escapeHTML(pr.symptoms.slice(0, 3).join("; "))}</div>` : "");
+        const allSymsBlock = pr.symptoms.length > 0
+          ? `<div><b>Manifestations:</b> ${escapeHTML(pr.symptoms.slice(0, 5).join("; "))}</div>`
+          : "";
+        const tpBlock = (pr.tongue || pr.pulse)
+          ? `${pr.tongue ? `<div><b>Tongue:</b> ${escapeHTML(pr.tongue)}</div>` : ""}${pr.pulse ? `<div><b>Pulse:</b> ${escapeHTML(pr.pulse)}</div>` : ""}`
+          : "";
+        const txBlock = pr.txPrinciple
+          ? `<div style="color:#007aff;"><b>Tx Principle:</b> ${escapeHTML(pr.txPrinciple)}</div>`
+          : "";
+        const rxBlock = pr.rxPointsLine
+          ? `<div><b>Prescription:</b> ${escapeHTML(pr.rxPointsLine)}${pr.rxMethodLine ? ` <i>(${escapeHTML(pr.rxMethodLine)})</i>` : ""}</div>`
+          : (pr.pointCodes.length > 0 ? `<div><b>Points:</b> ${escapeHTML(pr.pointCodes.slice(0, 8).join(", "))}</div>` : "");
+        const rxExpBlock = pr.rxExplanations.length > 0
+          ? `<div><b>Point Rationales:</b><br>${pr.rxExplanations.map(e => `• <b>${escapeHTML(e.pointLabel)}:</b> ${escapeHTML(e.explanation)}`).join("<br>")}</div>`
+          : "";
+
+        const pathItems = [];
+        if (pr.aetiologyLines.length > 0) pathItems.push({ label: "Aetiology", html: `<div><b>Aetiology:</b> ${escapeHTML(pr.aetiologyLines.slice(0, 2).join(" • "))}</div>` });
+        if (pr.mechanismSentences.length > 0) pathItems.push({ label: "Pathological Mechanism", html: `<div><b>Mechanism:</b> ${escapeHTML(pr.mechanismSentences.slice(0, 2).join(" • "))}</div>` });
+        else if (pr.analysisLines.length > 0) pathItems.push({ label: "Pathology & Description", html: `<div><b>Pathology:</b> ${escapeHTML(pr.analysisLines.slice(0, 2).join(" • "))}</div>` });
+        if (pr.precursorLines.length > 0) pathItems.push({ label: "Precursors of Pattern", html: `<div><b>Precursors:</b> ${escapeHTML(pr.precursorLines.join(" • "))}</div>` });
+        if (pr.developmentLines.length > 0) pathItems.push({ label: "Developments From Pattern", html: `<div><b>Developments:</b> ${escapeHTML(pr.developmentLines.join(" • "))}</div>` });
+        if (currentPathologySubLabel) {
+          pathItems.sort((a, b) => (a.label === currentPathologySubLabel ? -1 : (b.label === currentPathologySubLabel ? 1 : 0)));
+        }
+        const pathBlock = pathItems.map(x => x.html).join("");
+
+        let primaryParts = [];
+        let extraParts = [];
+        let summaryLabel = "Expand Other Pattern Info";
+
+        if (activeMode === "tongue_pulse") {
+          primaryParts.push(tpBlock || keyBlock);
+          if (keyBlock && tpBlock) primaryParts.push(keyBlock);
+          extraParts.push(allSymsBlock, txBlock, rxBlock, rxExpBlock, pathBlock);
+          summaryLabel = "Expand Manifestations, Tx Principle & Point Rx";
+        } else if (activeMode === "tx_prescription") {
+          primaryParts.push(txBlock, rxBlock);
+          if (pr.rxMethodLine && !rxBlock.includes(pr.rxMethodLine)) {
+            primaryParts.push(`<div><b>Method:</b> ${escapeHTML(pr.rxMethodLine)}</div>`);
+          }
+          extraParts.push(rxExpBlock, keyBlock || allSymsBlock, tpBlock, pathBlock);
+          summaryLabel = "Expand Point Rationales, Manifestations & Pathology";
+        } else if (activeMode === "rx_rationale") {
+          primaryParts.push(rxBlock, rxExpBlock);
+          extraParts.push(txBlock, keyBlock || allSymsBlock, tpBlock, pathBlock);
+          summaryLabel = "Expand Tx Principle, Manifestations & Pathology";
+        } else if (activeMode === "pathology_chain") {
+          primaryParts.push(pathBlock || keyBlock);
+          extraParts.push(keyBlock || allSymsBlock, tpBlock, txBlock, rxBlock, rxExpBlock);
+          summaryLabel = "Expand Manifestations, Tongue/Pulse & Point Rx";
+        } else if (activeMode === "cardinal_triad") {
+          primaryParts.push(keyBlock || allSymsBlock, tpBlock);
+          extraParts.push(allSymsBlock !== keyBlock ? allSymsBlock : "", txBlock, rxBlock, rxExpBlock, pathBlock);
+          summaryLabel = "Expand Full Manifestations, Tx Principle & Point Rx";
+        } else {
+          // vignette, differential, fitb_pattern
+          primaryParts.push(keyBlock || allSymsBlock);
+          if (allSymsBlock && keyBlock) primaryParts.push(allSymsBlock);
+          primaryParts.push(tpBlock);
+          extraParts.push(txBlock, rxBlock, rxExpBlock, pathBlock);
+          summaryLabel = "Expand Tx Principle, Point Rx & Pathology";
         }
 
-        if (includeDeepNotes) {
-          const deepParts = [];
-          if (pr.aetiologyLines.length > 0) {
-            deepParts.push(`<div><b>Aetiology:</b> ${escapeHTML(pr.aetiologyLines.slice(0, 2).join(" • "))}</div>`);
-          }
-          if (pr.precursorLines.length > 0) {
-            deepParts.push(`<div><b>Precursors:</b> ${escapeHTML(pr.precursorLines.join(" • "))}</div>`);
-          }
-          if (pr.developmentLines.length > 0) {
-            deepParts.push(`<div><b>Developments:</b> ${escapeHTML(pr.developmentLines.join(" • "))}</div>`);
-          }
-          if (pr.rxExplanations.length > 0) {
-            const expList = pr.rxExplanations.map(e => `• <b>${escapeHTML(e.pointLabel)}:</b> ${escapeHTML(e.explanation)}`).join("<br>");
-            deepParts.push(`<div style="margin-top:4px;"><b>Point Explanations:</b><br>${expList}</div>`);
-          }
-          if (deepParts.length > 0) {
-            box += `<details class="quiz-digest-details" ${!isCorrect ? "open" : ""}><summary>Pathology, Evolution & Point Rationales</summary><div style="margin-top:6px; display:flex; flex-direction:column; gap:4px;">${deepParts.join("")}</div></details>`;
-          }
+        const cleanPrimary = primaryParts.filter(Boolean);
+        const cleanExtra = extraParts.filter(Boolean);
+
+        box += cleanPrimary.join("");
+        if (cleanExtra.length > 0) {
+          box += `<details class="quiz-digest-details"><summary>${summaryLabel}</summary><div style="margin-top:6px; display:flex; flex-direction:column; gap:4px;">${cleanExtra.join("")}</div></details>`;
         }
         return box;
       };
@@ -2982,20 +3135,84 @@
         const otherBadge = (!isCorrect && currentPickedWrongPointId === otherId) ? "❌ Your Pick:" : "⚖️ Sibling Contrast:";
         html += `
           <div class="quiz-diff-grid">
-            <div class="quiz-diff-col">${buildPatternAnchorHtml(currentTargetPoint, "✅ Target:", true)}</div>
-            <div class="quiz-diff-col">${buildPatternAnchorHtml(otherPoint, otherBadge, false)}</div>
+            <div class="quiz-diff-col">${buildPatternAnchorHtml(currentTargetPoint, "✅ Target:")}</div>
+            <div class="quiz-diff-col">${buildPatternAnchorHtml(otherPoint, otherBadge)}</div>
           </div>
         `;
       } else {
-        html += buildPatternAnchorHtml(currentTargetPoint, "☯️ Pattern Anchor:", true);
+        html += buildPatternAnchorHtml(currentTargetPoint, "☯️ Pattern Anchor:");
       }
     } else if (currentTrack === "clinical_points") {
       const buildPointAnchorHtml = (pObj, badgeHtml) => {
-        const act = parsePointClinicalLines(pObj, "actions").lines.slice(0, 3).join("; ");
-        const ind = parsePointClinicalLines(pObj, "indications").lines.slice(0, 3).join("; ");
-        let box = `<div style="font-weight:800; font-size:14.5px; color:#cc5500; margin-bottom:4px;">${badgeHtml} ${escapeHTML(pObj["Short Name"])}</div>`;
-        if (act) box += `<div><b>Actions:</b> ${bbcodeToHtml(act)}</div>`;
-        if (ind) box += `<div><b>Indications:</b> ${bbcodeToHtml(ind)}</div>`;
+        const stdName = standardizeTCMTerminology(pObj["Short Name"]);
+        const catLines = parsePointClinicalLines(pObj, "categories").lines;
+        const fullNameRaw = standardizeTCMTerminology(pObj["Full Name"] || pObj[" Full Name"] || "").trim();
+        const actLines = parsePointClinicalLines(pObj, "actions").lines;
+        const indLines = parsePointClinicalLines(pObj, "indications").lines;
+        const combLines = parsePointClinicalLines(pObj, "combinations").lines;
+        const needlingLines = parsePointClinicalLines(pObj, "needling").lines;
+        const summaryLines = cleanSectionLines(pObj["Summary of clinical application"] || "");
+
+        const catBlock = catLines.length > 0
+          ? `<div><b>Point Categories:</b> ${escapeHTML(catLines.join(" • "))}</div>`
+          : (activeMode === "point_categories_mcq"
+              ? `<div><b>Point Categories:</b> <i>No special category listed</i>${fullNameRaw ? ` (${escapeHTML(fullNameRaw.split(/\n/)[0])})` : ""}</div>`
+              : "");
+        const actBlock = actLines.length > 0
+          ? `<div><b>Actions:</b> ${bbcodeToHtml(actLines.slice(0, 4).join("; "))}</div>`
+          : "";
+        const indBlock = indLines.length > 0
+          ? `<div><b>Indications:</b> ${bbcodeToHtml(indLines.slice(0, 4).join("; "))}</div>`
+          : "";
+        const sumBlock = summaryLines.length > 0
+          ? `<div><b>Clinical Summary:</b> ${bbcodeToHtml(summaryLines.slice(0, 2).join("; "))}</div>`
+          : "";
+        const combBlock = combLines.length > 0
+          ? `<div><b>Combinations:</b><br>${combLines.slice(0, 4).map(c => `• ${bbcodeToHtml(c)}`).join("<br>")}</div>`
+          : (activeMode === "combinations_mcq" ? `<div><b>Combinations:</b> <i>None listed</i></div>` : "");
+        const needlingBlock = needlingLines.length > 0
+          ? `<div><b>Needling & Cautions:</b> ${bbcodeToHtml(needlingLines.slice(0, 3).join(" • "))}</div>`
+          : "";
+
+        let primaryParts = [];
+        let extraParts = [];
+        let summaryLabel = "Expand Other Point Info";
+
+        if (activeMode === "point_categories_mcq") {
+          primaryParts.push(catBlock);
+          extraParts.push(actBlock, indBlock, sumBlock, combBlock, needlingBlock);
+          summaryLabel = "Expand Actions, Indications & Combos";
+        } else if (activeMode === "actions_mcq") {
+          primaryParts.push(actBlock || indBlock);
+          extraParts.push(catBlock, indBlock, sumBlock, combBlock, needlingBlock);
+          summaryLabel = "Expand Categories, Indications & Combos";
+        } else if (activeMode === "indications_mcq") {
+          primaryParts.push(indBlock || actBlock, sumBlock);
+          extraParts.push(catBlock, actBlock, combBlock, needlingBlock);
+          summaryLabel = "Expand Categories, Actions & Combos";
+        } else if (activeMode === "combinations_mcq") {
+          primaryParts.push(combBlock);
+          extraParts.push(catBlock, actBlock, indBlock, needlingBlock);
+          summaryLabel = "Expand Categories, Actions & Indications";
+        } else if (activeMode === "needling_cautions_mcq") {
+          primaryParts.push(needlingBlock || actBlock);
+          extraParts.push(catBlock, actBlock, indBlock, combBlock);
+          summaryLabel = "Expand Categories, Actions & Indications";
+        } else {
+          // both_mcq, except_mcq, fitb_clinical
+          primaryParts.push(actBlock, indBlock);
+          extraParts.push(catBlock, sumBlock, combBlock, needlingBlock);
+          summaryLabel = "Expand Categories, Combinations & Needling";
+        }
+
+        const cleanPrimary = primaryParts.filter(Boolean);
+        const cleanExtra = extraParts.filter(Boolean);
+
+        let box = `<div style="font-weight:800; font-size:14.5px; color:#cc5500; margin-bottom:4px;">${badgeHtml} ${escapeHTML(stdName)}</div>`;
+        box += cleanPrimary.join("");
+        if (cleanExtra.length > 0) {
+          box += `<details class="quiz-digest-details"><summary>${summaryLabel}</summary><div style="margin-top:6px; display:flex; flex-direction:column; gap:4px;">${cleanExtra.join("")}</div></details>`;
+        }
         return box;
       };
 
@@ -3011,8 +3228,39 @@
         html += buildPointAnchorHtml(currentTargetPoint, "⚡ Clinical Summary:");
       }
     } else {
-      const loc = currentTargetPoint["Location "] || currentTargetPoint["Location"] || "";
-      html += `<div><strong style="color:#cc5500;">📍 ${escapeHTML(currentTargetPoint["Short Name"])}:</strong> ${bbcodeToHtml(loc)}</div>`;
+      const buildLocationAnchorHtml = (pObj, badgeHtml) => {
+        const loc = pObj["Location "] || pObj["Location"] || "";
+        const locNotes = cleanSectionLines(pObj["Location Notes"] || "");
+        const needlingLines = parsePointClinicalLines(pObj, "needling").lines;
+        const catLines = parsePointClinicalLines(pObj, "categories").lines;
+        const actLines = parsePointClinicalLines(pObj, "actions").lines;
+
+        let box = `<div style="font-weight:800; font-size:14.5px; color:#cc5500; margin-bottom:4px;">${badgeHtml} ${escapeHTML(pObj["Short Name"])}</div>`;
+        box += `<div><b>Location:</b> ${bbcodeToHtml(loc)}</div>`;
+
+        const extraParts = [];
+        if (locNotes.length > 0) extraParts.push(`<div><b>Location Notes:</b> ${bbcodeToHtml(locNotes.join(" • "))}</div>`);
+        if (needlingLines.length > 0) extraParts.push(`<div><b>Needling:</b> ${bbcodeToHtml(needlingLines.slice(0, 2).join(" • "))}</div>`);
+        if (catLines.length > 0) extraParts.push(`<div><b>Categories:</b> ${escapeHTML(catLines.join(" • "))}</div>`);
+        if (actLines.length > 0) extraParts.push(`<div><b>Actions:</b> ${bbcodeToHtml(actLines.slice(0, 3).join("; "))}</div>`);
+
+        if (extraParts.length > 0) {
+          box += `<details class="quiz-digest-details"><summary>Expand Location Notes, Needling & Actions</summary><div style="margin-top:6px; display:flex; flex-direction:column; gap:4px;">${extraParts.join("")}</div></details>`;
+        }
+        return box;
+      };
+
+      if (otherPoint) {
+        const otherBadge = (!isCorrect && currentPickedWrongPointId === otherId) ? "❌ Your Pick:" : "⚖️ Contrast:";
+        html += `
+          <div class="quiz-diff-grid">
+            <div class="quiz-diff-col">${buildLocationAnchorHtml(currentTargetPoint, "✅ Target:")}</div>
+            <div class="quiz-diff-col">${buildLocationAnchorHtml(otherPoint, otherBadge)}</div>
+          </div>
+        `;
+      } else {
+        html += buildLocationAnchorHtml(currentTargetPoint, "📍 Location Anchor:");
+      }
     }
 
     if (html) {
@@ -3058,7 +3306,19 @@
       html += `<button class="quiz-pill-btn" style="background:#cc5500; color:#fff;" onclick="compareQuizItems(['${safeTarget}', '${safeWrong}'])">⚖️ Compare Both</button>`;
     }
 
-    const srsSec = currentTrack === "patterns" ? "Clinical Manifestations" : (currentTrack === "clinical_points" ? "Actions" : "Location");
+    const activeMode = currentQuestionSubMode || qzSubMode;
+    let srsSec = "Location";
+    if (currentTrack === "patterns") {
+      if (activeMode === "tx_prescription" && currentTargetPoint["Treatment Principle"]) srsSec = "Treatment Principle";
+      else if (activeMode === "rx_rationale" && currentTargetPoint["Point Prescription"]) srsSec = "Point Prescription";
+      else if (activeMode === "pathology_chain" && currentTargetPoint["Aetiology"]) srsSec = "Aetiology";
+      else srsSec = "Clinical Manifestations";
+    } else if (currentTrack === "clinical_points") {
+      if (activeMode === "indications_mcq" && currentTargetPoint["Indications"]) srsSec = "Indications";
+      else if (activeMode === "combinations_mcq" && currentTargetPoint["Combinations"]) srsSec = "Combinations";
+      else if (activeMode === "needling_cautions_mcq" && currentTargetPoint["Needling"]) srsSec = "Needling";
+      else srsSec = "Actions";
+    }
     html += `<button class="quiz-pill-btn" style="margin-left:auto; background:#34c759; color:#fff;" onclick="enrollQuizCardInSRS('${safeTarget}', '${srsSec}')">🧠 +SRS (${srsSec})</button>`;
 
     bar.innerHTML = html;
@@ -3074,7 +3334,8 @@
       pendingSRSUpdates.push({ cardId: cardId, rating: "swipe-wrong" });
       if (typeof saveSRSQueueLocal === "function") saveSRSQueueLocal();
       if (typeof updateStudySyncBadge === "function") updateStudySyncBadge();
-      if (typeof showToast === "function") showToast(`🧠 Added ${pointId} (${sectionLabel}) to SRS Queue`);
+      markQuizLedgerDirty();
+      if (typeof showToast === "function") showToast(`🧠 Added ${pointId} (${sectionLabel}) to SRS Queue (Tap ☁️ Sync to save to Sheet)`);
     }
   };
 
@@ -3092,9 +3353,243 @@
     document.getElementById("quizTopScore").textContent = `${qzScore}/${qzTotalAnswered} • ${pct}% (${remainingQuizQueue.length} left)`;
   }
 
-  // --- 13. POOL MANAGEMENT, RETAKE MISSED & SUMMARY ---
-  function getSeenKey() { return `tcmSeen_${currentTrack}`; }
+  // --- 13. POOL MANAGEMENT, CLOUD SYNC, RETAKE MISSED & SUMMARY ---
+  let qzSyncDirty = false;
+  let qzIsCloudSyncing = false;
+  const QUIZ_TRACK_ORDER = ["location", "clinical_points", "patterns"];
+
+  function getSeenKey() { return `tcmSeen_${currentTrack}_${qzSubMode}`; }
   function getStateKey() { return `tcmQuizState_${currentTrack}`; }
+
+  // Shards the 3 quiz tracks across the first 3 rows (points[0], points[1], points[2])
+  // so no single cell ever exceeds ~5 KB (well under Google Sheets' 50,000-char limit).
+  function getQuizSyncAnchorPoint(trackName = currentTrack) {
+    if (typeof points === "undefined" || !Array.isArray(points) || points.length === 0) return null;
+    const idx = Math.max(0, QUIZ_TRACK_ORDER.indexOf(trackName));
+    return points[Math.min(idx, points.length - 1)];
+  }
+
+  function updateQuizCloudSyncBtnUI() {
+    const btn = document.getElementById("qzCloudSyncBtn");
+    if (!btn) return;
+    const hasPendingSRS = typeof pendingSRSUpdates !== "undefined" && pendingSRSUpdates.length > 0;
+    if (qzIsCloudSyncing) {
+      btn.textContent = "⏳ Syncing...";
+      btn.style.background = "#e3e3e8";
+      btn.style.color = "#8e8e93";
+    } else if (qzSyncDirty || hasPendingSRS) {
+      btn.textContent = "☁️ Sync ●";
+      btn.style.background = "#ff9f0a";
+      btn.style.color = "#ffffff";
+    } else {
+      btn.textContent = "☁️ Sync";
+      btn.style.background = "";
+      btn.style.color = "";
+    }
+  }
+
+  function markQuizLedgerDirty() {
+    qzSyncDirty = true;
+    localStorage.setItem("tcmQuizLocalUpdatedAt", String(Date.now()));
+    updateQuizCloudSyncBtnUI();
+  }
+
+  function clearSeenPoolForCurrentMode() {
+    const sKey = getSeenKey();
+    localStorage.setItem(sKey, "[]");
+    localStorage.setItem(sKey + "_resetAt", String(Date.now()));
+    markQuizLedgerDirty();
+  }
+
+  function buildTrackQuizLedgerPayload(trackName) {
+    const prefix = `tcmSeen_${trackName}_`;
+    const seenMap = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix) && !k.endsWith("_resetAt")) {
+        try {
+          const ids = JSON.parse(localStorage.getItem(k) || "[]");
+          const resetAt = Number(localStorage.getItem(k + "_resetAt") || 0);
+          if (Array.isArray(ids) && (ids.length > 0 || resetAt > 0)) {
+            seenMap[k] = { ids, resetAt };
+          }
+        } catch (e) {}
+      }
+    }
+
+    const sKey = `tcmQuizState_${trackName}`;
+    const raw = localStorage.getItem(sKey);
+    const clearedAt = Number(localStorage.getItem(sKey + "_clearedAt") || 0);
+    let sessionObj = null;
+
+    if (raw) {
+      try {
+        sessionObj = JSON.parse(raw);
+      } catch (e) {}
+    } else if (clearedAt > 0) {
+      sessionObj = { cleared: true, updatedAt: clearedAt };
+    }
+
+    return {
+      track: trackName,
+      updatedAt: Number(localStorage.getItem("tcmQuizLocalUpdatedAt") || Date.now()),
+      prefs: {
+        requireReveal: qzRequireReveal,
+        showDigest: qzShowDigest,
+        masteryRequeue: qzMasteryRequeue
+      },
+      seen: seenMap,
+      session: sessionObj
+    };
+  }
+
+  function pullQuizLedgerFromCloud(forceRefreshUI = false) {
+    if (typeof points === "undefined" || !Array.isArray(points) || points.length === 0) return false;
+    let changed = false;
+
+    QUIZ_TRACK_ORDER.forEach(trk => {
+      const anchor = getQuizSyncAnchorPoint(trk);
+      if (!anchor || !anchor["SRS Data"]) return;
+
+      let srsObj = {};
+      try { srsObj = JSON.parse(anchor["SRS Data"] || "{}"); } catch (e) { return; }
+      const cloud = srsObj["__quiz_sync__"];
+      if (!cloud || typeof cloud !== "object") return;
+
+      // 1. Merge Seen Pools for this Track (respecting pool cycle resets)
+      if (cloud.seen && typeof cloud.seen === "object") {
+        Object.keys(cloud.seen).forEach(sKey => {
+          const cEntry = cloud.seen[sKey];
+          if (!cEntry || !Array.isArray(cEntry.ids)) return;
+          const cReset = Number(cEntry.resetAt || 0);
+          const lReset = Number(localStorage.getItem(sKey + "_resetAt") || 0);
+          let lIds = [];
+          try { lIds = JSON.parse(localStorage.getItem(sKey) || "[]"); } catch (e) {}
+
+          if (cReset > lReset) {
+            localStorage.setItem(sKey, JSON.stringify(cEntry.ids));
+            localStorage.setItem(sKey + "_resetAt", String(cReset));
+            changed = true;
+          } else if (cReset === lReset) {
+            const merged = [...new Set([...lIds, ...cEntry.ids])];
+            if (merged.length !== lIds.length) {
+              localStorage.setItem(sKey, JSON.stringify(merged));
+              changed = true;
+            }
+          }
+        });
+      }
+
+      // 2. Sync Active / Paused Session for this Track (supports both sharded .session and legacy .sessions)
+      const cSess = cloud.session || (cloud.sessions && cloud.sessions[trk]);
+      if (cSess) {
+        const sKey = `tcmQuizState_${trk}`;
+        const lCleared = Number(localStorage.getItem(sKey + "_clearedAt") || 0);
+        let lSess = null;
+        try {
+          const raw = localStorage.getItem(sKey);
+          if (raw) lSess = JSON.parse(raw);
+        } catch (e) {}
+        const lTime = Math.max(Number(lSess?.updatedAt || 0), lCleared);
+        const cTime = Number(cSess.updatedAt || cloud.updatedAt || 0);
+
+        if (cTime > lTime) {
+          if (cSess.cleared) {
+            localStorage.removeItem(sKey);
+            localStorage.setItem(sKey + "_clearedAt", String(cTime));
+          } else {
+            localStorage.setItem(sKey, JSON.stringify(cSess));
+          }
+          changed = true;
+        }
+      }
+
+      // 3. Sync Checkbox Preferences if Cloud is Newer
+      const localUpd = Number(localStorage.getItem("tcmQuizLocalUpdatedAt") || 0);
+      if (cloud.prefs && Number(cloud.updatedAt || 0) > localUpd) {
+        if (typeof cloud.prefs.requireReveal === "boolean") qzRequireReveal = cloud.prefs.requireReveal;
+        if (typeof cloud.prefs.showDigest === "boolean") qzShowDigest = cloud.prefs.showDigest;
+        if (typeof cloud.prefs.masteryRequeue === "boolean") qzMasteryRequeue = cloud.prefs.masteryRequeue;
+        localStorage.setItem("tcmQuizPrefs", JSON.stringify(cloud.prefs));
+        syncQuizSettingCheckboxes();
+        changed = true;
+      }
+    });
+
+    if (changed && forceRefreshUI) {
+      updatePoolSummaryBanner();
+    }
+    return changed;
+  }
+
+  window.syncQuizWithCloud = async function (isManualTap = false) {
+    if (qzIsCloudSyncing) return;
+    if (!navigator.onLine) {
+      if (isManualTap && typeof showToast === "function") showToast("⚠️ Offline: Quiz progress saved locally.");
+      return;
+    }
+
+    qzIsCloudSyncing = true;
+    updateQuizCloudSyncBtnUI();
+
+    try {
+      // 1. Stamp current local quiz state first so cloud pull never clobbers newer local progress
+      saveQuizSessionState();
+
+      // 2. Always pull latest Sheet data first so we never overwrite a recent SRS review on the anchor row
+      if (typeof loadTCMData === "function") {
+        await loadTCMData(true);
+      }
+
+      // 3. Merge cloud seen lists & newer sessions
+      const pulledChanges = pullQuizLedgerFromCloud(true);
+
+      // 4. If user enrolled any quiz cards via "+SRS", flush them to their respective Google Sheet rows first
+      if (typeof pendingSRSUpdates !== "undefined" && pendingSRSUpdates.length > 0 && typeof syncSRSData === "function") {
+        await syncSRSData();
+      }
+
+      // 5. Write this track's compact ledger into its dedicated anchor row (points[0], points[1], or points[2])
+      const anchor = getQuizSyncAnchorPoint(currentTrack);
+      if (!anchor) throw new Error("Database not loaded");
+
+      let srsObj = {};
+      try { srsObj = JSON.parse(anchor["SRS Data"] || "{}"); } catch (e) { srsObj = {}; }
+
+      srsObj["__quiz_sync__"] = buildTrackQuizLedgerPayload(currentTrack);
+      anchor["SRS Data"] = JSON.stringify(srsObj);
+
+      if (typeof saveSinglePointToVault === "function") {
+        await saveSinglePointToVault(anchor);
+      }
+
+      if (typeof writeUrl !== "undefined") {
+        await fetch(writeUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            id: anchor["Short Name"],
+            field: "SRS Data",
+            value: anchor["SRS Data"]
+          })
+        });
+      }
+
+      qzSyncDirty = false;
+      updatePoolSummaryBanner();
+      if (isManualTap && typeof showToast === "function") {
+        showToast(pulledChanges ? `☁️ Synced & merged (${anchor["Short Name"]})!` : `☁️ Synced to Sheet (${anchor["Short Name"]} -> SRS Data)!`);
+      }
+    } catch (err) {
+      console.warn("Quiz cloud sync error:", err);
+      if (isManualTap && typeof showToast === "function") {
+        showToast("⚠️ Cloud sync failed. Progress is safe locally.");
+      }
+    } finally {
+      qzIsCloudSyncing = false;
+      updateQuizCloudSyncBtnUI();
+    }
+  };
 
   window.retakeQuizWholePool = function () {
     const limitVal = document.getElementById("qzLimitSelect").value;
@@ -3108,7 +3603,7 @@
 
     if (limitVal === "all") {
       activeQuizPool = [...eligibleFiltered];
-      localStorage.removeItem(getSeenKey());
+      clearSeenPoolForCurrentMode();
     } else {
       const limit = parseInt(limitVal, 10);
       let seenIds = [];
@@ -3118,7 +3613,7 @@
       if (unseen.length === 0) {
         if (typeof showToast === "function") showToast("🎉 Completed all cards in filtered pool! Cycling fresh.");
         seenIds = [];
-        localStorage.removeItem(getSeenKey());
+        clearSeenPoolForCurrentMode();
         unseen = [...eligibleFiltered];
       }
       activeQuizPool = shuffleArr(unseen).slice(0, Math.min(limit, unseen.length));
@@ -3162,7 +3657,13 @@
   }
 
   function showQuizSummaryScreen() {
-    localStorage.removeItem(getStateKey());
+    const sKey = getStateKey();
+    localStorage.removeItem(sKey);
+    localStorage.setItem(sKey + "_clearedAt", String(Date.now()));
+    currentTargetPoint = null;
+    markQuizLedgerDirty();
+    syncQuizWithCloud(false);
+
     document.getElementById("qzActiveView").style.display = "none";
     document.getElementById("qzBottomBar").style.display = "none";
     document.getElementById("qzSummaryView").style.display = "flex";
@@ -3467,7 +3968,6 @@
 
     closeQuizFilterModal();
     document.getElementById("quizSettingsPanel").classList.remove("open");
-    localStorage.removeItem(getSeenKey());
     retakeQuizWholePool();
   };
 
@@ -3517,17 +4017,28 @@
   // --- 15. SESSION SAVE & RESUME ---
   function saveQuizSessionState() {
     if (remainingQuizQueue.length === 0 && !currentTargetPoint) return;
+    const allBtns = Array.from(document.querySelectorAll("#qzOptionsGrid .quiz-opt-btn"));
+    const isCurrentAlreadyGraded = allBtns.length > 0 && allBtns.some(b => b.disabled);
+    const isAllFiltered = trackFilteredPoints.length === trackEligiblePoints.length;
+
     const state = {
+      updatedAt: Date.now(),
       subMode: qzSubMode,
       difficulty: qzDifficulty,
       limitVal: document.getElementById("qzLimitSelect")?.value || "10",
-      filteredIds: trackFilteredPoints.map(p => p["Short Name"]),
+      filteredIds: isAllFiltered ? "ALL" : trackFilteredPoints.map(p => p["Short Name"]),
       activeIds: activeQuizPool.map(p => p["Short Name"]),
-      remainingIds: remainingQuizQueue.map(item => (item && item._isRequeuedWrapper ? item.point["Short Name"] : item["Short Name"])),
-      currentTargetId: currentTargetPoint ? currentTargetPoint["Short Name"] : null,
+      remainingIds: remainingQuizQueue.map(item => (
+        item && item._isRequeuedWrapper
+          ? { id: item.point["Short Name"], retry: true }
+          : item["Short Name"]
+      )),
+      currentTargetId: (!isCurrentAlreadyGraded && currentTargetPoint) ? currentTargetPoint["Short Name"] : null,
+      currentIsRetry: (!isCurrentAlreadyGraded && currentIsRequeuedTry) ? true : false,
+      requeuedCounts: requeuedCardCounts,
       misses: sessionMisses.map(m => ({
         pointId: m.point["Short Name"],
-        questionHtml: m.questionHtml,
+        questionHtml: String(m.questionHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180),
         selected: m.selected,
         correct: m.correct
       })),
@@ -3544,9 +4055,10 @@
     if (!raw) return false;
     try {
       const state = JSON.parse(raw);
-      if (state.totalAnswered > 0 && state.remainingIds && state.remainingIds.length > 0) {
+      const pendingCount = (state.remainingIds ? state.remainingIds.length : 0) + (state.currentTargetId ? 1 : 0);
+      if (state.totalAnswered > 0 && pendingCount > 0) {
         const pct = Math.round((state.score / state.totalAnswered) * 100);
-        document.getElementById("qzResumeStatsText").textContent = `${state.totalAnswered} Answered • ${pct}% (${state.remainingIds.length} Left)`;
+        document.getElementById("qzResumeStatsText").textContent = `${state.totalAnswered} Answered • ${pct}% (${pendingCount} Left)`;
         document.getElementById("quizResumeModal").style.display = "flex";
         return true;
       }
@@ -3572,7 +4084,13 @@
 
       const byId = id => trackEligiblePoints.find(p => p["Short Name"] === id);
 
-      if (Array.isArray(state.filteredIds) && state.filteredIds.length > 0) {
+      if (state.filteredIds === "ALL") {
+        trackFilteredPoints = [...trackEligiblePoints];
+        document.querySelectorAll("#qzChannelTree .qz-pt-cb, #qzChannelTree .qz-chan-cb").forEach(cb => {
+          cb.checked = true;
+          cb.indeterminate = false;
+        });
+      } else if (Array.isArray(state.filteredIds) && state.filteredIds.length > 0) {
         const restoredFiltered = state.filteredIds.map(byId).filter(Boolean);
         if (restoredFiltered.length > 0) {
           trackFilteredPoints = restoredFiltered;
@@ -3587,9 +4105,20 @@
       }
 
       activeQuizPool = (state.activeIds || []).map(byId).filter(Boolean);
-      remainingQuizQueue = (state.remainingIds || []).map(byId).filter(Boolean);
+      remainingQuizQueue = (state.remainingIds || []).map(item => {
+        if (item && typeof item === "object" && item.id) {
+          const pt = byId(item.id);
+          return pt ? (item.retry ? { _isRequeuedWrapper: true, point: pt } : pt) : null;
+        }
+        return byId(item);
+      }).filter(Boolean);
+
       const target = state.currentTargetId ? byId(state.currentTargetId) : null;
-      if (target) remainingQuizQueue.push(target);
+      if (target) {
+        remainingQuizQueue.push(state.currentIsRetry ? { _isRequeuedWrapper: true, point: target } : target);
+      }
+
+      requeuedCardCounts = state.requeuedCounts && typeof state.requeuedCounts === "object" ? state.requeuedCounts : {};
 
       sessionMisses = (state.misses || []).map(m => {
         const pt = byId(m.pointId);
@@ -3611,7 +4140,10 @@
 
   window.abandonSavedQuizSession = function () {
     document.getElementById("quizResumeModal").style.display = "none";
-    localStorage.removeItem(getStateKey());
+    const sKey = getStateKey();
+    localStorage.removeItem(sKey);
+    localStorage.setItem(sKey + "_clearedAt", String(Date.now()));
+    markQuizLedgerDirty();
     retakeQuizWholePool();
   };
 
