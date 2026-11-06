@@ -386,6 +386,41 @@
       letter-spacing: 0.5px; text-align: center !important; padding: 7px 10px;
     }
 
+    /* Table Quiz Control Bar */
+    .table-quiz-bar {
+      position: sticky; left: 0;
+      display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+      padding: 5px 8px; background: #f2f2f7;
+      border-bottom: 1px solid #d1d1d6;
+      font-size: 11px; font-weight: 700; color: #8e8e93;
+    }
+    .table-quiz-bar-label {
+      margin-right: auto; font-size: 10.5px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.4px; color: #8e8e93;
+    }
+    .table-quiz-btn {
+      background: #e3e3e8; color: #333; border: none; border-radius: 10px;
+      padding: 3px 9px; font-size: 11px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s, color 0.15s, transform 0.1s;
+      user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    .table-quiz-bar-label::before,
+    .table-quiz-btn::before {
+      content: attr(data-label);
+    }
+    .table-quiz-btn:active { transform: scale(0.95); }
+    .table-quiz-btn.active { background: #cc5500; color: #ffffff; }
+
+    /* Keep sticky first column & cell backgrounds intact when blurred */
+    .tcm-table th.first-col-cell.study-blur,
+    .tcm-table td.first-col-cell.study-blur { position: sticky; }
+    .tcm-table th.study-blur::after { background: #e3e3e8; }
+    .tcm-table td.first-col-cell.study-blur::after { background: #f2f2f7; }
+    .tcm-table tbody tr:nth-child(even) td.first-col-cell.study-blur::after { background: #ebebf0; }
+    .tcm-table tbody tr:nth-child(even) td.study-blur::after { background: #f7f7fa; }
+    .tcm-table .tcm-table-banner.study-blur::after { background: #fff3eb; }
+    @media print { .table-quiz-bar { display: none !important; } }
+
     /* Point Link Styles */
     .point-link {
       color: #007aff;
@@ -1714,6 +1749,14 @@ mark.shared-term-mark {
       .tcm-table td.tcm-table-banner, .tcm-table th.tcm-table-banner {
         background-color: #2c221e !important; color: #ff9f0a !important;
       }
+      .table-quiz-bar { background: #242426; border-bottom-color: #38383a; }
+      .table-quiz-btn { background: #3a3a3c; color: #eee; }
+      .table-quiz-btn.active { background: #ff9f0a; color: #000000; }
+      .tcm-table th.study-blur::after { background: #2c2c2e; }
+      .tcm-table td.first-col-cell.study-blur::after { background: #252528; }
+      .tcm-table tbody tr:nth-child(even) td.first-col-cell.study-blur::after { background: #2c2c30; }
+      .tcm-table tbody tr:nth-child(even) td.study-blur::after { background: #242426; }
+      .tcm-table .tcm-table-banner.study-blur::after { background: #2c221e; }
 
       .point-link { color: #64b5f6; text-decoration-color: rgba(100, 181, 246, 0.4); }
       .point-link:active { background-color: rgba(100, 181, 246, 0.2); }
@@ -2400,7 +2443,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "11.06.26.v1";
+const APP_VERSION = "11.06.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3825,9 +3868,87 @@ function renderSearchHistory() {
 
 
 
+  window.syncTableQuizBar = function(table) {
+    const wrapper = table.closest(".table-scroll-wrapper");
+    if (!wrapper) return;
+
+    const headers = Array.from(table.querySelectorAll("th, .tcm-table-banner"));
+    const bodyCells = Array.from(table.querySelectorAll("td:not(.tcm-table-banner)"));
+
+    // Keep each header's orange active state synced with whether its column is blurred
+    table.querySelectorAll("th").forEach(th => {
+      if (th.classList.contains("study-blur")) {
+        th.classList.remove("col-quiz-active");
+      } else {
+        const colIdx = th.getAttribute("data-tcol");
+        const colCells = Array.from(table.querySelectorAll(`td[data-tcol="${colIdx}"]:not(.tcm-table-banner)`));
+        const isColBlurred = colCells.length > 0 && colCells.every(td => td.classList.contains("study-blur"));
+        th.classList.toggle("col-quiz-active", isColBlurred);
+      }
+    });
+
+    const allHeadersBlurred = headers.length > 0 && headers.every(el => el.classList.contains("study-blur"));
+    const allBodyBlurred = bodyCells.length > 0 && bodyCells.every(el => el.classList.contains("study-blur"));
+    const allBlurred = (headers.length + bodyCells.length > 0) &&
+                       (headers.length === 0 || allHeadersBlurred) &&
+                       (bodyCells.length === 0 || allBodyBlurred);
+
+    const btnHeaders = wrapper.querySelector('[data-qmode="headers"]');
+    const btnBody = wrapper.querySelector('[data-qmode="body"]');
+    const btnAll = wrapper.querySelector('[data-qmode="all"]');
+
+    if (btnHeaders) btnHeaders.classList.toggle("active", allHeadersBlurred);
+    if (btnBody) btnBody.classList.toggle("active", allBodyBlurred);
+    if (btnAll) {
+      btnAll.classList.toggle("active", allBlurred);
+      btnAll.setAttribute("data-label", allBlurred ? "Show All" : "Hide All");
+    }
+  };
+
+  window.toggleTableQuizMode = function(event, btnEl, mode) {
+    event.stopPropagation();
+    if (document.body.classList.contains("mark-mode-active")) return;
+
+    const wrapper = btnEl.closest(".table-scroll-wrapper");
+    if (!wrapper) return;
+    const table = wrapper.querySelector("table");
+    if (!table) return;
+
+    const headers = Array.from(table.querySelectorAll("th, .tcm-table-banner"));
+    const thOnly = Array.from(table.querySelectorAll("th"));
+    const bodyCells = Array.from(table.querySelectorAll("td:not(.tcm-table-banner)"));
+
+    const isActivating = !btnEl.classList.contains("active");
+
+    if (mode === "headers" || mode === "all") {
+      headers.forEach(el => {
+        el.classList.toggle("study-blur", isActivating);
+        el.classList.remove("study-peek");
+      });
+    }
+
+    if (mode === "body" || mode === "all") {
+      bodyCells.forEach(td => {
+        td.classList.toggle("study-blur", isActivating);
+        td.classList.remove("study-peek");
+      });
+      thOnly.forEach(th => {
+        th.classList.toggle("col-quiz-active", isActivating && mode === "body");
+      });
+    }
+
+    window.syncTableQuizBar(table);
+  };
+
   window.toggleTableColumnQuiz = function(event, thEl, colIndex) {
     event.stopPropagation();
     if (document.body.classList.contains("mark-mode-active")) return;
+
+    // If the header itself is hidden, tapping it reveals/re-hides that header
+    if (thEl.classList.contains("study-blur")) {
+      thEl.classList.toggle("study-peek");
+      return;
+    }
 
     const table = thEl.closest("table");
     if (!table) return;
@@ -3846,6 +3967,8 @@ function renderSearchHistory() {
         td.classList.remove("study-peek");
       }
     });
+
+    window.syncTableQuizBar(table);
   };
 
   function formatCellInlineTokens(cellHtml) {
@@ -3898,7 +4021,15 @@ function renderSearchHistory() {
         }
       }
 
-      let html = '<div class="table-scroll-wrapper"><table class="tcm-table"><tbody>';
+      const hasHeaders = isHeaderRow.some(Boolean);
+      let quizBarHtml = `<div class="table-quiz-bar" onclick="event.stopPropagation()"><span class="table-quiz-bar-label" data-label="Table Controls"></span>`;
+      if (hasHeaders) {
+        quizBarHtml += `<button type="button" class="table-quiz-btn" data-qmode="headers" data-label="Headers" onclick="window.toggleTableQuizMode(event, this, 'headers')"></button>`;
+        quizBarHtml += `<button type="button" class="table-quiz-btn" data-qmode="body" data-label="Body" onclick="window.toggleTableQuizMode(event, this, 'body')"></button>`;
+      }
+      quizBarHtml += `<button type="button" class="table-quiz-btn" data-qmode="all" data-label="Hide All" onclick="window.toggleTableQuizMode(event, this, 'all')"></button></div>`;
+
+      let html = '<div class="table-scroll-wrapper">' + quizBarHtml + '<table class="tcm-table"><tbody>';
       for (let r = 0; r < grid.length; r++) {
         html += '<tr>';
         let tag = isHeaderRow[r] ? 'th' : 'td';
@@ -3926,7 +4057,7 @@ function renderSearchHistory() {
 
             if (tag === 'th') {
               attrs += ` onclick="window.toggleTableColumnQuiz(event, this, ${c})" title="Tap to quiz this column"`;
-            } else if (!isBannerRow) {
+            } else {
               attrs += ` onclick="if(this.classList.contains('study-blur')){event.stopPropagation(); this.classList.toggle('study-peek');}"`;
             }
 
@@ -5725,6 +5856,7 @@ window.shuffleCompare = function() {
           .tcm-table th, .tcm-table td { border: 1px solid #d1d1d6; padding: 8px; text-align: left; }
           /* FIX: Added print-color-adjust so the grey table headers actually export/print! */
           .tcm-table th { background-color: #e3e3e8; font-weight: 800; color: #333; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .table-quiz-bar { display: none !important; }
           .importance-badge { color: #ff3b30; font-weight: 900; font-size: 20px; margin-left: 8px; }
           .point-link { color: #007aff; font-weight: 600; text-decoration: underline; text-decoration-color: rgba(0, 122, 255, 0.4); text-underline-offset: 2px; }
         </style>
@@ -5944,7 +6076,7 @@ async function completeSave(newValue) {
     if (lineOccState === 'mark' || wordOccState === 'mark' || phraseOccState === 'mark') return;
 
     // Prevent swiping if they are scrolling the pill nav, jump bar, interacting with a table, link, or action button
-    if (e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button') || e.target.closest('.point-action-row') || e.target.closest('.pill-nav') || e.target.closest('.section-jump-bar')) return;
+    if (e.target.closest('.table-scroll-wrapper') || e.target.closest('.tcm-table') || e.target.closest('.point-link') || e.target.closest('button') || e.target.closest('.point-action-row') || e.target.closest('.pill-nav') || e.target.closest('.section-jump-bar')) return;
 
 
     let touchEndX = e.changedTouches[0].screenX; 
