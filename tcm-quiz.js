@@ -448,7 +448,9 @@
 
           <div style="margin-bottom:8px;">
             <select id="qzImpFilter" class="quiz-select" style="width:100%;" onchange="updateFilterModalLiveCount()">
-              <option value="all" selected>All Importance Levels</option>
+              <option value="all" selected>All Importance Levels & Pattern Types</option>
+              <option value="complex_only">🧩 Complex / Combined Patterns Only</option>
+              <option value="simple_only">🌱 Simple / Single-Organ Patterns Only</option>
               <option value="any">Any Important (!, !!, !!!)</option>
               <option value="!">! Only</option>
               <option value="!!">!! Only</option>
@@ -534,6 +536,7 @@
 
   let currentTargetPoint = null;
   let currentCorrectAnswer = "";
+  let currentValidAnswersSet = new Set();
   let currentQuestionSubMode = "";
   let currentPathologySubLabel = "";
   let lastAnswerWasCorrect = false;
@@ -715,6 +718,23 @@
           terms.push(`${org} ${pa}`, `${pa} of ${org}`, `${pa} of the ${org}`);
         });
       });
+
+      // Mask two-organ combinations in both orders (e.g., "Spleen and Kidney", "Kidney- and Spleen-Yang")
+      if (matchedOrgans.length >= 2) {
+        for (let i = 0; i < matchedOrgans.length; i++) {
+          for (let j = 0; j < matchedOrgans.length; j++) {
+            if (i === j) continue;
+            const o1 = matchedOrgans[i], o2 = matchedOrgans[j];
+            terms.push(`${o1} and ${o2}`, `${o1}- and ${o2}`);
+            matchedSubs.forEach(sub => {
+              terms.push(`${o1} and ${o2} ${sub}`, `${o1}- and ${o2}-${sub}`);
+              matchedPaths.forEach(pa => {
+                terms.push(`${o1} and ${o2} ${sub} ${pa}`, `${pa} of ${o1} and ${o2} ${sub}`);
+              });
+            });
+          }
+        }
+      }
 
       const revMatch = afterColon.toLowerCase().match(/^(.+?)\s+(deficiency|stagnation|stasis|blazing|rising|sinking|collapse|rebellion|excess)$/i);
       if (revMatch) {
@@ -1181,7 +1201,7 @@
     if (mode === "categories") {
       let rawFullName = standardizeTCMTerminology(pointObj["Full Name"] || pointObj[" Full Name"] || "");
       const fnLines = cleanSectionLines(rawFullName).filter(l =>
-        /\b(front-mu|back-shu|yuan-source|luo-connecting|xi-cleft|jing-well|ying-spring|shu-stream|jing-river|he-sea|confluent|hui-meeting|window of heaven|command point|heavenly star|ghost point|meeting point|sea of)\b/i.test(l)
+        /\b(front-mu|back-shu|yuan-source|luo-connecting|xi-cleft|jing-well|ying-spring|shu-stream|jing-river|lower he-sea|he-sea|confluent|hui-meeting|four seas|window of heaven|command point|heavenly star|ghost point|meeting point|sea of|tonification|sedation|horary|entry point|exit point|wood point|fire point|earth point|metal point|water point)\b/i.test(l)
       );
       res = { lines: fnLines, rawText: fnLines.join("\n") };
     } else if (mode === "needling") {
@@ -1297,23 +1317,38 @@
     document.getElementById("tabQuizPatterns").classList.toggle("active", track === "patterns");
 
     const masterPoints = typeof points !== "undefined" ? points : [];
+    const hasNoQuizTag = p => /#noquiz\b/i.test(String(p["Notes"] || ""));
+
     let rawEligible = [];
     if (track === "location") {
-      rawEligible = masterPoints.filter(p => p["Short Name"] && (p["Location "] || p["Location"]));
+      rawEligible = masterPoints.filter(p => {
+        if (hasNoQuizTag(p)) return false;
+        const sn = String(p["Short Name"] || "").trim();
+        const loc = String(p["Location "] || p["Location"] || "").trim();
+        const cm = String(p["Clinical Manifestations"] || "").trim();
+        return sn && loc && !cm && loc.toLowerCase() !== sn.toLowerCase();
+      });
     } else if (track === "clinical_points") {
-      rawEligible = masterPoints.filter(
-        p => p["Short Name"] && (p["Location "] || p["Location"]) &&
-             ((p["Actions"] && String(p["Actions"]).trim()) ||
-              (p["Indications"] && String(p["Indications"]).trim()) ||
-              (p["Combinations"] && String(p["Combinations"]).trim()))
-      );
+      rawEligible = masterPoints.filter(p => {
+        if (hasNoQuizTag(p)) return false;
+        const sn = String(p["Short Name"] || "").trim();
+        const loc = String(p["Location "] || p["Location"] || "").trim();
+        const cm = String(p["Clinical Manifestations"] || "").trim();
+        return sn && loc && !cm && loc.toLowerCase() !== sn.toLowerCase() &&
+          ((p["Actions"] && String(p["Actions"]).trim()) ||
+           (p["Indications"] && String(p["Indications"]).trim()) ||
+           (p["Combinations"] && String(p["Combinations"]).trim()));
+      });
     } else {
-      rawEligible = masterPoints.filter(
-        p => p["Short Name"] && p["Clinical Manifestations"] && String(p["Clinical Manifestations"]).trim() !== ""
-      );
+      rawEligible = masterPoints.filter(p => {
+        if (hasNoQuizTag(p)) return false;
+        const sn = String(p["Short Name"] || "").trim();
+        const cm = String(p["Clinical Manifestations"] || "").trim();
+        return sn && cm !== "" && !/\bNormal\s+Menses\s*:/i.test(cm);
+      });
     }
 
-    // Deduplicate by Short Name and merge any sparse duplicate rows into the richer record
+    // Deduplicate by Short Name and merge combined-organ Channel Short Names
     const byShortName = new Map();
     rawEligible.forEach(p => {
       const key = String(p["Short Name"]).trim();
@@ -1326,6 +1361,18 @@
             existing[k] = p[k];
           }
         });
+        const cKey = existing.hasOwnProperty("Channel Short Name") ? "Channel Short Name" : " Channel Short Name";
+        const exChanShort = String(existing[cKey] || "").trim();
+        const newChanShort = String(p["Channel Short Name"] || p[" Channel Short Name"] || "").trim();
+        if (newChanShort && !exChanShort.toLowerCase().includes(newChanShort.toLowerCase())) {
+          existing[cKey] = exChanShort ? `${exChanShort}, ${newChanShort}` : newChanShort;
+        }
+        const fKey = existing.hasOwnProperty("Channel Full Name") ? "Channel Full Name" : " Channel Full Name";
+        const exChanFull = String(existing[fKey] || "").trim();
+        const newChanFull = String(p["Channel Full Name"] || p[" Channel Full Name"] || "").trim();
+        if (newChanFull && exChanFull && exChanFull.toLowerCase() !== newChanFull.toLowerCase()) {
+          existing[fKey] = "Combined Zang-Fu Patterns";
+        }
         byShortName.set(key, existing);
       }
     });
@@ -1566,7 +1613,25 @@
       if (combined.length >= count) return combined.slice(0, count);
     }
 
-    const otherPoints = trackDistractorPoints.filter(p => p["Short Name"] !== targetName);
+    const isStandardBodyPoint = pt => {
+      const sn = String(pt["Short Name"] || "").trim();
+      const cShort = String(pt["Channel Short Name"] || pt[" Channel Short Name"] || "").trim().toUpperCase();
+      return /^(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*\d+$/i.test(sn) || cShort === "XP";
+    };
+
+    const allOtherPoints = trackDistractorPoints.filter(p => p["Short Name"] !== targetName);
+    const targetIsBodyPt = isStandardBodyPoint(targetPoint);
+    const targetChanFull = String(targetPoint["Channel Full Name"] || targetPoint[" Channel Full Name"] || "").trim();
+
+    // Keep standard/extra points paired with body points, and specialized groups (Pulses, Auricular, Scalp, etc.) paired with their own channel first
+    let otherPoints = targetIsBodyPt
+      ? allOtherPoints.filter(isStandardBodyPoint)
+      : allOtherPoints.filter(p => String(p["Channel Full Name"] || p[" Channel Full Name"] || "").trim() === targetChanFull);
+
+    if (otherPoints.length < count) {
+      const fallback = allOtherPoints.filter(p => !otherPoints.includes(p));
+      otherPoints = [...otherPoints, ...fallback];
+    }
 
     if (currentTrack === "clinical_points") {
       const targetClinical = stripBBCode((targetPoint["Actions"] || "") + " " + (targetPoint["Indications"] || "")).toLowerCase();
@@ -1762,6 +1827,118 @@
   };
 
   // --- 11. QUESTION GENERATORS FOR ALL 3 TRACKS ---
+  function recordMatchesAllClues(candidateLines, requiredClueLines) {
+    if (!requiredClueLines || requiredClueLines.length === 0) return false;
+    return requiredClueLines.every(reqLine => hasSymptomOverlap(reqLine, candidateLines, "all"));
+  }
+
+  function setCorrectQuizAnswers(primaryAnswer, additionalValidAnswers = []) {
+    currentCorrectAnswer = String(primaryAnswer || "").trim();
+    currentValidAnswersSet = new Set(
+      [primaryAnswer, ...additionalValidAnswers]
+        .map(a => stripBBCode(String(a || "")).trim().toLowerCase())
+        .filter(Boolean)
+    );
+  }
+
+  function extractDistinctZangFuOrgans(rawTitle) {
+    let t = String(rawTitle || "").toLowerCase();
+    const found = new Set();
+
+    // Check multi-word organs first and strip them so "gall bladder" never triggers "bladder"
+    if (/\bgall[\s\-]*bladder\b/.test(t)) {
+      found.add("gall bladder");
+      t = t.replace(/\bgall[\s\-]*bladder\b/g, " ");
+    }
+    if (/\bsmall[\s\-]*intestine\b/.test(t)) {
+      found.add("small intestine");
+      t = t.replace(/\bsmall[\s\-]*intestine\b/g, " ");
+    }
+    if (/\blarge[\s\-]*intestine\b/.test(t)) {
+      found.add("large intestine");
+      t = t.replace(/\blarge[\s\-]*intestine\b/g, " ");
+    }
+    if (/\b(?:san[\s\-]*jiao|triple[\s\-]*burner)\b/.test(t)) {
+      found.add("san jiao");
+      t = t.replace(/\b(?:san[\s\-]*jiao|triple[\s\-]*burner)\b/g, " ");
+    }
+
+    const singleOrgans = [
+      { key: "heart", rx: /\bheart\b/ },
+      { key: "liver", rx: /\bliver\b/ },
+      { key: "spleen", rx: /\bspleen\b/ },
+      { key: "lung", rx: /\blungs?\b/ },
+      { key: "kidney", rx: /\bkidneys?\b/ },
+      { key: "stomach", rx: /\bstomach\b/ },
+      { key: "bladder", rx: /\bbladder\b/ },
+      { key: "pericardium", rx: /\bpericardium\b/ },
+      { key: "uterus", rx: /\buterus\b/ }
+    ];
+
+    singleOrgans.forEach(item => {
+      if (item.rx.test(t)) found.add(item.key);
+    });
+
+    return [...found];
+  }
+
+  function isComplexPatternRecord(pointObj) {
+    const title = (String(pointObj["Short Name"] || "") + " " + String(pointObj["Full Name"] || pointObj[" Full Name"] || "")).toLowerCase();
+    const chanShort = String(pointObj["Channel Short Name"] || pointObj[" Channel Short Name"] || "");
+    const chanFull = String(pointObj["Channel Full Name"] || pointObj[" Channel Full Name"] || "");
+
+    if (chanShort.includes(",") || chanFull === "Combined Zang-Fu Patterns") return true;
+
+    if (extractDistinctZangFuOrgans(title).length >= 2) return true;
+
+    if (/\b(invading|insulting|not\s+harmonized|disharmony|failing\s+to|combined|and\s+blood|qi\s+and\s+yin|yin\s+and\s+yang|deficiency\s+with|stagnation\s+and|stasis\s+and|phlegm[\s\-]+fire|phlegm[\s\-]+heat|damp[\s\-]+heat|wind[\s\-]+damp|empty[\s\-]+heat|empty[\s\-]+fire|water\s+overflowing)\b/i.test(title)) {
+      return true;
+    }
+    return false;
+  }
+
+  function pickStratifiedVignetteSymptoms(targetPattern, parsed, count) {
+    const syms = parsed.symptoms;
+    if (syms.length <= count) return [...syms];
+
+    const titleLower = (targetPattern["Short Name"] + " " + (targetPattern["Full Name"] || targetPattern[" Full Name"] || "")).toLowerCase();
+    const matchedOrgans = extractDistinctZangFuOrgans(titleLower);
+
+    const organSymptomAnchors = {
+      heart: /palpitation|insomnia|dream|mental|restless|chest|memory|shen|tongue\s+ulcer/i,
+      liver: /hypochondr|rib|sigh|irritab|anger|depression|distension|dizz|tinnitus|headache|eye|nail|sinew|menstru|wiry/i,
+      spleen: /appetite|loose\s+stool|abdominal|epigastr|tired|fatigue|lassitude|heavy|edema|prolapse|bleed|sallow/i,
+      lung: /cough|breath|asthma|wheez|sputum|phlegm|voice|sweat|aversion\s+to\s+cold|nose|throat|chest/i,
+      kidney: /back|knee|lumbar|tinnitus|deaf|urination|urine|night\s+sweat|sexual|libido|infertility|hair|bone|marrow|edema/i,
+      stomach: /epigastr|vomiting|nausea|belch|hiccup|acid|regurgitat|thirst|hunger|appetite/i,
+      "gall bladder": /hypochondr|bitter|jaundice|timid|sigh|dizz/i,
+      bladder: /urination|urine|burning|dysuria|incontinence|frequency/i,
+      "large intestine": /stool|diarrhea|constipation|abdominal\s+pain|anus|tenesmus/i,
+      "small intestine": /borborygmi|flatulence|lower\s+abdominal|urine/i,
+      uterus: /menstru|period|amenorrhea|dysmenorrhea|leukorrhea|infertility|lochia/i
+    };
+
+    const selected = [];
+    const remaining = shuffleArr(syms);
+
+    if (matchedOrgans.length >= 2) {
+      matchedOrgans.forEach(org => {
+        if (selected.length >= count) return;
+        const rx = organSymptomAnchors[org];
+        if (!rx) return;
+        const idx = remaining.findIndex(s => rx.test(s));
+        if (idx !== -1) {
+          selected.push(remaining.splice(idx, 1)[0]);
+        }
+      });
+    }
+
+    while (selected.length < count && remaining.length > 0) {
+      selected.push(remaining.shift());
+    }
+    return shuffleArr(selected);
+  }
+
   window.generateNextQuizQuestion = function () {
     syncQuizSettingCheckboxes();
 
@@ -1785,6 +1962,7 @@
     currentPickedWrongPointId = null;
     currentContrastPointId = null;
     currentDecoySourceNote = null;
+    currentValidAnswersSet = new Set();
     currentQuestionSubMode = qzSubMode;
     currentPathologySubLabel = "";
     setupClueLadder([]);
@@ -1881,7 +2059,9 @@
         let displayHtml = bbcodeToHtml(rawText);
         ordered.forEach(m => {
           let wRx = new RegExp("\\b" + m[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
-          displayHtml = displayHtml.replace(wRx, "<span class='quiz-fitb-blank'>[ ______ ]</span>");
+          displayHtml = displayHtml.split(/(<[^>]*>)/g).map(part => {
+            return part.startsWith("<") ? part : part.replace(wRx, "<span class='quiz-fitb-blank'>[ ______ ]</span>");
+          }).join("");
         });
 
         const buildFakeCombo = () => ordered.map(m => {
@@ -1994,9 +2174,26 @@
       if (catParsed.lines.length > 0) {
         currentQuestionSubMode = "point_categories_mcq";
         const chosenCat = catParsed.lines[Math.floor(Math.random() * catParsed.lines.length)];
+        const normChosenCat = normalizeSymptomClause(chosenCat);
         const askWhichPoint = Math.random() < 0.65;
 
         if (askWhichPoint) {
+          let nonCollidingDistractors = distractors.filter(d => {
+            const dCats = parsePointClinicalLines(d, "categories").lines;
+            return !dCats.some(c => normalizeSymptomClause(c) === normChosenCat);
+          });
+          if (nonCollidingDistractors.length < 5) {
+            const extraPool = trackDistractorPoints.filter(p =>
+              p["Short Name"] !== targetPoint["Short Name"] &&
+              !nonCollidingDistractors.includes(p) &&
+              !parsePointClinicalLines(p, "categories").lines.some(c => normalizeSymptomClause(c) === normChosenCat)
+            );
+            nonCollidingDistractors = [...nonCollidingDistractors, ...shuffleArr(extraPool)].slice(0, 5);
+          } else {
+            nonCollidingDistractors = nonCollidingDistractors.slice(0, 5);
+          }
+          const finalDistractors = nonCollidingDistractors.length >= 3 ? nonCollidingDistractors : distractors.slice(0, 5);
+
           labelEl.textContent = "Point Category Identification";
           bodyEl.innerHTML = `
             <div style="font-size:13px; color:#8e8e93; margin-bottom:6px;">Which acupuncture point holds the following category designation?</div>
@@ -2006,10 +2203,16 @@
           if (actPreview.length > 0) {
             setupClueLadder([`<strong>Key Action:</strong> ${maskSelfSpoilers(escapeHTML(actPreview.join("; ")), targetPoint)}`]);
           }
-          currentCorrectAnswer = stdTargetName;
+
+          const allShownPts = [targetPoint, ...finalDistractors];
+          const allValidNames = allShownPts
+            .filter(p => parsePointClinicalLines(p, "categories").lines.some(c => normalizeSymptomClause(c) === normChosenCat))
+            .map(p => standardizeTCMTerminology(p["Short Name"]));
+          setCorrectQuizAnswers(stdTargetName, allValidNames);
+
           const opts = [
             { text: stdTargetName, pointId: targetPoint["Short Name"] },
-            ...distractors.slice(0, 5).map(d => ({ text: standardizeTCMTerminology(d["Short Name"]), pointId: d["Short Name"] }))
+            ...finalDistractors.map(d => ({ text: standardizeTCMTerminology(d["Short Name"]), pointId: d["Short Name"] }))
           ];
           renderQuizOptionButtons(shuffleArr(opts));
           return;
@@ -2019,13 +2222,19 @@
             <div style="font-size:20px; font-weight:900; color:#cc5500; margin-bottom:6px;">${escapeHTML(stdTargetName)}</div>
             <div style="color:#007aff; font-weight:700;">Which of the following is an official point category / classification for <u>${escapeHTML(stdTargetName)}</u>?</div>
           `;
-          currentCorrectAnswer = chosenCat;
+          const targetCatNormSet = new Set(catParsed.lines.map(normalizeSymptomClause));
+          setCorrectQuizAnswers(chosenCat, catParsed.lines);
+
           let opts = [{ text: escapeHTML(chosenCat), rawCompare: chosenCat, pointId: targetPoint["Short Name"] }];
           for (let d of distractors) {
             if (opts.length >= 6) break;
             const dCats = parsePointClinicalLines(d, "categories").lines;
-            if (dCats.length > 0 && !opts.some(o => o.rawCompare.toLowerCase() === dCats[0].toLowerCase())) {
-              opts.push({ text: escapeHTML(dCats[0]), rawCompare: dCats[0], pointId: d["Short Name"] });
+            const validDecoyCat = dCats.find(c =>
+              !targetCatNormSet.has(normalizeSymptomClause(c)) &&
+              !opts.some(o => normalizeSymptomClause(o.rawCompare) === normalizeSymptomClause(c))
+            );
+            if (validDecoyCat) {
+              opts.push({ text: escapeHTML(validDecoyCat), rawCompare: validDecoyCat, pointId: d["Short Name"] });
             }
           }
           if (opts.length >= 3) {
@@ -2048,7 +2257,10 @@
           <div style="color:#007aff; font-weight:700;">Select the accurate needling technique or safety caution for <u>${escapeHTML(stdTargetName)}</u>:</div>
         `;
         const cleanCaution = maskSelfSpoilers(escapeHTML(cautionLine), targetPoint, stdTargetName);
-        currentCorrectAnswer = stripBBCode(cleanCaution).trim();
+        const allTargetCleanCautions = needlingLines.map(l => stripBBCode(maskSelfSpoilers(escapeHTML(l), targetPoint, stdTargetName)).trim());
+        const targetNeedlingNormSet = new Set(allTargetCleanCautions.map(normalizeSymptomClause));
+        setCorrectQuizAnswers(stripBBCode(cleanCaution).trim(), allTargetCleanCautions);
+
         let opts = [{ text: cleanCaution, rawCompare: currentCorrectAnswer, pointId: targetPoint["Short Name"] }];
 
         for (let d of distractors) {
@@ -2058,7 +2270,10 @@
             const dPick = dNLines.find(l => /caution|contraindicated|avoid|pneumothorax|pregnancy|moxibustion|artery/i.test(l)) || dNLines[0];
             const dDisp = maskSelfSpoilers(escapeHTML(dPick), d, stdTargetName);
             const dRaw = stripBBCode(dDisp).trim();
-            if (dRaw.toLowerCase() !== currentCorrectAnswer.toLowerCase() && !opts.some(o => o.rawCompare.toLowerCase() === dRaw.toLowerCase())) {
+            if (
+              !targetNeedlingNormSet.has(normalizeSymptomClause(dRaw)) &&
+              !opts.some(o => o.rawCompare.toLowerCase() === dRaw.toLowerCase())
+            ) {
               opts.push({ text: dDisp, rawCompare: dRaw, pointId: d["Short Name"] });
             }
           }
@@ -2076,12 +2291,20 @@
       if (combParsed.lines.length > 0) {
         currentQuestionSubMode = "combinations_mcq";
         const chosenLine = combParsed.lines[Math.floor(Math.random() * combParsed.lines.length)];
+        const normComb = normalizeSymptomClause(maskSelfSpoilers(stripBBCode(chosenLine), targetPoint, ""));
         labelEl.textContent = "Point Combinations & Clinical Synergy";
         bodyEl.innerHTML = `
           <div style="font-size:13px; color:#8e8e93; margin-bottom:6px;">Which point completes this clinical combination?</div>
           <div class="quiz-diag-box">${maskSelfSpoilers(bbcodeToHtml(chosenLine), targetPoint)}</div>
         `;
-        currentCorrectAnswer = stdTargetName;
+        const shownPts = [targetPoint, ...distractors.slice(0, 5)];
+        const validCombNames = shownPts
+          .filter(p => parsePointClinicalLines(p, "combinations").lines.some(
+            l => normalizeSymptomClause(maskSelfSpoilers(stripBBCode(l), p, "")) === normComb
+          ))
+          .map(p => standardizeTCMTerminology(p["Short Name"]));
+        setCorrectQuizAnswers(stdTargetName, validCombNames);
+
         const opts = [
           { text: stdTargetName, pointId: targetPoint["Short Name"] },
           ...distractors.slice(0, 5).map(d => ({ text: standardizeTCMTerminology(d["Short Name"]), pointId: d["Short Name"] }))
@@ -2232,10 +2455,19 @@
 
       setupClueLadder(hiddenLines.map(l => `➣ ${maskSelfSpoilers(bbcodeToHtml(l), targetPoint)}`));
 
-      currentCorrectAnswer = stdTargetName;
+      const nonCollidingDistractors = distractors.filter(
+        d => !recordMatchesAllClues(parsePointClinicalLines(d, fieldMode).lines, shownLines)
+      );
+      const finalDistractors = (nonCollidingDistractors.length >= 4 ? nonCollidingDistractors : distractors).slice(0, 5);
+      const allShownPts = [targetPoint, ...finalDistractors];
+      const allValidNames = allShownPts
+        .filter(p => recordMatchesAllClues(parsePointClinicalLines(p, fieldMode).lines, shownLines))
+        .map(p => standardizeTCMTerminology(p["Short Name"]));
+      setCorrectQuizAnswers(stdTargetName, allValidNames);
+
       const opts = [
         { text: stdTargetName, pointId: targetPoint["Short Name"] },
-        ...distractors.slice(0, 5).map(d => ({ text: standardizeTCMTerminology(d["Short Name"]), pointId: d["Short Name"] }))
+        ...finalDistractors.map(d => ({ text: standardizeTCMTerminology(d["Short Name"]), pointId: d["Short Name"] }))
       ];
       renderQuizOptionButtons(shuffleArr(opts));
     } else {
@@ -2596,7 +2828,7 @@
           }
         } else {
           labelEl.textContent = "Point Prescription ➔ Identify Pattern";
-          let boxHtml = `<div><strong>Points:</strong> ${escapeHTML(parsed.rxPointsLine)}</div>`;
+          let boxHtml = `<div><strong>Points:</strong> ${maskSelfSpoilers(escapeHTML(parsed.rxPointsLine), targetPattern, "[ TARGET PATTERN ]")}</div>`;
           if (parsed.rxMethodLine) {
             boxHtml += `<div style="margin-top:4px;"><strong>Method:</strong> ${maskSelfSpoilers(escapeHTML(parsed.rxMethodLine), targetPattern, "[ TARGET PATTERN ]")}</div>`;
           }
@@ -2871,14 +3103,15 @@
     labelEl.textContent = "Identify the Pattern from Clinical Manifestations";
     let html = "";
     const clueQueue = [];
-    const shuffledSyms = shuffleArr(parsed.symptoms);
+    let displayedSyms = [];
 
     if (qzDifficulty === "easy") {
       if (parsed.keyRaw) {
         html += `<div style="margin-bottom:8px;"><strong style="color:#cc5500;">Key Symptoms:</strong> ${maskSelfSpoilers(escapeHTML(parsed.keyRaw), targetPattern, "[ TARGET PATTERN ]")}</div>`;
       }
       if (parsed.symptoms.length > 0) {
-        html += parsed.symptoms.slice(0, 6).map(s => `<div>➣ ${maskSelfSpoilers(escapeHTML(s), targetPattern, "[ TARGET PATTERN ]")}</div>`).join("");
+        displayedSyms = parsed.symptoms.slice(0, 6);
+        html += displayedSyms.map(s => `<div>➣ ${maskSelfSpoilers(escapeHTML(s), targetPattern, "[ TARGET PATTERN ]")}</div>`).join("");
       }
       if (parsed.tongue || parsed.pulse) {
         html += `<div class="quiz-diag-box">`;
@@ -2887,7 +3120,8 @@
         html += `</div>`;
       }
     } else if (qzDifficulty === "medium") {
-      const pool = shuffledSyms.length > 0 ? shuffledSyms.slice(0, 4) : parsed.keySymptoms;
+      const pool = parsed.symptoms.length > 0 ? pickStratifiedVignetteSymptoms(targetPattern, parsed, 4) : parsed.keySymptoms;
+      displayedSyms = pool;
       html += pool.map(s => `<div style="margin-bottom:4px;">➣ ${maskSelfSpoilers(escapeHTML(s), targetPattern, "[ TARGET PATTERN ]")}</div>`).join("");
       if (parsed.tongue || parsed.pulse) {
         html += `<div class="quiz-diag-box">`;
@@ -2898,7 +3132,8 @@
       if (parsed.keyRaw) clueQueue.push(`<strong>Key Symptoms:</strong> ${maskSelfSpoilers(escapeHTML(parsed.keyRaw), targetPattern, "[ TARGET PATTERN ]")}`);
       if (parsed.rxPointsLine) clueQueue.push(`<strong>Point Rx:</strong> ${escapeHTML(parsed.rxPointsLine)}`);
     } else if (qzDifficulty === "hard") {
-      const pool = shuffledSyms.length > 0 ? shuffledSyms.slice(0, 3) : parsed.keySymptoms.slice(0, 2);
+      const pool = parsed.symptoms.length > 0 ? pickStratifiedVignetteSymptoms(targetPattern, parsed, 3) : parsed.keySymptoms.slice(0, 2);
+      displayedSyms = pool;
       html += pool.map(s => `<div style="margin-bottom:4px;">➣ ${maskSelfSpoilers(escapeHTML(s), targetPattern, "[ TARGET PATTERN ]")}</div>`).join("");
       const showTongue = Math.random() < 0.5;
       if (showTongue && parsed.tongue) {
@@ -2910,8 +3145,9 @@
       }
       if (parsed.keyRaw) clueQueue.push(`<strong>Key Symptoms:</strong> ${maskSelfSpoilers(escapeHTML(parsed.keyRaw), targetPattern, "[ TARGET PATTERN ]")}`);
     } else {
-      const nonCardinal = parsed.symptoms.length > 3 ? parsed.symptoms.slice(1) : parsed.symptoms;
-      const pool = shuffleArr(nonCardinal).slice(0, Math.min(2, nonCardinal.length));
+      const minInsaneCount = isComplexPatternRecord(targetPattern) ? 3 : 2;
+      const pool = pickStratifiedVignetteSymptoms(targetPattern, parsed, Math.min(minInsaneCount, parsed.symptoms.length));
+      displayedSyms = pool;
       html += pool.map(s => `<div style="margin-bottom:4px;">➣ ${maskSelfSpoilers(escapeHTML(s), targetPattern, "[ TARGET PATTERN ]")}</div>`).join("");
       html += `<div style="font-size:12px; color:#8e8e93; font-style:italic; margin-top:6px;">(Key Signs, Tongue & Pulse withheld -- tap 💡 +1 Clue if needed)</div>`;
       if (parsed.tongue || parsed.pulse) {
@@ -2922,7 +3158,12 @@
 
     bodyEl.innerHTML = html;
     setupClueLadder(clueQueue);
-    currentCorrectAnswer = targetPattern["Short Name"];
+
+    const shownPatterns = [targetPattern, ...distractors.slice(0, 5)];
+    const validPatternNames = shownPatterns
+      .filter(p => displayedSyms.length > 0 && recordMatchesAllClues(parseManifestationRecord(p).symptoms, displayedSyms))
+      .map(p => p["Short Name"]);
+    setCorrectQuizAnswers(targetPattern["Short Name"], validPatternNames);
 
     const opts = [
       { text: targetPattern["Short Name"], pointId: targetPattern["Short Name"] },
@@ -2958,7 +3199,9 @@
     qzTotalAnswered++;
     const pickedVal = (selectedBtn.dataset.compare || "").trim().toLowerCase();
     const targetVal = String(currentCorrectAnswer || "").trim().toLowerCase();
-    const isCorrect = pickedVal === targetVal;
+    const isCorrect = (currentValidAnswersSet && currentValidAnswersSet.size > 0)
+      ? currentValidAnswersSet.has(pickedVal)
+      : (pickedVal === targetVal);
     lastAnswerWasCorrect = isCorrect;
     const cardId = currentTargetPoint ? currentTargetPoint["Short Name"] : "";
 
@@ -2982,7 +3225,8 @@
       currentPickedWrongPointId = selectedBtn.dataset.pointId || null;
 
       allBtns.forEach(b => {
-        if ((b.dataset.compare || "").trim().toLowerCase() === targetVal) {
+        const bVal = (b.dataset.compare || "").trim().toLowerCase();
+        if (bVal === targetVal || (currentValidAnswersSet && currentValidAnswersSet.has(bVal))) {
           b.classList.add("correct");
         }
       });
@@ -3361,10 +3605,21 @@
   function getSeenKey() { return `tcmSeen_${currentTrack}_${qzSubMode}`; }
   function getStateKey() { return `tcmQuizState_${currentTrack}`; }
 
-  // Shards the 3 quiz tracks across the first 3 rows (points[0], points[1], points[2])
-  // so no single cell ever exceeds ~5 KB (well under Google Sheets' 50,000-char limit).
+  // Dynamically locates whichever row holds this track's "__quiz_sync__" ledger
+  // (immune to row insertions, deletions, or sheet sorting), falling back to points[0..2] on first init.
   function getQuizSyncAnchorPoint(trackName = currentTrack) {
     if (typeof points === "undefined" || !Array.isArray(points) || points.length === 0) return null;
+    for (let i = 0; i < points.length; i++) {
+      const rawSrs = points[i]["SRS Data"];
+      if (rawSrs && rawSrs.includes('"__quiz_sync__"')) {
+        try {
+          const parsed = JSON.parse(rawSrs);
+          if (parsed["__quiz_sync__"] && parsed["__quiz_sync__"].track === trackName) {
+            return points[i];
+          }
+        } catch (e) {}
+      }
+    }
     const idx = Math.max(0, QUIZ_TRACK_ORDER.indexOf(trackName));
     return points[Math.min(idx, points.length - 1)];
   }
@@ -3403,6 +3658,16 @@
 
   function buildTrackQuizLedgerPayload(trackName) {
     const prefix = `tcmSeen_${trackName}_`;
+    const dict = [];
+    const idToIdx = new Map();
+    const encodeId = (id) => {
+      if (!idToIdx.has(id)) {
+        idToIdx.set(id, dict.length);
+        dict.push(id);
+      }
+      return idToIdx.get(id);
+    };
+
     const seenMap = {};
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -3411,7 +3676,8 @@
           const ids = JSON.parse(localStorage.getItem(k) || "[]");
           const resetAt = Number(localStorage.getItem(k + "_resetAt") || 0);
           if (Array.isArray(ids) && (ids.length > 0 || resetAt > 0)) {
-            seenMap[k] = { ids, resetAt };
+            const subKey = k.slice(prefix.length); // e.g. 'vignette' instead of 'tcmSeen_patterns_vignette'
+            seenMap[subKey] = { ids: ids.map(encodeId), r: resetAt };
           }
         } catch (e) {}
       }
@@ -3431,6 +3697,7 @@
     }
 
     return {
+      v: 2,
       track: trackName,
       updatedAt: Number(localStorage.getItem("tcmQuizLocalUpdatedAt") || Date.now()),
       prefs: {
@@ -3438,6 +3705,7 @@
         showDigest: qzShowDigest,
         masteryRequeue: qzMasteryRequeue
       },
+      d: dict,
       seen: seenMap,
       session: sessionObj
     };
@@ -3456,22 +3724,31 @@
       const cloud = srsObj["__quiz_sync__"];
       if (!cloud || typeof cloud !== "object") return;
 
-      // 1. Merge Seen Pools for this Track (respecting pool cycle resets)
+      const dict = Array.isArray(cloud.d) ? cloud.d : null;
+      const prefix = `tcmSeen_${trk}_`;
+
+      // 1. Merge Seen Pools for this Track (supports both v2 dictionary-compressed and v1 raw IDs)
       if (cloud.seen && typeof cloud.seen === "object") {
-        Object.keys(cloud.seen).forEach(sKey => {
-          const cEntry = cloud.seen[sKey];
+        Object.keys(cloud.seen).forEach(rawKey => {
+          const cEntry = cloud.seen[rawKey];
           if (!cEntry || !Array.isArray(cEntry.ids)) return;
-          const cReset = Number(cEntry.resetAt || 0);
+
+          const sKey = rawKey.startsWith("tcmSeen_") ? rawKey : (prefix + rawKey);
+          const cIds = dict
+            ? cEntry.ids.map(idx => (typeof idx === "number" ? dict[idx] : idx)).filter(Boolean)
+            : cEntry.ids;
+
+          const cReset = Number(cEntry.r !== undefined ? cEntry.r : (cEntry.resetAt || 0));
           const lReset = Number(localStorage.getItem(sKey + "_resetAt") || 0);
           let lIds = [];
           try { lIds = JSON.parse(localStorage.getItem(sKey) || "[]"); } catch (e) {}
 
           if (cReset > lReset) {
-            localStorage.setItem(sKey, JSON.stringify(cEntry.ids));
+            localStorage.setItem(sKey, JSON.stringify(cIds));
             localStorage.setItem(sKey + "_resetAt", String(cReset));
             changed = true;
           } else if (cReset === lReset) {
-            const merged = [...new Set([...lIds, ...cEntry.ids])];
+            const merged = [...new Set([...lIds, ...cIds])];
             if (merged.length !== lIds.length) {
               localStorage.setItem(sKey, JSON.stringify(merged));
               changed = true;
@@ -3480,7 +3757,7 @@
         });
       }
 
-      // 2. Sync Active / Paused Session for this Track (supports both sharded .session and legacy .sessions)
+      // 2. Sync Active / Paused Session for this Track
       const cSess = cloud.session || (cloud.sessions && cloud.sessions[trk]);
       if (cSess) {
         const sKey = `tcmQuizState_${trk}`;
@@ -3718,6 +3995,20 @@
     const container = document.getElementById("qzChannelTree");
     container.innerHTML = "";
 
+    const impEl = document.getElementById("qzImpFilter");
+    if (impEl) {
+      const isPatTrack = currentTrack === "patterns";
+      Array.from(impEl.options).forEach(opt => {
+        if (opt.value === "complex_only" || opt.value === "simple_only") {
+          opt.hidden = !isPatTrack;
+          opt.disabled = !isPatTrack;
+        }
+      });
+      if (!isPatTrack && (impEl.value === "complex_only" || impEl.value === "simple_only")) {
+        impEl.value = "all";
+      }
+    }
+
     let channelsMap = {};
     let channelOrder = [];
 
@@ -3813,7 +4104,11 @@
     );
 
     let base = trackEligiblePoints.filter(p => checkedSet.has(p["Short Name"]));
-    if (impVal === "any") {
+    if (impVal === "complex_only") {
+      base = base.filter(p => isComplexPatternRecord(p));
+    } else if (impVal === "simple_only") {
+      base = base.filter(p => !isComplexPatternRecord(p));
+    } else if (impVal === "any") {
       base = base.filter(p => ["!", "!!", "!!!"].includes(String(p.Important || "").trim()));
     } else if (impVal !== "all") {
       base = base.filter(p => String(p.Important || "").trim() === impVal);
