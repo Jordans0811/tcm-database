@@ -179,13 +179,71 @@
     }
     .row-title { font-size: 18px; font-weight: 700; padding: 0 15px; margin-bottom: 10px; color: #333; }
     
-       .scroller {
-      position: relative; /* FIX: Restores local coordinates for horizontal card centering */
+    .scroller-wrap {
+      position: relative;
+      width: 100%;
+      display: flex;
+      align-items: center;
+    }
+
+    .scroller {
+      position: relative; /* Restores local coordinates for horizontal card centering */
       display: flex; overflow-x: auto; padding: 0 15px 15px 15px; gap: 12px;
       -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      width: 100%; box-sizing: border-box;
     }
 
     .scroller::-webkit-scrollbar { display: none; }
+
+    /* Desktop Hover Paddles (Hidden by default and on touchscreens) */
+    .row-paddle {
+       display: none;
+      position: absolute;
+      top: calc(50% - 7px);
+      transform: translateY(-50%);
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: #007aff;
+      font-size: 22px; font-weight: 800; line-height: 1;
+      align-items: center; justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+      z-index: 25;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.12s ease, background 0.15s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .row-paddle.left { left: 6px; padding-right: 2px; }
+    .row-paddle.right { right: 6px; padding-left: 2px; }
+    .row-paddle:active { transform: translateY(-50%) scale(0.92); }
+
+    @media (hover: hover) and (pointer: fine) {
+      .row-paddle { display: flex; }
+      .scroller-wrap:hover .row-paddle.can-scroll {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .row-paddle:hover {
+        background: #ffffff;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .row-paddle {
+        background: rgba(44, 44, 46, 0.92);
+        border-color: #48484a;
+        color: #0a84ff;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+      }
+      .row-paddle:hover { background: #3a3a3c; }
+    }
 
     .point-card {
       flex: 0 0 auto; width: 100px; background: white; border-radius: 8px; overflow: hidden;
@@ -2443,7 +2501,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "11.06.26.v2";
+const APP_VERSION = "11.09.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -4869,12 +4927,46 @@ searchInput.addEventListener("keydown", e => {
       // --- ADD THIS GLOBAL VARIABLE ---
   let windowingObserver = null;
 
+  // --- HELPER: UPDATES HOVER PADDLE VISIBILITY ---
+  function updateRowPaddles(scroller, leftBtn, rightBtn) {
+    const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+    if (maxScroll <= 4) {
+      leftBtn.classList.remove("can-scroll");
+      rightBtn.classList.remove("can-scroll");
+      return;
+    }
+    leftBtn.classList.toggle("can-scroll", scroller.scrollLeft > 4);
+    rightBtn.classList.toggle("can-scroll", scroller.scrollLeft < maxScroll - 4);
+  }
+
   // --- EXTRACTED BUILDER FUNCTION ---
   function buildRow(channelName, channelPoints) {
     const rowDiv = document.createElement("div"); rowDiv.className = "channel-row";
     const title = document.createElement("div"); title.className = "row-title"; title.textContent = channelName;
+    
+    const scrollerWrap = document.createElement("div"); scrollerWrap.className = "scroller-wrap";
     const scroller = document.createElement("div"); scroller.className = "scroller";
     const panel = document.createElement("div"); panel.className = "detail-panel";
+
+    const leftBtn = document.createElement("button");
+    leftBtn.type = "button";
+    leftBtn.className = "row-paddle left";
+    leftBtn.setAttribute("aria-label", "Scroll left");
+    leftBtn.textContent = "‹";
+    leftBtn.onclick = (e) => {
+      e.stopPropagation();
+      scroller.scrollBy({ left: -Math.max(220, scroller.clientWidth * 0.75), behavior: "smooth" });
+    };
+
+    const rightBtn = document.createElement("button");
+    rightBtn.type = "button";
+    rightBtn.className = "row-paddle right";
+    rightBtn.setAttribute("aria-label", "Scroll right");
+    rightBtn.textContent = "›";
+    rightBtn.onclick = (e) => {
+      e.stopPropagation();
+      scroller.scrollBy({ left: Math.max(220, scroller.clientWidth * 0.75), behavior: "smooth" });
+    };
 
     channelPoints.forEach((point) => {
       const card = document.createElement("div"); card.className = "point-card";
@@ -4901,8 +4993,16 @@ searchInput.addEventListener("keydown", e => {
       scroller.appendChild(card);
     });
 
+    scroller.addEventListener("scroll", () => updateRowPaddles(scroller, leftBtn, rightBtn), { passive: true });
+    scrollerWrap.addEventListener("mouseenter", () => updateRowPaddles(scroller, leftBtn, rightBtn), { passive: true });
+    requestAnimationFrame(() => updateRowPaddles(scroller, leftBtn, rightBtn));
+
+    scrollerWrap.appendChild(leftBtn);
+    scrollerWrap.appendChild(scroller);
+    scrollerWrap.appendChild(rightBtn);
+
     rowDiv.appendChild(title); 
-    rowDiv.appendChild(scroller); 
+    rowDiv.appendChild(scrollerWrap); 
     rowDiv.appendChild(panel);
     return rowDiv;
   }
@@ -7899,6 +7999,71 @@ window.markAllLinesInSection = function(buttonEl, pointId) {
 };
 
 
+// --- SMART HORIZONTAL WHEEL HANDLER ---
+let isVerticallyScrolling = false;
+let verticalScrollTimer = null;
+let armedScroller = null;
+let horizontalWheelTimer = null;
+
+// 1. Lock vertical momentum so passing rows cannot hijack the wheel mid-scroll
+appContainer.addEventListener('scroll', () => {
+  // Don't lock vertical scroll if the user was just actively scrolling a row horizontally
+  if (horizontalWheelTimer) return;
+  isVerticallyScrolling = true;
+  armedScroller = null;
+  clearTimeout(verticalScrollTimer);
+  verticalScrollTimer = setTimeout(() => {
+    isVerticallyScrolling = false;
+  }, 160);
+}, { passive: true });
+
+// 2. Arm a row when hovering a card; keep it armed across the 12px gaps inside that same row
+cardContainer.addEventListener('mousemove', (e) => {
+  if (isVerticallyScrolling) return;
+  const scroller = e.target.closest('.scroller');
+  if (!scroller || scroller.scrollWidth <= scroller.clientWidth + 4) {
+    armedScroller = null;
+    return;
+  }
+  // Arm as soon as pointer touches a card, and stay armed while inside that same scroller
+  if (e.target.closest('.point-card') || armedScroller === scroller) {
+    armedScroller = scroller;
+  }
+}, { passive: true });
+
+// 3. Scroll horizontally only when an overflowing row is armed; otherwise scroll page vertically
+cardContainer.addEventListener('wheel', (e) => {
+  // Let native horizontal trackpad two-finger swipes work untouched
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+
+  // Never interrupt active vertical page scrolling
+  if (isVerticallyScrolling) return;
+
+  // Use .closest('.scroller') so the 12px gaps between sliding cards don't drop the scroll
+  const scroller = e.target.closest('.scroller');
+
+  // Ignore non-overflowing rows, row titles, or un-armed rows
+  if (!scroller || scroller !== armedScroller || scroller.scrollWidth <= scroller.clientWidth + 4) {
+    return;
+  }
+
+  // Pass wheel through to vertical page scroll once the row hits its left or right end
+  const atLeftEdge = scroller.scrollLeft <= 0 && e.deltaY < 0;
+  const atRightEdge = (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 2) && e.deltaY > 0;
+  if (atLeftEdge || atRightEdge) {
+    return;
+  }
+
+  e.preventDefault();
+  scroller.scrollLeft += e.deltaY;
+
+  // Brief guard so hitting an edge and immediately reversing direction stays responsive
+  clearTimeout(horizontalWheelTimer);
+  horizontalWheelTimer = setTimeout(() => {
+    horizontalWheelTimer = null;
+  }, 200);
+}, { passive: false });
+
 // --- WIPE KEYBOARD CURSOR ON TOUCH ---
 document.getElementById('appContainer').addEventListener('touchstart', () => {
   document.querySelectorAll('.point-card.active').forEach(c => c.classList.remove('active'));
@@ -10039,15 +10204,15 @@ document.getElementById("studyOrderSelect").addEventListener("change", () => {
 
 
 document.addEventListener('wheel', (e) => {
-  // Define which classes should intercept the scroll wheel
-  const scroller = e.target.closest('.pill-nav, .jump-pills-scroller, .scroller, .point-action-row, .study-occ-bar, .quiz-track-tabs, .quiz-subtoolbar, .compare-actions');
+  // Intercept horizontal pill/action toolbars (main-page .scroller is handled separately above)
+  const scroller = e.target.closest('.pill-nav, .jump-pills-scroller, .point-action-row, .study-occ-bar, .quiz-track-tabs, .quiz-subtoolbar, .compare-actions');
   
-  // Only hijack if we are over a menu, moving vertically, and NOT using a trackpad's horizontal swipe
-  if (scroller && e.deltaY !== 0 && Math.abs(e.deltaX) < 10) {
-    e.preventDefault(); // Stop the page from scrolling down
+  // Only hijack if the toolbar actually overflows horizontally and user is scrolling vertically
+  if (scroller && scroller.scrollWidth > scroller.clientWidth + 2 && e.deltaY !== 0 && Math.abs(e.deltaX) < 10) {
+    e.preventDefault();
     scroller.scrollBy({ left: e.deltaY, behavior: 'auto' });
   }
-}, { passive: false }); // passive: false is strictly required to allow preventDefault()
+}, { passive: false });
 
 
 
