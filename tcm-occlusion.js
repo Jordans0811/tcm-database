@@ -1,5 +1,5 @@
 /* ============================================================================
-   TCM VISUAL OCCLUSION STUDIO MODULE (tcm-occlusion.js) -- V18.3 PRODUCTION
+   TCM VISUAL OCCLUSION STUDIO MODULE (tcm-occlusion.js) -- V18.4 PRODUCTION
    - Zero external Panzoom dependency (Built-in Native Transform Engine)
    - Deferred / Offline-Resilient PDF.js loader + Cache API pre-caching
    - Full Multi-Photo (JPEG, PNG, WebP) & PDF Occlusion + Google Sheets Sync
@@ -87,7 +87,6 @@
       document.head.appendChild(s);
     });
   }
-
 
   // --- 1. INJECT SCOPED STYLES & MODAL DOM ---
   function injectOcclusionStudioDOM() {
@@ -571,21 +570,36 @@
 
       #occStudioModal .group-badge {
         position: absolute;
-        top: -7px; right: -7px;
+        top: -6px; right: -6px;
         background: #34c759;
         color: #ffffff;
-        border-radius: 10px;
-        min-width: 15px;
-        height: 15px;
-        padding: 0 4px;
-        font-size: 9px;
+        border-radius: 8px;
+        min-width: 14px;
+        height: 14px;
+        padding: 0 3.5px;
+        font-size: 8.5px;
+        line-height: 1;
         font-weight: 800;
         display: flex;
         align-items: center;
         justify-content: center;
         pointer-events: none;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         z-index: 10;
+      }
+      @media (max-width: 640px) {
+        #occStudioModal .group-badge {
+          top: -4px; right: -4px;
+          min-width: 10px;
+          height: 10px;
+          padding: 0 2px;
+          font-size: 6.5px;
+          border-radius: 5px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+        }
+      }
+      #occStudioModal.occ-study-mode .occlusion-box.revealed .group-badge {
+        display: none !important;
       }
 
       #occStudioModal .occlusion-box[data-boxtype="note"] {
@@ -755,6 +769,42 @@
         color: var(--occ-text);
         border: 1px solid var(--occ-border);
         padding: 8px 11px;
+      }
+      .occ-stepper-split {
+        display: none;
+        align-items: stretch;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--occ-accent);
+        box-shadow: 0 2px 8px rgba(0, 122, 255, 0.22);
+      }
+      .occ-stepper-split-half {
+        border: none;
+        padding: 8px 13px;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: opacity 0.12s, transform 0.1s;
+      }
+      .occ-stepper-split-half:active {
+        opacity: 0.75;
+        transform: scale(0.97);
+      }
+      .occ-stepper-split-half.reset-half {
+        background: var(--occ-surface-elevated);
+        color: var(--occ-text);
+        border-right: 1px solid var(--occ-border);
+      }
+      .occ-stepper-split-half.next-half {
+        background: var(--occ-accent);
+        color: #ffffff;
+      }
+      .occ-stepper-split-half.next-half:disabled {
+        opacity: 0.45;
+        cursor: default;
       }
       @media (max-width: 540px) {
         #occStudyStepper { right: 50%; transform: translateX(50%); width: max-content; }
@@ -928,6 +978,10 @@
             <button class="occ-stepper-btn secondary" id="occPeekBtn" title="Hold to Peek (Key: P)">👁️ Peek</button>
             <button class="occ-stepper-btn secondary" onclick="occHandleUndoReveal()" title="Undo Last Reveal">↩️</button>
             <button class="occ-stepper-btn" id="occStepperMainBtn" onclick="occHandleSequentialStep()">▶️ Next Box (Space)</button>
+            <div class="occ-stepper-split" id="occStepperSplitGroup">
+              <button class="occ-stepper-split-half reset-half" onclick="occHideAll()" title="Reset all boxes on this page">🔄 Reset</button>
+              <button class="occ-stepper-split-half next-half" id="occStepperNextPageBtn" onclick="occChangePage(1)" title="Go to Next Page (Space / Shift+→)">Next Page ›</button>
+            </div>
           </div>
 
           <div id="occEditPanel">
@@ -1193,6 +1247,10 @@
   }
 
   window.occTriggerUndo = function () {
+    if (!isEditMode) {
+      occHandleUndoReveal();
+      return;
+    }
     if (undoStack.length === 0) {
       notify("Nothing to undo");
       return;
@@ -1204,6 +1262,16 @@
     saveToLocal();
     notify("Undid last action");
   };
+
+  function pageHasActiveBoxes(targetPage) {
+    return allBoxes.some(b => {
+      if (b.page !== targetPage || b.boxType === "deleted") return false;
+      if (!isEditMode) {
+        return b.boxType === "occlusion" && !isBoxFilteredOutInStudy(b);
+      }
+      return true;
+    });
+  }
 
   function gotoPage(targetNum, retainHighlight = false) {
     if (!docType) return;
@@ -1227,9 +1295,9 @@
     ["occFilterBtnEdit", "occFilterBtnStudy"].forEach(id => {
       document.getElementById(id)?.classList.toggle("active", filterEmptyPages);
     });
-    if (filterEmptyPages && !allBoxes.some(b => b.page === pageNum && b.boxType !== "deleted")) {
+    if (filterEmptyPages && !pageHasActiveBoxes(pageNum)) {
       occChangePage(1);
-      if (!allBoxes.some(b => b.page === pageNum && b.boxType !== "deleted")) occChangePage(-1);
+      if (!pageHasActiveBoxes(pageNum)) occChangePage(-1);
     }
   };
 
@@ -1238,13 +1306,13 @@
     if (filterEmptyPages) {
       let nextNum = pageNum + delta;
       while (nextNum >= 1 && nextNum <= totalPages) {
-        if (allBoxes.some(b => b.page === nextNum && b.boxType !== "deleted")) {
+        if (pageHasActiveBoxes(nextNum)) {
           gotoPage(nextNum);
           return;
         }
         nextNum += delta;
       }
-      notify("No more pages with boxes");
+      notify("No more matching pages");
     } else {
       gotoPage(pageNum + delta);
     }
@@ -1266,7 +1334,7 @@
   window.occRevealAll = function () {
     editBoxesRevealed = true;
     currentTargetBoxId = null;
-    document.querySelectorAll('#occOverlay .occlusion-box[data-boxtype="occlusion"]').forEach(b => {
+    document.querySelectorAll('#occOverlay .occlusion-box[data-boxtype="occlusion"]:not(.filtered-out)').forEach(b => {
       b.classList.add("revealed");
       b.classList.remove("study-target");
     });
@@ -1282,7 +1350,11 @@
       b.classList.remove("revealed", "study-target");
     });
     hideRatingBasket();
-    updateStudyStepperLabel();
+    if (!isEditMode) {
+      drawStoredBoxes();
+    } else {
+      updateStudyStepperLabel();
+    }
   };
 
   window.occResetView = function () {
@@ -1299,6 +1371,7 @@
     if (!docType) return;
     isEditMode = !isEditMode;
     currentTargetBoxId = null;
+    sequentialRevealHistory = [];
     const modal = document.getElementById("occStudioModal");
 
     if (isEditMode) {
@@ -1317,6 +1390,9 @@
       occCloseEditPanel();
       hideRatingBasket();
       activeSearchHighlight = "";
+      document.querySelectorAll('#occOverlay .occlusion-box').forEach(b => {
+        b.classList.remove("revealed", "study-target");
+      });
       document.getElementById("occEditActions").style.display = "none";
       document.getElementById("occEditToolbar").style.display = "none";
       document.getElementById("occStudyToolbar").style.display = "flex";
@@ -1329,6 +1405,17 @@
   };
 
   // --- 6. BOX RENDERING & STUDY ENGINE ---
+  function getEffectiveBoxPoints(boxData) {
+    if (!boxData) return 0;
+    const gKey = boxData.group !== undefined && boxData.group !== null ? String(boxData.group).trim() : "";
+    if (!gKey) return boxData.points || 0;
+    const groupBoxes = allBoxes.filter(
+      b => b.page === boxData.page && b.boxType === "occlusion" && String(b.group !== undefined && b.group !== null ? b.group : "").trim() === gKey
+    );
+    if (groupBoxes.length <= 1) return boxData.points || 0;
+    return Math.min(...groupBoxes.map(b => b.points || 0));
+  }
+
   function getBoxColor(points) {
     const pts = points || 0;
     if (pts < 2) return "var(--occ-red)";
@@ -1347,7 +1434,7 @@
 
   function isBoxFilteredOutInStudy(boxData) {
     if (isEditMode || boxData.boxType !== "occlusion") return false;
-    const pts = boxData.points || 0;
+    const pts = getEffectiveBoxPoints(boxData);
     if (studyFilterMode === "unmastered" && pts >= 3) return true;
     if (studyFilterMode === "red" && pts >= 2) return true;
     return false;
@@ -1363,7 +1450,11 @@
     studyFilterMode = order[(order.indexOf(studyFilterMode) + 1) % order.length];
     document.getElementById("occStudyFilterPill").innerText = labels[studyFilterMode];
     currentTargetBoxId = null;
+    sequentialRevealHistory = [];
     hideRatingBasket();
+    document.querySelectorAll('#occOverlay .occlusion-box').forEach(b => {
+      b.classList.remove("revealed", "study-target", "filtered-out");
+    });
     drawStoredBoxes();
   };
 
@@ -1372,6 +1463,11 @@
     saveStateForUndo();
     allBoxes.forEach(b => {
       if (b.page === pageNum && b.boxType === "occlusion") b.points = 0;
+    });
+    sequentialRevealHistory = [];
+    currentTargetBoxId = null;
+    document.querySelectorAll('#occOverlay .occlusion-box').forEach(b => {
+      b.classList.remove("revealed", "study-target", "filtered-out");
     });
     drawStoredBoxes();
     saveToLocal();
@@ -1392,16 +1488,24 @@
 
   function updateMasteryCounters() {
     const pageOcc = allBoxes.filter(b => b.page === pageNum && b.boxType === "occlusion");
+    const seenGroups = new Set();
     let r = 0, y = 0, g = 0;
     pageOcc.forEach(b => {
-      const pts = b.points || 0;
+      const gKey = b.group !== undefined && b.group !== null ? String(b.group).trim() : "";
+      if (gKey) {
+        if (seenGroups.has(gKey)) return;
+        seenGroups.add(gKey);
+      }
+      const pts = getEffectiveBoxPoints(b);
       if (pts < 2) r++;
       else if (pts < 3) y++;
       else g++;
     });
+    const totalUnits = r + y + g;
     document.getElementById("occStatRed").innerText = r;
     document.getElementById("occStatYellow").innerText = y;
     document.getElementById("occStatGreen").innerText = g;
+    document.getElementById("occBoxCounter").innerText = totalUnits > 0 ? `(${totalUnits})` : "";
   }
 
   function drawStoredBoxes() {
@@ -1409,7 +1513,7 @@
     if (!overlay) return;
 
     const previouslyRevealedIds = new Set(
-      Array.from(overlay.querySelectorAll(".occlusion-box.revealed")).map(el => el.dataset.id)
+      Array.from(overlay.querySelectorAll(".occlusion-box.revealed:not(.filtered-out)")).map(el => el.dataset.id)
     );
 
     Array.from(overlay.children).forEach(child => {
@@ -1418,11 +1522,7 @@
       }
     });
 
-    let boxesOnPage = 0;
-
     allBoxes.filter(b => b.page === pageNum && b.boxType !== "deleted").forEach(data => {
-      boxesOnPage++;
-
       if (data.boxType === "drawing") {
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svg.setAttribute("class", "occlusion-box");
@@ -1470,18 +1570,23 @@
       const isSelected = selectedBoxes.includes(data.id) && isEditMode;
       if (isSelected) box.classList.add("selected");
 
-      if (isEditMode && editBoxesRevealed && data.boxType !== "note") {
+      const filteredOut = isBoxFilteredOutInStudy(data);
+      if (filteredOut) {
+        box.classList.add("filtered-out", "revealed");
+      } else if (isEditMode && editBoxesRevealed && data.boxType !== "note") {
         box.classList.add("revealed");
       } else if (!isEditMode && previouslyRevealedIds.has(data.id)) {
         box.classList.add("revealed");
       }
 
-      if (isBoxFilteredOutInStudy(data)) {
-        box.classList.add("filtered-out", "revealed");
-      }
-
-      if (!isEditMode && currentTargetBoxId === data.id) {
-        box.classList.add("study-target");
+      if (!isEditMode && currentTargetBoxId && !filteredOut) {
+        const targetBox = allBoxes.find(b => b.id === currentTargetBoxId);
+        const targetG = targetBox && targetBox.group ? String(targetBox.group).trim() : "";
+        const dataG = data.group ? String(data.group).trim() : "";
+        const isGroupMatch = Boolean(targetG && dataG === targetG && data.boxType === "occlusion");
+        if (currentTargetBoxId === data.id || isGroupMatch) {
+          box.classList.add("study-target");
+        }
       }
 
       box.style.left = data.left;
@@ -1489,11 +1594,11 @@
       box.style.width = data.width;
       box.style.height = data.height;
       box.dataset.id = data.id;
-      box.dataset.group = data.group || "";
+      box.dataset.group = data.group !== undefined && data.group !== null ? String(data.group).trim() : "";
       box.dataset.boxtype = data.boxType || "occlusion";
 
       if (box.dataset.boxtype === "occlusion") {
-        const boxColor = getBoxColor(data.points);
+        const boxColor = getBoxColor(getEffectiveBoxPoints(data));
         box.style.backgroundColor = boxColor;
         box.style.borderColor = boxColor;
       }
@@ -1522,7 +1627,6 @@
       if (hintEl) autoFitHintText(hintEl);
     });
 
-    document.getElementById("occBoxCounter").innerText = boxesOnPage > 0 ? `(${boxesOnPage})` : "";
     updateMasteryCounters();
     updateStudyStepperLabel();
   }
@@ -1534,7 +1638,7 @@
     let boxesToReveal = [];
     if (data.group) {
       const safeGroup = CSS.escape(data.group);
-      boxesToReveal = Array.from(overlay.querySelectorAll(`.occlusion-box[data-group="${safeGroup}"]`));
+      boxesToReveal = Array.from(overlay.querySelectorAll(`.occlusion-box[data-group="${safeGroup}"]:not(.filtered-out)`));
     } else {
       boxesToReveal = [boxElement];
     }
@@ -1545,10 +1649,19 @@
 
     if (isCurrentlyRevealed) {
       boxesToReveal.forEach(b => b.classList.remove("revealed"));
+      const rehidIds = new Set(boxesToReveal.map(el => el.dataset.id));
+      sequentialRevealHistory = sequentialRevealHistory.filter(
+        entry => !entry.elements.some(el => rehidIds.has(el.dataset.id))
+      );
       hideRatingBasket();
     } else {
-      boxesToReveal.forEach(b => b.classList.add("revealed"));
-      sequentialRevealHistory.push(boxesToReveal);
+      const prevScores = new Map();
+      boxesToReveal.forEach(b => {
+        b.classList.add("revealed");
+        const bObj = allBoxes.find(item => item.id === b.dataset.id);
+        if (bObj) prevScores.set(bObj.id, bObj.points || 0);
+      });
+      sequentialRevealHistory.push({ elements: boxesToReveal, prevScores, rated: false });
 
       if (ratingEnabled) {
         currentlyRatingGroup = data.group
@@ -1580,21 +1693,50 @@
 
   function updateStudyStepperLabel() {
     const btn = document.getElementById("occStepperMainBtn");
-    if (!btn || isEditMode) return;
+    const splitGroup = document.getElementById("occStepperSplitGroup");
+    const nextPageBtn = document.getElementById("occStepperNextPageBtn");
+    if (!btn || !splitGroup || isEditMode) return;
+
     const hidden = getRemainingHiddenBoxes();
     if (hidden.length === 0) {
-      btn.innerHTML = "🎉 Page Complete (Reset)";
-    } else if (currentTargetBoxId) {
-      btn.innerHTML = "👁️ Reveal Target (Space)";
+      btn.style.display = "none";
+      splitGroup.style.display = "inline-flex";
+      if (nextPageBtn) {
+        const isLastPage = pageNum >= totalPages;
+        nextPageBtn.disabled = isLastPage;
+        nextPageBtn.innerHTML = isLastPage ? "🏁 End" : "Next Page ›";
+      }
     } else {
-      btn.innerHTML = `▶️ Focus Next (${hidden.length} left)`;
+      btn.style.display = "inline-block";
+      splitGroup.style.display = "none";
+      if (currentTargetBoxId) {
+        btn.innerHTML = "👁️ Reveal Target (Space)";
+      } else {
+        const seenGroups = new Set();
+        let stepsLeft = 0;
+        hidden.forEach(b => {
+          if (b.group) {
+            if (!seenGroups.has(b.group)) {
+              seenGroups.add(b.group);
+              stepsLeft++;
+            }
+          } else {
+            stepsLeft++;
+          }
+        });
+        btn.innerHTML = `▶️ Focus Next (${stepsLeft} left)`;
+      }
     }
   }
 
   window.occHandleSequentialStep = function () {
     const hidden = getRemainingHiddenBoxes();
     if (hidden.length === 0) {
-      occHideAll();
+      if (pageNum < totalPages) {
+        occChangePage(1);
+      } else {
+        occHideAll();
+      }
       return;
     }
     if (currentTargetBoxId) {
@@ -1610,10 +1752,20 @@
 
   function focusTargetBox(boxData) {
     hideRatingBasket();
-    document.querySelectorAll("#occOverlay .occlusion-box.study-target").forEach(el => el.classList.remove("study-target"));
-    currentTargetBoxId = boxData.id;
-    const targetEl = document.querySelector(`#occOverlay .occlusion-box[data-id="${boxData.id}"]`);
-    if (targetEl) targetEl.classList.add("study-target");
+    const overlay = document.getElementById("occOverlay");
+    if (overlay) {
+      overlay.querySelectorAll(".occlusion-box.study-target").forEach(el => el.classList.remove("study-target"));
+      currentTargetBoxId = boxData.id;
+      if (boxData.group) {
+        const safeGroup = CSS.escape(boxData.group);
+        overlay.querySelectorAll(`.occlusion-box[data-group="${safeGroup}"]`).forEach(el => {
+          if (!el.classList.contains("revealed")) el.classList.add("study-target");
+        });
+      } else {
+        const targetEl = overlay.querySelector(`.occlusion-box[data-id="${boxData.id}"]`);
+        if (targetEl) targetEl.classList.add("study-target");
+      }
+    }
     updateStudyStepperLabel();
   }
 
@@ -1645,24 +1797,34 @@
   window.occSubmitRating = function (addedPoints) {
     if (!currentlyRatingGroup) return;
 
-    allBoxes.forEach(box => {
-      if (box.page !== pageNum || box.boxType === "deleted") return;
-      const matches = currentlyRatingGroup.isGroup
-        ? box.group === currentlyRatingGroup.id
+    const targetGroupStr = String(currentlyRatingGroup.id).trim();
+    const matchingBoxes = allBoxes.filter(box => {
+      if (box.page !== pageNum || box.boxType !== "occlusion") return false;
+      return currentlyRatingGroup.isGroup
+        ? String(box.group !== undefined && box.group !== null ? box.group : "").trim() === targetGroupStr
         : box.id === currentlyRatingGroup.id;
+    });
 
-      if (matches && box.boxType === "occlusion") {
-        if (addedPoints === 0) box.points = 0;
-        else box.points = (box.points || 0) + addedPoints;
+    if (matchingBoxes.length > 0) {
+      const basePts = Math.min(...matchingBoxes.map(b => b.points || 0));
+      const nextPts = addedPoints === 0 ? 0 : basePts + addedPoints;
 
+      matchingBoxes.forEach(box => {
+        box.points = nextPts;
         const domBox = document.querySelector(`#occOverlay .occlusion-box[data-id="${box.id}"]`);
         if (domBox) {
           const newColor = getBoxColor(box.points);
           domBox.style.backgroundColor = newColor;
           domBox.style.borderColor = newColor;
+          if (isBoxFilteredOutInStudy(box)) {
+            domBox.classList.add("filtered-out", "revealed");
+          }
         }
-      }
-    });
+      });
+    }
+
+    const lastHistory = sequentialRevealHistory[sequentialRevealHistory.length - 1];
+    if (lastHistory) lastHistory.rated = true;
 
     updateMasteryCounters();
     saveToLocal();
@@ -1675,8 +1837,27 @@
 
   window.occHandleUndoReveal = function () {
     if (sequentialRevealHistory.length === 0) return;
-    const lastRevealedElements = sequentialRevealHistory.pop();
-    lastRevealedElements.forEach(el => el.classList.remove("revealed", "study-target"));
+    const lastEntry = sequentialRevealHistory.pop();
+    const lastRevealedElements = Array.isArray(lastEntry) ? lastEntry : (lastEntry.elements || []);
+
+    if (lastEntry && lastEntry.rated && lastEntry.prevScores) {
+      lastEntry.prevScores.forEach((oldPts, boxId) => {
+        const box = allBoxes.find(b => b.id === boxId);
+        if (box) {
+          box.points = oldPts;
+          const domBox = document.querySelector(`#occOverlay .occlusion-box[data-id="${box.id}"]`);
+          if (domBox) {
+            const oldColor = getBoxColor(box.points);
+            domBox.style.backgroundColor = oldColor;
+            domBox.style.borderColor = oldColor;
+          }
+        }
+      });
+      updateMasteryCounters();
+      saveToLocal();
+    }
+
+    lastRevealedElements.forEach(el => el.classList.remove("revealed", "study-target", "filtered-out"));
     if (lastRevealedElements[0]) {
       const id = lastRevealedElements[0].dataset.id;
       const bData = allBoxes.find(b => b.id === id);
@@ -2264,14 +2445,24 @@
 
   function liveUpdateBox(type, value) {
     if (selectedBoxes.length === 0) return;
+    const cleanVal = type === "group" ? String(value || "").trim() : value;
     selectedBoxes.forEach(id => {
       const box = allBoxes.find(b => b.id === id);
       if (box) {
-        if (type === "hint") box.hint = value;
-        if (type === "group") box.group = value;
-        if (type === "boxType") box.boxType = value;
+        if (type === "hint") box.hint = cleanVal;
+        if (type === "group") box.group = cleanVal;
+        if (type === "boxType") box.boxType = cleanVal;
       }
     });
+    if (type === "group" && cleanVal) {
+      const groupMembers = allBoxes.filter(
+        b => b.page === pageNum && b.boxType === "occlusion" && String(b.group || "").trim() === cleanVal
+      );
+      if (groupMembers.length > 1) {
+        const minPts = Math.min(...groupMembers.map(b => b.points || 0));
+        groupMembers.forEach(b => { b.points = minPts; });
+      }
+    }
 
     if (selectedBoxes.length === 1 && type === "hint") {
       const targetDom = document.querySelector(`#occOverlay .occlusion-box[data-id="${selectedBoxes[0]}"]`);
@@ -2456,6 +2647,7 @@
       allBoxes.forEach(b => {
         if (b.points === undefined) b.points = 0;
         if (!b.boxType) b.boxType = "occlusion";
+        b.group = b.group !== undefined && b.group !== null ? String(b.group).trim() : "";
       });
 
       const savedPage = localStorage.getItem("tcm_page_" + currentFileName);
@@ -2528,8 +2720,24 @@
     }
   }
 
+  function flushPendingSaveSnapshot() {
+    if (!currentFileName) return;
+    const snapshotName = currentFileName;
+    const snapshotBoxes = JSON.parse(JSON.stringify(allBoxes));
+    if (db) {
+      const tx = db.transaction("boxesCache", "readwrite");
+      tx.objectStore("boxesCache").put({ name: snapshotName, boxes: snapshotBoxes }, snapshotName);
+    }
+    localStorage.setItem("tcm_page_" + snapshotName, pageNum);
+    if (cloudSyncTimer || localStorage.getItem("tcm_dirty_" + snapshotName) === "1") {
+      clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = null;
+      pushToCloud(false, snapshotName, snapshotBoxes);
+    }
+  }
+
   window.occCloseDocument = function () {
-    if (currentFileName) saveToLocal();
+    if (currentFileName) flushPendingSaveSnapshot();
     if (pdfDoc) { pdfDoc.destroy(); pdfDoc = null; }
     imagePages.forEach(p => { if (p.url) URL.revokeObjectURL(p.url); });
     imagePages = [];
@@ -2615,6 +2823,7 @@
 
   window.occLoadFromLibrary = function (name) {
     if (!db) return;
+    if (currentFileName && currentFileName !== name) flushPendingSaveSnapshot();
     const tx = db.transaction("libraryCache", "readonly");
     const req = tx.objectStore("libraryCache").get(name);
     req.onsuccess = async () => {
@@ -2641,33 +2850,40 @@
 
   async function saveToLocal(skipCloudPush = false) {
     if (!currentFileName) return;
+    const snapshotName = currentFileName;
+    const snapshotBoxes = JSON.parse(JSON.stringify(allBoxes));
     if (db) {
       const tx = db.transaction("boxesCache", "readwrite");
-      tx.objectStore("boxesCache").put({ name: currentFileName, boxes: allBoxes }, currentFileName);
+      tx.objectStore("boxesCache").put({ name: snapshotName, boxes: snapshotBoxes }, snapshotName);
     }
-    localStorage.setItem("tcm_page_" + currentFileName, pageNum);
+    localStorage.setItem("tcm_page_" + snapshotName, pageNum);
 
     if (!skipCloudPush) {
+      localStorage.setItem("tcm_dirty_" + snapshotName, "1");
       const saveBtn = document.getElementById("occSaveCloudBtn");
       if (saveBtn) saveBtn.innerHTML = "⏳";
       clearTimeout(cloudSyncTimer);
-      cloudSyncTimer = setTimeout(() => pushToCloud(false), 1800);
+      cloudSyncTimer = setTimeout(() => pushToCloud(false, snapshotName, snapshotBoxes), 1800);
     }
   }
 
-  async function pushToCloud(manual = false) {
-    if (!navigator.onLine || !currentFileName) {
+  async function pushToCloud(manual = false, overrideFileName = null, overrideBoxes = null) {
+    const targetFile = overrideFileName || currentFileName;
+    const targetBoxes = overrideBoxes || allBoxes;
+    if (!navigator.onLine || !targetFile) {
+      cloudSyncTimer = null;
       if (manual) notify("Offline -- saved locally");
       return;
     }
     try {
-      const payload = { pdfName: currentFileName, boxes: allBoxes };
+      const payload = { pdfName: targetFile, boxes: targetBoxes };
       await fetch(GOOGLE_WEB_APP_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
       });
+      localStorage.removeItem("tcm_dirty_" + targetFile);
       const saveBtn = document.getElementById("occSaveCloudBtn");
       if (saveBtn) saveBtn.innerHTML = "💾";
       cloudSyncTimer = null;
@@ -2680,13 +2896,29 @@
       if (!isBackground) notify("Must be online with a file open to sync");
       return;
     }
+
+    // Protect unsynced local edits/ratings against automatic background pulls
+    const hasPendingLocalEdits = Boolean(cloudSyncTimer) || localStorage.getItem("tcm_dirty_" + currentFileName) === "1";
+    if (isBackground && hasPendingLocalEdits) {
+      clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = null;
+      await pushToCloud(false);
+      return;
+    }
+
     const syncBtn = document.getElementById("occSyncCloudBtn");
     if (syncBtn) syncBtn.innerHTML = "⏳";
+    const requestedFile = currentFileName;
 
     try {
-      const url = GOOGLE_WEB_APP_URL + "?pdfName=" + encodeURIComponent(currentFileName);
+      const url = GOOGLE_WEB_APP_URL + "?pdfName=" + encodeURIComponent(requestedFile);
       const response = await fetch(url);
       const data = await response.json();
+
+      // Abort background overwrite if user edited/rated a box while the fetch was in flight
+      if (isBackground && (requestedFile !== currentFileName || cloudSyncTimer || localStorage.getItem("tcm_dirty_" + currentFileName) === "1")) {
+        return;
+      }
 
       if (data && data.boxes && data.boxes.length > 0) {
         const safeCSS = val => {
@@ -2710,7 +2942,7 @@
             width: safeCSS(b.Width !== undefined ? b.Width : b.width),
             height: safeCSS(b.Height !== undefined ? b.Height : b.height),
             hint: (b.Hint !== undefined ? b.Hint : b.hint) || "",
-            group: (b.Group !== undefined ? b.Group : b.group) || "",
+            group: String(b.Group !== undefined ? b.Group : (b.group !== undefined ? b.group : "")).trim(),
             points: parseFloat(b.Points !== undefined ? b.Points : b.points) || 0,
             boxType: (b["Box Type"] !== undefined ? b["Box Type"] : b.boxType) || "occlusion",
             pathData: b.pathData || b["Path Data"] || ""
@@ -2718,6 +2950,7 @@
         });
 
         allBoxes = Array.from(uniqueBoxes.values());
+        localStorage.removeItem("tcm_dirty_" + currentFileName);
         saveToLocal(true);
         drawStoredBoxes();
         if (!isBackground) notify("Pulled latest boxes from Google Sheets ☁️");
@@ -2735,6 +2968,7 @@
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden" && currentFileName && cloudSyncTimer) {
       clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = null;
       pushToCloud(false);
     } else if (document.visibilityState === "visible" && isOcclusionModalOpen() && currentFileName) {
       occSyncFromCloud(true);
@@ -2891,9 +3125,10 @@
     if (currentTargetBoxId) {
       currentFocus = allBoxes.find(b => b.id === currentTargetBoxId);
     } else if (sequentialRevealHistory.length > 0) {
-      const lastRevealed = sequentialRevealHistory[sequentialRevealHistory.length - 1];
-      if (lastRevealed && lastRevealed[0]) {
-        currentFocus = allBoxes.find(b => b.id === lastRevealed[0].dataset.id);
+      const lastEntry = sequentialRevealHistory[sequentialRevealHistory.length - 1];
+      const lastEls = Array.isArray(lastEntry) ? lastEntry : (lastEntry?.elements || []);
+      if (lastEls[0]) {
+        currentFocus = allBoxes.find(b => b.id === lastEls[0].dataset.id);
       }
     }
 
@@ -2910,6 +3145,7 @@
 
     hiddenBoxes.forEach(b => {
       if (b.id === currentFocus.id) return;
+      if (currentFocus.group && b.group === currentFocus.group) return;
       const bX = parseFloat(b.left) + parseFloat(b.width) / 2;
       const bY = parseFloat(b.top) + parseFloat(b.height) / 2;
       const dx = bX - cX, dy = bY - cY;
