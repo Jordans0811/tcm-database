@@ -183,7 +183,8 @@
       position: relative;
       width: 100%;
       display: flex;
-      align-items: center;
+      align-items: stretch;
+      box-sizing: border-box;
     }
 
     .scroller {
@@ -195,54 +196,71 @@
 
     .scroller::-webkit-scrollbar { display: none; }
 
-    /* Desktop Hover Paddles (Hidden by default and on touchscreens) */
+    /* Desktop Vertical Bar Paddles (Hidden on touchscreens) */
     .row-paddle {
-       display: none;
+      display: none;
       position: absolute;
-      top: calc(50% - 7px);
-      transform: translateY(-50%);
-      width: 34px; height: 34px;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      background: rgba(255, 255, 255, 0.92);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      color: #007aff;
-      font-size: 22px; font-weight: 800; line-height: 1;
-      align-items: center; justify-content: center;
+      top: 0;
+      height: calc(100% - 15px); /* Matches exact card height above the 15px bottom padding */
+      width: 26px;
+      padding: 0;
+      border-radius: 8px;
+      border: 1px solid #d1d1d6;
+      background: #ffffff; /* Solid opaque background */
+      color: #cc5500; /* TCM Orange */
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
       z-index: 25;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.18s ease, transform 0.12s ease, background 0.15s ease;
+      transition: opacity 0.15s ease, background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
-    .row-paddle.left { left: 6px; padding-right: 2px; }
-    .row-paddle.right { right: 6px; padding-left: 2px; }
-    .row-paddle:active { transform: translateY(-50%) scale(0.92); }
+    .row-paddle svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      display: block;
+      flex-shrink: 0;
+    }
+    .row-paddle.left { left: 4px; }
+    .row-paddle.right { right: 4px; }
+    .row-paddle:active { transform: scale(0.96); }
 
     @media (hover: hover) and (pointer: fine) {
+      .channel-row { max-width: 860px; }
+      .row-title { padding: 0 45px; }
+      .scroller-wrap { padding: 0 30px; } /* Reserves side gutters so bars never cover cards */
       .row-paddle { display: flex; }
       .scroller-wrap:hover .row-paddle.can-scroll {
         opacity: 1;
         pointer-events: auto;
       }
       .row-paddle:hover {
-        background: #ffffff;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+        background: #fff3eb;
+        border-color: #cc5500;
+        box-shadow: 0 3px 10px rgba(204, 85, 0, 0.2);
       }
     }
 
     @media (prefers-color-scheme: dark) {
       .row-paddle {
-        background: rgba(44, 44, 46, 0.92);
-        border-color: #48484a;
-        color: #0a84ff;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+        background: #1c1c1e; /* Solid dark card background */
+        border-color: #38383a;
+        color: #ff9f0a; /* Dark mode TCM Orange */
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
       }
-      .row-paddle:hover { background: #3a3a3c; }
+      .row-paddle:hover {
+        background: #2c221e;
+        border-color: #ff9f0a;
+      }
     }
 
     .point-card {
@@ -834,13 +852,22 @@
   box-shadow: 3px 0 8px rgba(0,0,0,0.08);
 }
 
-/* Shared Clinical Term Highlight Pill */
+/* Shared & Different Clinical Highlight Pills */
 mark.shared-term-mark {
   background-color: rgba(52, 199, 89, 0.26);
   color: inherit;
-  padding: 1px 3px;
-  border-radius: 3px;
+  padding: 1px 4px;
+  border-radius: 4px;
   font-weight: 600;
+}
+
+mark.diff-term-mark {
+  background-color: rgba(255, 149, 0, 0.25);
+  color: inherit;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: 600;
+  border-bottom: 1.5px solid rgba(204, 85, 0, 0.45);
 }
 
 .compare-card-body {
@@ -866,6 +893,11 @@ mark.shared-term-mark {
   mark.shared-term-mark {
     background-color: rgba(48, 209, 88, 0.32);
     color: #ffffff;
+  }
+  mark.diff-term-mark {
+    background-color: rgba(255, 159, 10, 0.32);
+    color: #ffffff;
+    border-bottom-color: rgba(255, 159, 10, 0.65);
   }
 }
 
@@ -2299,7 +2331,8 @@ display: flex; flex-direction: column;">
          <div class="compare-header">
         <h2>Compare Points</h2>
         <div class="compare-actions">
-          <button id="compareSharedBtn" onclick="toggleCompareSharedHighlight()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">✨ Shared</button>
+          <button id="compareSharedBtn" onclick="toggleCompareDiffMode('shared')" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">✨ Shared</button>
+          <button id="compareDiffBtn" onclick="toggleCompareDiffMode('diff')" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">⚡ Diff</button>
           <button id="compareToggleNamesBtn" onclick="toggleCompareNames()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide Names</button>
           <button onclick="shuffleCompare()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">🔀 Shuffle</button>
           <button id="compareHideAllBtn" onclick="toggleAllCompareColumns()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide All</button>
@@ -2501,7 +2534,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "11.09.26.v1";
+const APP_VERSION = "11.10.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -4952,7 +4985,7 @@ searchInput.addEventListener("keydown", e => {
     leftBtn.type = "button";
     leftBtn.className = "row-paddle left";
     leftBtn.setAttribute("aria-label", "Scroll left");
-    leftBtn.textContent = "‹";
+    leftBtn.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
     leftBtn.onclick = (e) => {
       e.stopPropagation();
       scroller.scrollBy({ left: -Math.max(220, scroller.clientWidth * 0.75), behavior: "smooth" });
@@ -4962,7 +4995,7 @@ searchInput.addEventListener("keydown", e => {
     rightBtn.type = "button";
     rightBtn.className = "row-paddle right";
     rightBtn.setAttribute("aria-label", "Scroll right");
-    rightBtn.textContent = "›";
+    rightBtn.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
     rightBtn.onclick = (e) => {
       e.stopPropagation();
       scroller.scrollBy({ left: Math.max(220, scroller.clientWidth * 0.75), behavior: "smooth" });
@@ -5425,10 +5458,10 @@ async function saveEdit() {
     }
   }
 
-        let comparePinFirst = false;
-  let compareHighlightShared = false;
+let comparePinFirst = false;
+  let compareDiffMode = "off"; // 'off' | 'shared' | 'diff'
 
-  const COMPARE_SHARED_SKIP_SECTIONS = new Set(["Location", "Location Notes", "Needling"]);
+  const COMPARE_SHARED_SKIP_SECTIONS = new Set(["Location Notes"]);
 
   const COMPARE_SHARED_IGNORE_WORDS = new Set([
     "this","that","with","from","have","they","will","what","when","where","your","then","than","into","only","also",
@@ -5444,7 +5477,8 @@ async function saveEdit() {
     "treated","treating","treatment","treats","indicate","indicated","indicates","indication","indications","action","actions",
     "commentary","combination","combinations","summary","clinical","application","notes","pattern","patterns","syndrome",
     "syndromes","disorder","disorders","disease","diseases","condition","conditions","symptom","symptoms","patient","patients",
-    "effect","effects","effective","first","second","third","four","five","single","double","primary","secondary"
+    "effect","effects","effective","first","second","third","four","five","single","double","primary","secondary",
+    "feeling","sensation","slight","possibly","severe","cases","women","children","adults","accompanied"
   ]);
 
   const COMPARE_SHORT_TCM_TERMS = new Set([
@@ -5454,12 +5488,41 @@ async function saveEdit() {
     "hot","red","pale","weak","full","xu","bi","shan","lin","beng","lou"
   ]);
 
+  // Generic single stems that should not match a 2-stem clause on their own
+  const COMPARE_GENERIC_SINGLE_STEMS = new Set([
+    "tonify","clear","drain","warm","cool","expel","resolve","transform","calm","pacify","subdue","descend","raise",
+    "lift","regulate","harmonize","invigorate","activate","stop","alleviate","benefit","open","unbind","moisten",
+    "astringe","consolidate","release","extinguish","nourish","promote","strengthen","move","pain","ache","stagnation",
+    "deficiency","excess","chronic","acute","distension","fullness","heaviness","soreness","numbness","weakness"
+  ]);
+
+  // Opposing clinical polarities so contrasting clauses (e.g., "Pale tongue" vs "Red tongue", "Cold limbs" vs "Hot limbs") never match as Shared
+  const COMPARE_POLARITY_PAIRS = [
+    [new Set(["pale"]), new Set(["red","scarlet","purple","dark"])],
+    [new Set(["cold","chill","cool"]), new Set(["heat","hot","fire","fever","warm","burning"])],
+    [new Set(["deficiency","deficient","empty","xu","weak"]), new Set(["excess","full","shi","overflow","hyperactive"])],
+    [new Set(["yin"]), new Set(["yang"])],
+    [new Set(["reinforce","reinforcing","tonify","tonifies","supplement"]), new Set(["reduce","reducing","drain","drains","sedate"])],
+    [new Set(["scanty","oliguria"]), new Set(["profuse","polyuria","copious"])],
+    [new Set(["loose","diarrhea"]), new Set(["constipation","constipated","hard"])],
+    [new Set(["slow"]), new Set(["rapid","fast","hurried"])],
+    [new Set(["thin","peel","peeled"]), new Set(["swollen","thick","flabby"])],
+    [new Set(["dry","parched"]), new Set(["sticky","slippery","greasy","moist","wet"])]
+  ];
+
   function getCompareTermStem(word) {
     const w = word.toLowerCase();
     if (/^(?:lu|li|l\.i\.|st|sp|ht|he|si|bl|ub|ki|kd|kid|pc|p|sj|te|tb|th|gb|lr|liv|lv|du|gv|rn|ren|cv|ex-[a-z]+)\s*-?\s*\d+$/i.test(w)) {
       return getCanonicalPointKey(w);
     }
-    let stem = w;
+    const ukMap = {
+      "diarrhoea": "diarrhea", "oedema": "edema", "amenorrhoea": "amenorrhea",
+      "spermatorrhoea": "spermatorrhea", "leucorrhoea": "leukorrhea", "haemoptysis": "hemoptysis",
+      "haematemesis": "hematemesis", "haemorrhoids": "hemorrhoids", "colour": "color",
+      "odour": "odor", "behaviour": "behavior", "centre": "center", "lustre": "luster",
+      "borborygmus": "borborygmi", "gallbladder": "gall"
+    };
+    let stem = ukMap[w] || w;
     if (stem.length >= 6) {
       stem = stem.replace(/(?:ness|ment|tion|sion)$/, "");
     }
@@ -5471,72 +5534,416 @@ async function saveEdit() {
     return stem;
   }
 
-  function buildSharedCompareRegex(pts, fields) {
-    if (!pts || pts.length < 2) return null;
+  function hasOppositeComparePolarity(stemsA, stemsB) {
+    if (!stemsA.length || !stemsB.length) return false;
+    const setA = new Set(stemsA);
+    const setB = new Set(stemsB);
+    for (const [group1, group2] of COMPARE_POLARITY_PAIRS) {
+      const aIn1 = stemsA.some(s => group1.has(s));
+      const aIn2 = stemsA.some(s => group2.has(s));
+      const bIn1 = stemsB.some(s => group1.has(s));
+      const bIn2 = stemsB.some(s => group2.has(s));
+      if ((aIn1 && bIn2 && !aIn2 && !bIn1) || (aIn2 && bIn1 && !aIn1 && !bIn2)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
-    const stemToPointSet = new Map();
-    const stemToSurfaceWords = new Map();
-    const tokenRegex = /\b(?:(?:LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*\d{1,2}|[A-Za-z]{2,})\b/g;
+  function normalizeCompareClause(rawSlice, lineContext) {
+    const decoded = String(rawSlice || "")
+      .replace(/&amp;/gi, " and ")
+      .replace(/&bull;/gi, " ")
+      .replace(/&[a-z0-9#]+;/gi, " ");
 
-    pts.forEach((p, ptIdx) => {
-      fields.forEach(f => {
-        if (COMPARE_SHARED_SKIP_SECTIONS.has(f.label)) return;
-        if (isSectionFilterActive && activeSections.length > 0 && !activeSections.includes(f.label)) return;
+    const pointCodes = [];
+    const ptRx = /\b(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*(\d{1,2})\b/gi;
+    let pm;
+    while ((pm = ptRx.exec(decoded)) !== null) {
+      const code = getCanonicalPointKey(pm[1], pm[2]);
+      if (code && !pointCodes.includes(code)) pointCodes.push(code);
+    }
 
-        const rawVal = p[f.key] || p[f.altKey] || "";
-        if (!rawVal) return;
-        const cleanText = stripBBCode(String(rawVal));
+    let normText = decoded
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/^(?:a|an|the|slight|very\s+slight|possibly|in\s+severe\s+cases|in\s+women|in\s+children|in\s+adults)\s+/i, "")
+      .replace(/^(?:a\s+)?(?:feeling|sensation)\s+of\s+/i, "")
+      .replace(/\bdiarrhoea\b/g, "diarrhea")
+      .replace(/\boedema\b/g, "edema")
+      .replace(/\bamenorrhoea\b/g, "amenorrhea")
+      .replace(/\bspermatorrhoea\b/g, "spermatorrhea")
+      .replace(/\bleucorrhoea\b/g, "leukorrhea")
+      .replace(/\bhaemoptysis\b/g, "hemoptysis")
+      .replace(/\bhaematemesis\b/g, "hematemesis")
+      .replace(/\bhaemorrhoids\b/g, "hemorrhoids")
+      .replace(/\bcolour\b/g, "color")
+      .replace(/\bodour\b/g, "odor")
+      .replace(/\bbehaviour\b/g, "behavior")
+      .replace(/\bcentre\b/g, "center")
+      .replace(/\blustre\b/g, "luster")
+      .replace(/\bborborygmus\b/g, "borborygmi")
+      .replace(/['".,;:!?\/\\\-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
-        let m;
-        tokenRegex.lastIndex = 0;
-        while ((m = tokenRegex.exec(cleanText)) !== null) {
-          const surface = m[0];
+    const words = normText ? normText.split(" ") : [];
+    const stems = [];
+    const wordRx = /\b[a-z]{2,}\b/g;
+    let wm;
+    while ((wm = wordRx.exec(normText)) !== null) {
+      const w = wm[0];
+      if (COMPARE_SHARED_IGNORE_WORDS.has(w)) continue;
+      if (typeof TCM_STOPWORDS !== "undefined" && TCM_STOPWORDS.has(w)) continue;
+      if (w.length < 4 && !COMPARE_SHORT_TCM_TERMS.has(w)) continue;
+      const st = getCompareTermStem(w);
+      if (st && !stems.includes(st)) stems.push(st);
+    }
+
+    let context = lineContext || "general";
+    if (context === "general") {
+      if (/\btongue\b|\bcoating\b|\bcoat\b/i.test(normText)) context = "tongue";
+      else if (/\bpulse\b/i.test(normText)) context = "pulse";
+    }
+
+    return {
+      normText,
+      pointCodes,
+      stems,
+      wordCount: words.length,
+      context
+    };
+  }
+
+  function extractClausesFromPlainLine(plainLine) {
+    if (!plainLine || !plainLine.trim()) return [];
+
+    let lineContext = "general";
+    if (/^(?:[\s\u27A2\u27A3\u2794\u2022\-\*]|&bull;)*Tongue\s*:/i.test(plainLine)) {
+      lineContext = "tongue";
+    } else if (/^(?:[\s\u27A2\u27A3\u2794\u2022\-\*]|&bull;)*Pulse\s*:/i.test(plainLine)) {
+      lineContext = "pulse";
+    }
+
+    // Skip structural prefixes like "Key Symptoms:", "Tongue:", "Pulse:", "Points:", "Method:"
+    let contentStart = 0;
+    const hdrMatch = plainLine.match(/^(?:[\s\u27A2\u27A3\u2794\u2022\-\*]|&bull;)*(?:(?:Key|Cardinal|Main)\s+Symptoms?|Symptoms?|(?:All\s+)?Clinical\s+Manifestations?|Tongue\s*(?:&amp;|&)\s*Pulse|Tongue|Pulse|Points|Method|Needle\s+Technique|Strict\s+Rule|Principle\s+of\s+treatment|Treatment\s+principle|Tx\s+Principle|Aetiology(?:\s*(?:&amp;|&)\s*Precursors)?|Pathogenesis\s*(?:&amp;|&)\s*Analysis|Precursors(?:\s+of\s+Pattern)?|Developments(?:\s+From\s+Pattern)?)\s*:\s*/i);
+    if (hdrMatch) {
+      contentStart = hdrMatch[0].length;
+    }
+
+    // Primary split on commas, semicolons, bullets, colons, or sentence periods outside parentheses
+    const primarySpans = [];
+    let segStart = contentStart;
+    let parenDepth = 0;
+    const len = plainLine.length;
+
+    for (let i = contentStart; i < len; i++) {
+      const ch = plainLine[i];
+      if (ch === "(") { parenDepth++; continue; }
+      if (ch === ")") { parenDepth = Math.max(0, parenDepth - 1); continue; }
+      if (parenDepth > 0) continue;
+
+      if (plainLine.slice(i, i + 6).toLowerCase() === "&bull;") {
+        if (i > segStart) primarySpans.push([segStart, i]);
+        segStart = i + 6;
+        i += 5;
+        continue;
+      }
+
+      if (ch === ";" || ch === "," || ch === ":" || ch === "\u2022" || ch === "\u27A2" || ch === "\u27A3" || ch === "\u2794") {
+        if (i > segStart) primarySpans.push([segStart, i]);
+        segStart = i + 1;
+        continue;
+      }
+
+      if (ch === "." && (i + 1 === len || /\s/.test(plainLine[i + 1]))) {
+        const prevChar = i > 0 ? plainLine[i - 1] : "";
+        const nextNonSpace = plainLine.slice(i + 1).trim()[0] || "";
+        // Don't split decimal numbers (e.g. 1.5) or dotted channels (e.g. L.I.)
+        if (!/\d/.test(prevChar) && !/[I\.]/.test(nextNonSpace)) {
+          if (i > segStart) primarySpans.push([segStart, i]);
+          segStart = i + 1;
+          continue;
+        }
+      }
+    }
+    if (segStart < len) primarySpans.push([segStart, len]);
+
+    // Secondary split on " and " / " or " / " with " when on Tongue/Pulse lines or compound clauses
+    const finalSpans = [];
+    const conjRx = /\s+(?:and\/or|and|or|with)\s+/gi;
+
+    primarySpans.forEach(([s, e]) => {
+      const subStr = plainLine.slice(s, e);
+      let shouldSplitConj = (lineContext === "tongue" || lineContext === "pulse");
+      if (!shouldSplitConj) {
+        const parts = subStr.split(conjRx);
+        if (parts.length > 1 && parts.every(p => p.trim().split(/\s+/).length >= 2)) {
+          shouldSplitConj = true;
+        }
+      }
+
+      if (!shouldSplitConj) {
+        finalSpans.push([s, e]);
+        return;
+      }
+
+      let lastIdx = 0;
+      let cm;
+      conjRx.lastIndex = 0;
+      while ((cm = conjRx.exec(subStr)) !== null) {
+        if (cm.index > lastIdx) {
+          finalSpans.push([s + lastIdx, s + cm.index]);
+        }
+        lastIdx = cm.index + cm[0].length;
+      }
+      if (lastIdx < subStr.length) {
+        finalSpans.push([s + lastIdx, e]);
+      }
+    });
+
+    const clauses = [];
+    finalSpans.forEach(([rawStart, rawEnd]) => {
+      let start = rawStart;
+      let end = rawEnd;
+
+      while (start < end && /[\s\u27A2\u27A3\u2794\u2022\-\*.,;:]/.test(plainLine[start])) start++;
+      while (end > start && /[\s\u27A2\u27A3\u2794\u2022\-\*.,;:]/.test(plainLine[end - 1])) end--;
+      if (end - start < 2) return;
+
+      const sliceText = plainLine.slice(start, end);
+      if (/^(?:\[\.\.\.\]|none|n\/a|-)$/i.test(sliceText.trim())) return;
+
+      const meta = normalizeCompareClause(sliceText, lineContext);
+      if (meta.stems.length === 0 && meta.pointCodes.length === 0) return;
+
+      // For long narrative sentences (>12 words), also record individual clinical term spans
+      const subTerms = [];
+      if (meta.wordCount > 12) {
+        const termRx = /\b(?:(?:LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*\d{1,2}|[A-Za-z]{2,})\b/g;
+        let tm;
+        while ((tm = termRx.exec(sliceText)) !== null) {
+          if (tm.index > 0 && sliceText[tm.index - 1] === "&") continue; // Skip HTML entity names
+          const surface = tm[0];
           const lower = surface.toLowerCase();
-          const isPointCode = /\d/.test(lower);
-
-          if (!isPointCode) {
+          const isPt = /\d/.test(lower);
+          if (!isPt) {
             if (COMPARE_SHARED_IGNORE_WORDS.has(lower)) continue;
             if (typeof TCM_STOPWORDS !== "undefined" && TCM_STOPWORDS.has(lower)) continue;
             if (lower.length < 4 && !COMPARE_SHORT_TCM_TERMS.has(lower)) continue;
           }
-
           const stem = getCompareTermStem(lower);
-          if (!stemToPointSet.has(stem)) {
-            stemToPointSet.set(stem, new Set());
-            stemToSurfaceWords.set(stem, new Set());
+          if (stem) {
+            subTerms.push({
+              start: start + tm.index,
+              end: start + tm.index + surface.length,
+              stem,
+              isPt,
+              context: meta.context
+            });
           }
-          stemToPointSet.get(stem).add(ptIdx);
-          stemToSurfaceWords.get(stem).add(lower);
         }
+      }
+
+      clauses.push({
+        start,
+        end,
+        ...meta,
+        subTerms
       });
     });
 
-    const sharedWords = [];
-    stemToPointSet.forEach((ptSet, stem) => {
-      if (ptSet.size >= 2) {
-        stemToSurfaceWords.get(stem).forEach(w => sharedWords.push(w));
-      }
-    });
-
-    if (sharedWords.length === 0) return null;
-
-    const escaped = sharedWords
-      .sort((a, b) => b.length - a.length)
-      .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-
-    return new RegExp("\\b(" + escaped.join("|") + ")\\b", "gi");
+    return clauses;
   }
 
-  function highlightSharedCompareTerms(html, sharedRegex) {
-    if (!html || !sharedRegex) return html;
-    const parts = html.split(/(<[^>]*>)/g);
-    for (let i = 0; i < parts.length; i++) {
-      if (!parts[i].startsWith("<")) {
-        parts[i] = parts[i].replace(sharedRegex, '<mark class="shared-term-mark">$1</mark>');
+  function doCompareClausesMatch(cA, cB) {
+    if (cA.context !== cB.context) return false;
+
+    // 1. Point code match (when a clause is a point code or point label like "ST-36 Zusanli")
+    if (cA.pointCodes.length > 0 && cB.pointCodes.length > 0 && (cA.wordCount <= 4 || cB.wordCount <= 4)) {
+      if (cA.pointCodes.some(code => cB.pointCodes.includes(code))) return true;
+    }
+
+    if (hasOppositeComparePolarity(cA.stems, cB.stems)) return false;
+
+    // 2. Exact normalized clause match
+    if (cA.normText && cA.normText === cB.normText) return true;
+
+    // 3. Substring inclusion for concise clinical clauses (e.g., "abdominal distension" vs "abdominal distension after eating")
+    const minNormLen = Math.min(cA.normText.length, cB.normText.length);
+    const minStems = Math.min(cA.stems.length, cB.stems.length);
+    const maxStems = Math.max(cA.stems.length, cB.stems.length);
+
+    if (minNormLen >= 5 && minStems >= 1 && maxStems <= 6) {
+      if (cA.normText.includes(cB.normText) || cB.normText.includes(cA.normText)) {
+        const loneStem = minStems === 1 ? (cA.stems.length === 1 ? cA.stems[0] : cB.stems[0]) : null;
+        if (!loneStem || maxStems === 1 || !COMPARE_GENERIC_SINGLE_STEMS.has(loneStem)) {
+          return true;
+        }
       }
     }
-    // Merge adjacent shared-term highlights across spaces or hyphens into unified phrase pills
-    return parts.join("").replace(/<\/mark>([ \t\-]+)<mark class="shared-term-mark">/gi, "$1");
+
+    // 4. Clinical stem overlap
+    if (minStems === 0) return false;
+    const setB = new Set(cB.stems);
+    const sharedCount = cA.stems.filter(s => setB.has(s)).length;
+    if (sharedCount === 0) return false;
+
+    if (minStems === 1 && maxStems === 1) {
+      return sharedCount === 1;
+    }
+    if (minStems === 1 && maxStems === 2) {
+      const singleStem = cA.stems.length === 1 ? cA.stems[0] : cB.stems[0];
+      return sharedCount === 1 && !COMPARE_GENERIC_SINGLE_STEMS.has(singleStem);
+    }
+    if (minStems >= 2) {
+      return sharedCount >= 2 && (sharedCount / minStems) >= 0.65;
+    }
+    return false;
+  }
+
+  function applyHighlightRangesToLineTokens(tokens, ranges, cssClass) {
+    if (!ranges || ranges.length === 0) return tokens.join("");
+    const sorted = [...ranges].sort((a, b) => a.start - b.start);
+    let charCursor = 0;
+    const out = [];
+
+    for (let i = 0; i < tokens.length; i++) {
+      const tok = tokens[i];
+      if (i % 2 === 1) {
+        out.push(tok);
+        continue;
+      }
+      const tStart = charCursor;
+      const tEnd = charCursor + tok.length;
+      charCursor = tEnd;
+
+      const overlapping = sorted.filter(r => r.end > tStart && r.start < tEnd);
+      if (overlapping.length === 0) {
+        out.push(tok);
+        continue;
+      }
+
+      let rebuilt = "";
+      let localPos = 0;
+      overlapping.forEach(r => {
+        const s = Math.max(0, r.start - tStart);
+        const e = Math.min(tok.length, r.end - tStart);
+        if (s > localPos) rebuilt += tok.slice(localPos, s);
+        if (e > s) rebuilt += `<mark class="${cssClass}">${tok.slice(s, e)}</mark>`;
+        localPos = Math.max(localPos, e);
+      });
+      if (localPos < tok.length) rebuilt += tok.slice(localPos);
+      out.push(rebuilt);
+    }
+
+    // Merge adjacent highlights separated only by spaces or hyphens into a single smooth pill
+    const mergeRx = new RegExp(`</mark>([ \\t\\-]+)<mark class="${cssClass}">`, "gi");
+    return out.join("").replace(mergeRx, "$1");
+  }
+
+  function annotateCompareSectionCells(rawHtmlArray, sectionLabel) {
+    if (compareDiffMode === "off" || COMPARE_SHARED_SKIP_SECTIONS.has(sectionLabel)) {
+      return rawHtmlArray;
+    }
+
+    const activeIndices = [];
+    rawHtmlArray.forEach((h, idx) => {
+      if (h && h.trim() !== "") activeIndices.push(idx);
+    });
+    if (activeIndices.length < 2) return rawHtmlArray;
+
+    const blockSplitRx = /(<br\s*\/?>|<\/?(?:tr|td|th|table|tbody|thead|div|p)\b[^>]*>)/gi;
+
+    // 1. Parse each column's section HTML into lines & clauses
+    const parsedColumns = rawHtmlArray.map(html => {
+      if (!html) return null;
+      const blocks = html.split(blockSplitRx);
+      const parsedBlocks = blocks.map((blk, bIdx) => {
+        if (bIdx % 2 === 1 || !blk.trim()) return { raw: blk, isTag: true };
+        const tokens = blk.split(/(<[^>]*>)/g);
+        let plainLine = "";
+        for (let i = 0; i < tokens.length; i += 2) plainLine += tokens[i];
+        const clauses = extractClausesFromPlainLine(plainLine);
+        return { raw: blk, isTag: false, tokens, plainLine, clauses };
+      });
+
+      const allClauses = [];
+      const allStemsByContext = { general: new Set(), tongue: new Set(), pulse: new Set() };
+      parsedBlocks.forEach(pb => {
+        if (pb.clauses) {
+          pb.clauses.forEach(c => {
+            allClauses.push(c);
+            const ctxSet = allStemsByContext[c.context] || allStemsByContext.general;
+            c.stems.forEach(s => ctxSet.add(s));
+            c.pointCodes.forEach(pc => ctxSet.add(pc));
+          });
+        }
+      });
+
+      return { parsedBlocks, allClauses, allStemsByContext };
+    });
+
+    // 2. Compare clauses across columns and highlight Shared (green) or Different (orange)
+    const cssClass = compareDiffMode === "shared" ? "shared-term-mark" : "diff-term-mark";
+
+    return parsedColumns.map((colData, colIdx) => {
+      if (!colData) return rawHtmlArray[colIdx];
+
+      const otherCols = parsedColumns.filter((c, idx) => c !== null && idx !== colIdx);
+      if (otherCols.length === 0) return rawHtmlArray[colIdx];
+
+      const rebuiltBlocks = colData.parsedBlocks.map(pb => {
+        if (pb.isTag || !pb.clauses || pb.clauses.length === 0) return pb.raw;
+
+        const highlightRanges = [];
+
+        pb.clauses.forEach(clause => {
+          const isSharedWithOther = otherCols.some(otherCol =>
+            otherCol.allClauses.some(otherClause => doCompareClausesMatch(clause, otherClause))
+          );
+
+          if (clause.wordCount <= 12 || (compareDiffMode === "shared" && isSharedWithOther)) {
+            if (compareDiffMode === "shared" && isSharedWithOther) {
+              highlightRanges.push({ start: clause.start, end: clause.end });
+            } else if (compareDiffMode === "diff" && !isSharedWithOther) {
+              highlightRanges.push({ start: clause.start, end: clause.end });
+            }
+          } else if (clause.subTerms && clause.subTerms.length > 0) {
+            // Long narrative prose (>12 words): highlight individual shared or unique clinical terms
+            clause.subTerms.forEach(term => {
+              const termInOther = otherCols.some(otherCol => {
+                const ctxSet = otherCol.allStemsByContext[term.context] || otherCol.allStemsByContext.general;
+                return ctxSet.has(term.stem);
+              });
+              if (compareDiffMode === "shared" && termInOther) {
+                highlightRanges.push({ start: term.start, end: term.end });
+              } else if (compareDiffMode === "diff" && !termInOther) {
+                highlightRanges.push({ start: term.start, end: term.end });
+              }
+            });
+          }
+        });
+
+        return applyHighlightRangesToLineTokens(pb.tokens, highlightRanges, cssClass);
+      });
+
+      return rebuiltBlocks.join("");
+    });
+  }
+
+  function syncCompareDiffButtonsUI() {
+    const sharedBtn = document.getElementById("compareSharedBtn");
+    const diffBtn = document.getElementById("compareDiffBtn");
+    if (sharedBtn) {
+      sharedBtn.style.background = compareDiffMode === "shared" ? "#34c759" : "#e3e3e8";
+      sharedBtn.style.color = compareDiffMode === "shared" ? "#ffffff" : "#007aff";
+    }
+    if (diffBtn) {
+      diffBtn.style.background = compareDiffMode === "diff" ? "#cc5500" : "#e3e3e8";
+      diffBtn.style.color = compareDiffMode === "diff" ? "#ffffff" : "#007aff";
+    }
   }
 
   window.togglePinFirstCompare = function() {
@@ -5549,14 +5956,14 @@ async function saveEdit() {
     showToast(comparePinFirst ? "📌 Baseline column pinned" : "Baseline column unpinned");
   };
 
-  window.toggleCompareSharedHighlight = function() {
-    compareHighlightShared = !compareHighlightShared;
-    const btn = document.getElementById("compareSharedBtn");
-    if (btn) {
-      btn.style.background = compareHighlightShared ? "#34c759" : "#e3e3e8";
-      btn.style.color = compareHighlightShared ? "#ffffff" : "#007aff";
-    }
+  window.toggleCompareDiffMode = function(mode) {
+    compareDiffMode = (compareDiffMode === mode) ? "off" : mode;
+    syncCompareDiffButtonsUI();
     openCompareModal(true);
+  };
+
+  window.toggleCompareSharedHighlight = function() {
+    window.toggleCompareDiffMode("shared");
   };
 
   window.removePointFromCompare = function(pointId) {
@@ -5600,14 +6007,11 @@ async function saveEdit() {
       comparePinFirst = false;
       modal.classList.remove("pin-first-col");
 
-      compareHighlightShared = false;
-      const sharedBtn = document.getElementById("compareSharedBtn");
-      if (sharedBtn) {
-        sharedBtn.style.background = "#e3e3e8";
-        sharedBtn.style.color = "#007aff";
-      }
+      compareDiffMode = "off";
+      syncCompareDiffButtonsUI();
     } else {
       modal.classList.toggle("pin-first-col", comparePinFirst);
+      syncCompareDiffButtonsUI();
     }
 
     // Lock viewport to maintain native app feel
@@ -5615,8 +6019,6 @@ async function saveEdit() {
 
     const fields = TCM_SECTIONS;
     let pts = compareList.map(id => points.find(p => p["Short Name"] === id)).filter(Boolean);
-
-    const sharedCompareRegex = compareHighlightShared ? buildSharedCompareRegex(pts, fields) : null;
 
     // --- THE RESPONSIVE IPAD + IPHONE ALGORITHM ---
     const isIPad = window.innerWidth >= 850;
@@ -5663,16 +6065,21 @@ async function saveEdit() {
           </div>`;
       });
 
-      // ROW 2: Data Bodies
-      pts.forEach((p, i) => {
+      // ROW 2: Data Bodies (Pre-format, run section-aware Shared/Diff clause engine, then apply Occlusions & Links)
+      const baseFormattedCells = pts.map(p => {
         let rawVal = p[f.key] || p[f.altKey] || "";
-        let formatted = "";
-
         if (rawVal && String(rawVal).trim() !== "") {
-          formatted = formatTextWithTables(highlightText(rawVal));
-          if (compareHighlightShared && sharedCompareRegex && !COMPARE_SHARED_SKIP_SECTIONS.has(f.label)) {
-            formatted = highlightSharedCompareTerms(formatted, sharedCompareRegex);
-          }
+          return formatTextWithTables(highlightText(rawVal));
+        }
+        return "";
+      });
+
+      const diffAnnotatedCells = annotateCompareSectionCells(baseFormattedCells, f.label);
+
+      pts.forEach((p, i) => {
+        let formatted = diffAnnotatedCells[i];
+
+        if (formatted) {
           formatted = applyWordOcclusionToHTML(formatted, p["Short Name"]);
           formatted = applyPhraseOcclusionToHTML(formatted, p["Short Name"]);
           formatted = linkifyPoints(formatted);
@@ -8047,17 +8454,10 @@ cardContainer.addEventListener('wheel', (e) => {
     return;
   }
 
-  // Pass wheel through to vertical page scroll once the row hits its left or right end
-  const atLeftEdge = scroller.scrollLeft <= 0 && e.deltaY < 0;
-  const atRightEdge = (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 2) && e.deltaY > 0;
-  if (atLeftEdge || atRightEdge) {
-    return;
-  }
-
+  // Always consume the wheel event while the row is armed so hitting the left/right end stops firmly
   e.preventDefault();
   scroller.scrollLeft += e.deltaY;
 
-  // Brief guard so hitting an edge and immediately reversing direction stays responsive
   clearTimeout(horizontalWheelTimer);
   horizontalWheelTimer = setTimeout(() => {
     horizontalWheelTimer = null;
