@@ -934,7 +934,8 @@
           <div id="occStudyToolbar">
             <div class="occ-pill-nav" style="padding:0; flex:1;">
               <div class="occ-pill active" id="occStudyFilterPill" onclick="occCycleStudyFilter()">🎯 Filter: All</div>
-              <div class="occ-pill active" id="occToggleRatingBtn" onclick="occToggleRatingMode()">⭐ Rate: ON</div>
+              <div class="occ-pill" id="occToggleRatingBtn" onclick="occToggleRatingMode()">⭐ Rate: OFF</div>
+              <div class="occ-pill" id="occToggleShuffleBtn" onclick="occToggleShuffleMode()">🔀 Shuffle: OFF</div>
               <div class="occ-pill" onclick="occHideAll()">🙈 Reset Cover</div>
               <div class="occ-pill" onclick="occRevealAll()">👁️ Reveal All</div>
               <div class="occ-pill" onclick="occResetView()">🎯 Fit</div>
@@ -1057,7 +1058,8 @@
   let isEditMode = true;
   let editBoxesRevealed = true;
   let activeTool = "pan";
-  let ratingEnabled = true;
+  let ratingEnabled = false;
+  let shuffleEnabled = false;
   let studyFilterMode = "all";
 
   const pageCache = new Map();
@@ -1673,6 +1675,19 @@
     updateStudyStepperLabel();
   }
 
+  window.occToggleShuffleMode = function () {
+    shuffleEnabled = !shuffleEnabled;
+    const btn = document.getElementById("occToggleShuffleBtn");
+    if (btn) {
+      btn.classList.toggle("active", shuffleEnabled);
+      btn.innerText = shuffleEnabled ? "🔀 Shuffle: ON" : "🔀 Shuffle: OFF";
+    }
+    if (currentTargetBoxId) {
+      const hidden = getRemainingHiddenBoxes();
+      if (hidden.length > 0) focusTargetBox(hidden[0]);
+    }
+  };
+
   function getRemainingHiddenBoxes() {
     const overlay = document.getElementById("occOverlay");
     const boxesOnPage = allBoxes.filter(b =>
@@ -1680,10 +1695,20 @@
       b.boxType === "occlusion" &&
       !isBoxFilteredOutInStudy(b)
     );
-    return boxesOnPage.filter(b => {
+    const unrevealed = boxesOnPage.filter(b => {
       const domEl = overlay?.querySelector(`.occlusion-box[data-id="${b.id}"]`);
       return domEl && !domEl.classList.contains("revealed");
-    }).sort((a, b) => {
+    });
+
+    if (shuffleEnabled) {
+      for (let i = unrevealed.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [unrevealed[i], unrevealed[j]] = [unrevealed[j], unrevealed[i]];
+      }
+      return unrevealed;
+    }
+
+    return unrevealed.sort((a, b) => {
       const topA = parseFloat(a.top), topB = parseFloat(b.top);
       const leftA = parseFloat(a.left), leftB = parseFloat(b.left);
       if (Math.abs(topA - topB) < 2.8) return leftA - leftB;
@@ -3360,13 +3385,18 @@
       if (e.key === "ArrowUp" && e.shiftKey) { e.preventDefault(); occHandleUndoReveal(); return; }
 
       if (!isEditMode) {
+        const isPageCompleted = getRemainingHiddenBoxes().length === 0;
         if (e.key === " " || e.code === "Space") {
           e.preventDefault();
           occHandleSequentialStep();
         } else if (e.key === "ArrowRight" && !e.shiftKey) {
-          e.preventDefault(); handleDirectionalReveal("right");
+          e.preventDefault();
+          if (isPageCompleted) occHandleSequentialStep();
+          else handleDirectionalReveal("right");
         } else if (e.key === "ArrowLeft" && !e.shiftKey) {
-          e.preventDefault(); handleDirectionalReveal("left");
+          e.preventDefault();
+          if (isPageCompleted) occHideAll();
+          else handleDirectionalReveal("left");
         } else if (e.key === "ArrowDown" && !e.shiftKey) {
           e.preventDefault(); handleDirectionalReveal("down");
         } else if (e.key === "ArrowUp" && !e.shiftKey) {
