@@ -127,6 +127,58 @@
     }
 
     .history-item:active { background: rgba(0,0,0,0.05); }
+
+    .history-row {
+      display: flex;
+      align-items: stretch;
+      border-bottom: 1px solid #e3e3e8;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .history-row .history-item {
+      border-bottom: none;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-right: 6px;
+    }
+    .history-row.is-pinned {
+      background: rgba(255, 149, 0, 0.06);
+    }
+    .history-row.is-pinned .history-item {
+      color: #cc5500;
+      font-weight: 600;
+    }
+    .history-action-btn {
+      background: transparent;
+      border: none;
+      padding: 0 11px;
+      font-size: 14px;
+      cursor: pointer;
+      color: #8e8e93;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: color 0.15s, transform 0.1s;
+    }
+    .history-action-btn:active {
+      transform: scale(0.9);
+      background: rgba(0,0,0,0.05);
+    }
+    .history-action-btn.pinned {
+      color: #ff9500;
+    }
+    .history-action-btn.delete:hover {
+      color: #ff3b30;
+    }
+    @media (prefers-color-scheme: dark) {
+      .history-row { border-bottom-color: #38383a; }
+      .history-row.is-pinned { background: rgba(255, 159, 10, 0.12); }
+      .history-row.is-pinned .history-item { color: #ff9f0a; }
+    }
     
     .history-clear-row { 
       display: flex; 
@@ -2533,8 +2585,8 @@ display: flex; flex-direction: column;">
 
 
 
-// --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER --- 
-const APP_VERSION = "11.10.26.v2";
+// --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
+const APP_VERSION = "11.10.26.v3";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2773,6 +2825,7 @@ async function loadTCMData(hasLocalData) {
     
     if (serverVersion && serverVersion === localVersion) {
       console.log("Data is identical. No update needed.");
+      if (typeof flushSearchHistoryCloudSync === "function") flushSearchHistoryCloudSync();
       return; 
     }
 
@@ -2854,8 +2907,9 @@ document.addEventListener("visibilitychange", () => {
     }
   } 
   else if (document.visibilityState === "hidden") {
-    // Save your exact study position offline. NO auto-syncs.
+    // Save your exact study position offline and flush any queued search history edit
     if (typeof saveSessionLocal === 'function') saveSessionLocal();
+    if (typeof flushSearchHistoryCloudSync === 'function') flushSearchHistoryCloudSync();
   }
 });
 
@@ -3363,7 +3417,7 @@ function applySectionFilter() {
 
       const sameStructure = processed.length === points.length && processed.every((p, i) => points[i] && p["Short Name"] === points[i]["Short Name"]);
 
-                  if (sameStructure) {
+      if (sameStructure) {
         points = processed;
         changedIds.forEach(id => {
           const card = document.querySelector('.point-card[data-id="' + id + '"]');
@@ -3396,11 +3450,10 @@ function applySectionFilter() {
         });
         
         if (typeof window.refreshActivePanel === 'function') {
-  window.refreshActivePanel(true);
-} else {
-  handleSearch(true);
-}
-
+          window.refreshActivePanel(true);
+        } else {
+          handleSearch(true);
+        }
 
       } else {
         points = processed;
@@ -3411,6 +3464,10 @@ function applySectionFilter() {
         } else {
           handleSearch(true);
         }
+      }
+
+      if (typeof syncSearchHistoryFromPoints === "function") {
+        syncSearchHistoryFromPoints(points);
       }
 
       showToast("🔄 Data synced");
@@ -3667,62 +3724,354 @@ document.getElementById("lightbox-img").src = getImagePath(point);
   });
 
 
+  const MAX_SEARCH_HISTORY = 20;
+  const SEARCH_HISTORY_FIELD = "Search History";
+  let searchHistorySyncTimer = null;
+  let lastSyncedHistorySignature = localStorage.getItem('tcm_search_history_cloud_sig') || "";
+  let hasUnsyncedHistoryChanges = localStorage.getItem('tcm_search_history_dirty') === "true";
+
+  function setLastSyncedSignature(sig) {
+    lastSyncedHistorySignature = sig;
+    try { localStorage.setItem('tcm_search_history_cloud_sig', sig); } catch (e) {}
+  }
+
+  function setHistoryDirtyFlag(isDirty) {
+    hasUnsyncedHistoryChanges = isDirty;
+    try { localStorage.setItem('tcm_search_history_dirty', isDirty ? "true" : "false"); } catch (e) {}
+  }
+
+  function getHistorySignature(state) {
+    return JSON.stringify({
+      p: state.pinned || [],
+      r: state.recent || [],
+      d: state.deleted || []
+    });
+  }
+
+  function getSearchHistoryState() {
+    try {
+      const rawState = localStorage.getItem('tcm_search_history_state');
+      if (rawState) {
+        const parsed = JSON.parse(rawState);
+        return {
+          updatedAt: Number(parsed.updatedAt) || 0,
+          pinned: Array.isArray(parsed.pinned) ? parsed.pinned : [],
+          recent: Array.isArray(parsed.recent) ? parsed.recent : [],
+          deleted: Array.isArray(parsed.deleted) ? parsed.deleted : []
+        };
+      }
+    } catch (e) {}
+
+    // Migrate legacy 10-item array seamlessly
+    let legacy = [];
+    try { legacy = JSON.parse(localStorage.getItem('tcm_search_history')) || []; } catch (e) {}
+    return {
+      updatedAt: 0,
+      pinned: [],
+      recent: Array.isArray(legacy) ? legacy.slice(0, MAX_SEARCH_HISTORY) : [],
+      deleted: []
+    };
+  }
+
+  function normalizeHistoryArrays(state) {
+    state.pinned = [...new Set((state.pinned || []).map(s => String(s).replace(/\r?\n/g, " ").trim()).filter(Boolean))];
+    const pinnedSet = new Set(state.pinned);
+    state.recent = [...new Set((state.recent || []).map(s => String(s).replace(/\r?\n/g, " ").trim()).filter(s => s && !pinnedSet.has(s)))].slice(0, MAX_SEARCH_HISTORY);
+    state.deleted = [...new Set((state.deleted || []).map(s => String(s).replace(/\r?\n/g, " ").trim()).filter(Boolean))].slice(0, 40);
+    return state;
+  }
+
+  function saveSearchHistoryStateLocal(state) {
+    normalizeHistoryArrays(state);
+    try {
+      localStorage.setItem('tcm_search_history_state', JSON.stringify(state));
+      // Keep legacy key synced for backward compatibility
+      localStorage.setItem('tcm_search_history', JSON.stringify([...state.pinned, ...state.recent]));
+    } catch (e) {}
+  }
+
+  function getHistoryCarrierPoint(ptsArray) {
+    const list = ptsArray || points;
+    if (!Array.isArray(list) || list.length === 0) return null;
+    return list.find(p => p["Short Name"] === "LU-1") || list[0];
+  }
+
+  function syncSearchHistoryFromPoints(ptsArray) {
+    const carrier = getHistoryCarrierPoint(ptsArray);
+    if (!carrier) return;
+
+    // If the Google Sheet cell is completely empty on first setup, push local history up once
+    if (!carrier[SEARCH_HISTORY_FIELD]) {
+      const local = getSearchHistoryState();
+      if (local.pinned.length > 0 || local.recent.length > 0) {
+        queueSearchHistoryCloudSync();
+      }
+      return;
+    }
+
+    try {
+      const cloud = JSON.parse(carrier[SEARCH_HISTORY_FIELD]);
+      if (!cloud || typeof cloud !== "object") return;
+
+      const local = getSearchHistoryState();
+      const cloudTime = Number(cloud.updatedAt) || 0;
+      const localTime = Number(local.updatedAt) || 0;
+
+      const cloudPinned = Array.isArray(cloud.pinned) ? cloud.pinned : [];
+      const cloudRecent = Array.isArray(cloud.recent) ? cloud.recent : [];
+      const cloudDeleted = Array.isArray(cloud.deleted) ? cloud.deleted : [];
+
+      const cloudStateNormalized = normalizeHistoryArrays({
+        pinned: cloudPinned,
+        recent: cloudRecent,
+        deleted: cloudDeleted
+      });
+      const cloudSig = getHistorySignature(cloudStateNormalized);
+
+      // Combine tombstones so deleted queries don't resurrect across devices
+      const activeSearchPool = new Set(
+        cloudTime >= localTime
+          ? [...cloudStateNormalized.pinned, ...cloudStateNormalized.recent]
+          : [...local.pinned, ...local.recent]
+      );
+      const mergedDeleted = [...new Set([...cloudStateNormalized.deleted, ...local.deleted])].filter(term => !activeSearchPool.has(term));
+      const deletedSet = new Set(mergedDeleted);
+
+      // Prevent an item that was unpinned on the newer device (moved to recent) from being re-pinned by the older device
+      const newerRecentSet = new Set(cloudTime >= localTime ? cloudStateNormalized.recent : local.recent);
+
+      const mergedPinned = (cloudTime >= localTime
+        ? [...cloudStateNormalized.pinned, ...local.pinned.filter(t => !newerRecentSet.has(t))]
+        : [...local.pinned, ...cloudStateNormalized.pinned.filter(t => !newerRecentSet.has(t))]
+      ).filter(term => !deletedSet.has(term));
+
+      const mergedRecent = (cloudTime >= localTime
+        ? [...cloudStateNormalized.recent, ...local.recent]
+        : [...local.recent, ...cloudStateNormalized.recent]
+      ).filter(term => !deletedSet.has(term));
+
+      const mergedState = {
+        updatedAt: Math.max(cloudTime, localTime),
+        pinned: mergedPinned,
+        recent: mergedRecent,
+        deleted: mergedDeleted
+      };
+
+      saveSearchHistoryStateLocal(mergedState);
+      carrier[SEARCH_HISTORY_FIELD] = JSON.stringify(mergedState);
+
+      // Record what the cloud actually has right now
+      setLastSyncedSignature(cloudSig);
+
+      // If merging local offline/unsynced changes produced a newer state than what's on the cloud, queue a sync!
+      const mergedSig = getHistorySignature(mergedState);
+      if (mergedSig !== cloudSig) {
+        queueSearchHistoryCloudSync();
+      } else {
+        setHistoryDirtyFlag(false);
+      }
+
+      // Live-refresh the dropdown if the user currently has it open
+      const dropdown = document.getElementById("searchDropdown");
+      if (dropdown && dropdown.classList.contains("expanded") && searchInput.value.trim().length === 0) {
+        renderSearchHistory();
+      }
+    } catch (e) {
+      console.warn("Search history merge skipped:", e);
+    }
+  }
+
+  function flushSearchHistoryCloudSync() {
+    clearTimeout(searchHistorySyncTimer);
+    searchHistorySyncTimer = null;
+    if (!hasUnsyncedHistoryChanges || !navigator.onLine) return;
+
+    const state = getSearchHistoryState();
+    const currentSig = getHistorySignature(state);
+    if (currentSig === lastSyncedHistorySignature) {
+      setHistoryDirtyFlag(false);
+      return;
+    }
+
+    const carrier = getHistoryCarrierPoint(points);
+    if (!carrier) return;
+
+    const serialized = JSON.stringify(state);
+    setLastSyncedSignature(currentSig);
+    setHistoryDirtyFlag(false);
+
+    fetch(writeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        id: carrier["Short Name"],
+        field: SEARCH_HISTORY_FIELD,
+        value: serialized
+      }),
+      keepalive: true
+    }).catch(err => {
+      setLastSyncedSignature("");
+      setHistoryDirtyFlag(true);
+      console.log("Search history cloud sync deferred:", err);
+    });
+  }
+
+  // Flush when tab closes or when device reconnects from offline mode
+  window.addEventListener("pagehide", flushSearchHistoryCloudSync);
+  window.addEventListener("online", flushSearchHistoryCloudSync);
+
+  function queueSearchHistoryCloudSync() {
+    const state = getSearchHistoryState();
+    const currentSig = getHistorySignature(state);
+
+    // Skip network write if the actual arrays haven't changed since last confirmed cloud sync
+    if (currentSig === lastSyncedHistorySignature) {
+      setHistoryDirtyFlag(false);
+      return;
+    }
+
+    const carrier = getHistoryCarrierPoint(points);
+    if (carrier) {
+      carrier[SEARCH_HISTORY_FIELD] = JSON.stringify(state);
+    }
+
+    setHistoryDirtyFlag(true);
+    clearTimeout(searchHistorySyncTimer);
+    // Batch rapid searches over a 10-second window into a single write
+    searchHistorySyncTimer = setTimeout(flushSearchHistoryCloudSync, 10000);
+  }
+
   function saveSearchHistory(query) {
     if (!query || query.trim().length < 2) return;
-    let cleanQuery = query.trim();
-    let history = JSON.parse(localStorage.getItem('tcm_search_history')) || [];
-    
-    // Remove if it exists, then put it at the very top
-    history = history.filter(item => item !== cleanQuery);
-    history.unshift(cleanQuery);
-    history = history.slice(0, 10); // Keep only the last 10
-    
-    localStorage.setItem('tcm_search_history', JSON.stringify(history));
+    const cleanQuery = query.trim();
+    const state = getSearchHistoryState();
+
+    // No-op Guard: If already pinned OR already #1 in recent (and not in deleted), do nothing!
+    const isAlreadyPinned = state.pinned.includes(cleanQuery);
+    const isAlreadyTopRecent = state.recent[0] === cleanQuery;
+    const isMarkedDeleted = state.deleted.includes(cleanQuery);
+
+    if ((isAlreadyPinned || isAlreadyTopRecent) && !isMarkedDeleted) {
+      return;
+    }
+
+    state.deleted = state.deleted.filter(item => item !== cleanQuery);
+
+    if (isAlreadyPinned) {
+      // Leave pinned order intact so tapping a pinned item doesn't trigger a write
+      return;
+    } else {
+      state.recent = [cleanQuery, ...state.recent.filter(item => item !== cleanQuery)].slice(0, MAX_SEARCH_HISTORY);
+    }
+
+    state.updatedAt = Date.now();
+    saveSearchHistoryStateLocal(state);
+    queueSearchHistoryCloudSync();
   }
+
+  window.togglePinSearchHistory = function(event, term) {
+    if (event) event.stopPropagation();
+    const state = getSearchHistoryState();
+    state.deleted = state.deleted.filter(item => item !== term);
+
+    if (state.pinned.includes(term)) {
+      state.pinned = state.pinned.filter(item => item !== term);
+      state.recent = [term, ...state.recent.filter(item => item !== term)].slice(0, MAX_SEARCH_HISTORY);
+    } else {
+      state.recent = state.recent.filter(item => item !== term);
+      state.pinned = [term, ...state.pinned];
+    }
+
+    state.updatedAt = Date.now();
+    saveSearchHistoryStateLocal(state);
+    queueSearchHistoryCloudSync();
+    renderSearchHistory();
+    if (isQuickPeekOpen() && qpCurrentState && qpCurrentState.mode === "search") {
+      const qpInput = document.getElementById("qpSearchInput");
+      if (qpInput && qpInput.value.trim().length === 0) renderQuickPeekSearchResults("");
+    }
+  };
+
+  window.deleteSingleSearchHistory = function(event, term) {
+    if (event) event.stopPropagation();
+    const state = getSearchHistoryState();
+    state.pinned = state.pinned.filter(item => item !== term);
+    state.recent = state.recent.filter(item => item !== term);
+    state.deleted = [term, ...state.deleted.filter(item => item !== term)].slice(0, 40);
+    state.updatedAt = Date.now();
+
+    saveSearchHistoryStateLocal(state);
+    queueSearchHistoryCloudSync();
+    renderSearchHistory();
+    if (isQuickPeekOpen() && qpCurrentState && qpCurrentState.mode === "search") {
+      const qpInput = document.getElementById("qpSearchInput");
+      if (qpInput && qpInput.value.trim().length === 0) renderQuickPeekSearchResults("");
+    }
+  };
 
   let historyNavIndex = -1; // Tracks keyboard position
 
-function renderSearchHistory() {
-  const container = document.getElementById("searchHistoryContainer");
-  let history = JSON.parse(localStorage.getItem('tcm_search_history')) || [];
-  
-  // Only show if the input is empty AND we have history
-  if (history.length === 0 || searchInput.value.trim().length > 0) {
-    container.style.display = "none";
-    historyNavIndex = -1; // Reset when hidden
-    return;
+  function renderSearchHistory() {
+    const container = document.getElementById("searchHistoryContainer");
+    const state = getSearchHistoryState();
+    const totalCount = state.pinned.length + state.recent.length;
+
+    // Only show if the input is empty AND we have history
+    if (totalCount === 0 || searchInput.value.trim().length > 0) {
+      container.style.display = "none";
+      historyNavIndex = -1;
+      return;
+    }
+
+    let html = "";
+    const buildRow = (term, isPinned) => {
+      const safeTerm = term.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+      const icon = isPinned ? "⭐" : "🕒";
+      return `
+        <div class="history-row${isPinned ? ' is-pinned' : ''}">
+          <button type="button" class="history-item" onmousedown="event.preventDefault()" onclick="applyHistorySearch('${safeTerm}')">
+            <span class="history-icon">${icon}</span> ${escapeHTML(term)}
+          </button>
+          <button type="button" class="history-action-btn${isPinned ? ' pinned' : ''}" title="${isPinned ? 'Unpin search' : 'Pin search to top'}" onmousedown="event.preventDefault()" onclick="togglePinSearchHistory(event, '${safeTerm}')">
+            ${isPinned ? '★' : '☆'}
+          </button>
+          <button type="button" class="history-action-btn delete" title="Remove from history" onmousedown="event.preventDefault()" onclick="deleteSingleSearchHistory(event, '${safeTerm}')">
+            ✕
+          </button>
+        </div>
+      `;
+    };
+
+    state.pinned.forEach(term => { html += buildRow(term, true); });
+    state.recent.forEach(term => { html += buildRow(term, false); });
+
+    if (state.recent.length > 0) {
+      html += `<div class="history-clear-row"><button type="button" class="history-clear-btn" onmousedown="event.preventDefault()" onclick="clearSearchHistory(event)">Clear Recent (${state.recent.length})</button></div>`;
+    }
+
+    container.innerHTML = html;
+    container.style.display = "flex";
+    historyNavIndex = -1;
   }
 
-  let html = "";
-  history.forEach(term => {
-    // Escape single quotes so points with apostrophes don't break the click handler
-    const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;"); 
-    html += `<button type="button" class="history-item" onmousedown="event.preventDefault()" onclick="applyHistorySearch('${safeTerm}')"><span class="history-icon">🕒</span> ${term}</button>`;
-  });
-  
-    html += `<div class="history-clear-row"><button type="button" class="history-item history-clear-btn" onmousedown="event.preventDefault()" onclick="clearSearchHistory()" style="justify-content: center; text-align: center; border-bottom: none;">Clear History</button></div>`;
-
-  
-  container.innerHTML = html;
-  container.style.display = "flex";
-  historyNavIndex = -1; // Reset when newly rendered
-}
-
-
   function applyHistorySearch(term) {
-  searchInput.value = term;
-  saveSearchHistory(term); // Bumps this term back to the top of the list!
-  handleSearch();
-  
-  // Also close the dropdown when clicking a history item
-  document.getElementById("searchDropdown").classList.remove("expanded");
-  updateStickyHeaderHeights();
-}
+    searchInput.value = term;
+    saveSearchHistory(term);
+    handleSearch();
+    document.getElementById("searchDropdown").classList.remove("expanded");
+    updateStickyHeaderHeights();
+  }
 
+  function clearSearchHistory(event) {
+    if (event) event.stopPropagation();
+    const state = getSearchHistoryState();
+    state.deleted = [...state.recent, ...state.deleted].slice(0, 40);
+    state.recent = []; // Clears recent searches while preserving your Pinned searches!
+    state.updatedAt = Date.now();
 
-  function clearSearchHistory() {
-    localStorage.removeItem('tcm_search_history');
-    renderSearchHistory(); // Instantly hides the menu
+    saveSearchHistoryStateLocal(state);
+    queueSearchHistoryCloudSync();
+    renderSearchHistory();
   }
 
 
@@ -4759,19 +5108,34 @@ function renderSearchHistory() {
       qpSearchHighlightRegex = null;
       if (addAllBtn) addAllBtn.style.display = "none";
 
-      let history = JSON.parse(localStorage.getItem('tcm_search_history')) || [];
-      if (history.length === 0) {
+      const state = getSearchHistoryState();
+      if (state.pinned.length === 0 && state.recent.length === 0) {
         counterEl.textContent = "Enter a search term above";
         listEl.innerHTML = `<div style="text-align:center; padding:30px 15px; color:#8e8e93; font-size:13px;">Search by keyword, <b>@point</b>, <b>#channel</b>, or <b>"exact phrase"</b>.</div>`;
         return;
       }
 
-      counterEl.textContent = "Recent Searches";
+      counterEl.textContent = state.pinned.length > 0 ? "Pinned & Recent Searches" : "Recent Searches";
       let histHtml = `<div class="qp-history-box">`;
-      history.forEach(term => {
-        const safeTerm = term.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-        histHtml += `<button type="button" class="history-item" onclick="applyQuickPeekHistorySearch('${safeTerm}')"><span class="history-icon">🕒</span> ${escapeHTML(term)}</button>`;
-      });
+      const buildQpRow = (term, isPinned) => {
+        const safeTerm = term.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const icon = isPinned ? "⭐" : "🕒";
+        return `
+          <div class="history-row${isPinned ? ' is-pinned' : ''}">
+            <button type="button" class="history-item" onclick="applyQuickPeekHistorySearch('${safeTerm}')">
+              <span class="history-icon">${icon}</span> ${escapeHTML(term)}
+            </button>
+            <button type="button" class="history-action-btn${isPinned ? ' pinned' : ''}" onclick="togglePinSearchHistory(event, '${safeTerm}')">
+              ${isPinned ? '★' : '☆'}
+            </button>
+            <button type="button" class="history-action-btn delete" onclick="deleteSingleSearchHistory(event, '${safeTerm}')">
+              ✕
+            </button>
+          </div>
+        `;
+      };
+      state.pinned.forEach(term => { histHtml += buildQpRow(term, true); });
+      state.recent.forEach(term => { histHtml += buildQpRow(term, false); });
       histHtml += `</div>`;
       listEl.innerHTML = histHtml;
       return;
@@ -8355,9 +8719,9 @@ window.clearAllOcclusions = async function() {
     updateSheetUI(false, true);
 
     if (navigator.onLine) {
-      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: "[]" }) });
-      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Word Occlusions", value: "[]" }) });
-      fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Phrase Occlusions", value: "[]" }) });
+      if (oldLines.length > 0) fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Line Occlusions", value: "[]" }) });
+      if (oldWords.length > 0) fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Word Occlusions", value: "[]" }) });
+      if (oldPhrases.length > 0) fetch(writeUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: pointId, field: "Phrase Occlusions", value: "[]" }) });
     }
   } else { 
     showToast("No marks to clear."); 
