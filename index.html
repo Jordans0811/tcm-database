@@ -47,24 +47,34 @@
       border-bottom: 1px solid transparent; box-sizing: border-box; width: 100%;
     }
     
-    .header-top-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0 15px 4px 15px; }
-    h1 { font-size: 22px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
-    #resultsCounter { font-size: 13px; color: #8e8e93; margin: 0; font-weight: 500;}
-        #searchQueryDisplay { 
+    .header-top-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 15px 4px 15px; }
+    .header-top-row > div:first-child { flex: 1; min-width: 0; }
+    h1 { font-size: 22px; margin: 0; font-weight: 700; letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #resultsCounter { font-size: 13px; color: #8e8e93; margin: 0; font-weight: 500; white-space: nowrap; }
+    #searchQueryDisplay { 
       font-size: 12px; color: #8e8e93; margin: 2px 0 0 0; font-style: italic; 
-      display: block; visibility: hidden; min-height: 10px; /* Reserves the space permanently */
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65vw; 
+      display: block; visibility: hidden; height: 16px; min-height: 16px; line-height: 16px; /* Reserves exact space permanently */
+      white-space: nowrap; overflow-x: auto; overflow-y: hidden; max-width: 100%;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
     }
+    #searchQueryDisplay::-webkit-scrollbar { display: none; }
 
-    
     /* Header & Icon Buttons */
-    .header-actions { display: flex; gap: 10px; align-items: center; }
+    .header-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
     .icon-btn {
       width: 42px; height: 42px; border-radius: 50%; border: none;
       background: #e3e3e8; color: #007aff; font-size: 16px;
       display: flex; align-items: center; justify-content: center; cursor: pointer;
+      flex-shrink: 0;
     }
     .icon-btn:active { opacity: 0.7; }
+    #resultsCounterRow::-webkit-scrollbar { display: none; }
+    @media (max-width: 480px) {
+      .header-top-row { padding: 0 10px 4px 10px; gap: 6px; }
+      .header-actions { gap: 5px; }
+      .icon-btn { width: 35px; height: 35px; font-size: 14px; }
+      #resultsCounter { font-size: 12px; }
+    }
 
     /* Contextual Clear Search button (Red/Orange) */
     .clear-active-btn { background: rgba(255, 59, 48, 0.1); color: #ff3b30; font-weight: 800; }
@@ -134,15 +144,21 @@
       border-bottom: 1px solid #e3e3e8;
       width: 100%;
       box-sizing: border-box;
+      flex-shrink: 0;
     }
     .history-row .history-item {
       border-bottom: none;
       flex: 1;
       min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      overflow-x: auto;
+      overflow-y: hidden;
       white-space: nowrap;
       padding-right: 6px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .history-row .history-item::-webkit-scrollbar {
+      display: none;
     }
     .history-row.is-pinned {
       background: rgba(255, 149, 0, 0.06);
@@ -185,6 +201,7 @@
       justify-content: center; /* Centered looks better in a floating card */
       padding: 12px;
       background: #f8f8f8;
+      flex-shrink: 0;
     }
     .history-clear-btn {
       background: transparent; border: none;
@@ -718,7 +735,7 @@
       .mentioned-in-line { color: #ddd; border-top-color: #38383a; }
       .qp-sticky-header { background: rgba(28, 28, 30, 0.98); border-color: #38383a; }
       .qp-nav-btn { background: #2c2c2e; color: #0a84ff; }
-      #qpAddAllCompareBtn { background: #2c2c2e !important; color: #0a84ff !important; }
+      #addAllCompareBtn, #qpAddAllCompareBtn { background: #2c2c2e !important; color: #0a84ff !important; }
       .qp-close-btn { background: rgba(255,255,255,0.15); color: #ccc; }
       .qp-point-info-row img { background: #1c1c1e; }
       .qp-result-card, .qp-history-box { background: #1c1c1e; border-color: #333; }
@@ -806,20 +823,20 @@
     
   /* Compare Modal Header Controls */
     .compare-actions {
-      display: flex; align-items: center; gap: 8px;
+      display: flex; align-items: center; gap: 8px; min-width: 0;
       overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
     }
     .compare-actions::-webkit-scrollbar { display: none; }
-    .compare-actions button { flex-shrink: 0; }
+    .compare-actions button, .compare-actions select { flex-shrink: 0; }
 
 /* --- SHRINK MODAL HEADER --- */
 .compare-header {
-  display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: nowrap;
   padding: calc(10px + env(safe-area-inset-top)) 15px 10px 15px; 
   background: white; border-bottom: 1px solid #d1d1d6; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
 .compare-header h2 {
-  margin: 0; font-size: 18px; white-space: nowrap;
+  margin: 0; font-size: 18px; white-space: nowrap; flex-shrink: 0;
   color: #333; font-weight: 800;
 }
 
@@ -1965,20 +1982,11 @@ mark.diff-term-mark {
       .dev-stat { color: #ccc; }
       .progress-track { background: #3a3a3c; }
       .dev-btn-close { background: #3a3a3c; color: white; }
-    }
 
-    /* iPad / Desktop Adaptive Layout */
-    @media (min-width: 1900px) {
-      #searchDropdown { height: auto !important; overflow: visible !important; opacity: 1 !important; pointer-events: auto !important; padding: 4px 15px 15px 15px; border-bottom: 1px solid #d1d1d6; }
-
-
-
-      .search-toggle-btn { display: none !important; } 
-    
-          #editFieldSelect { background: #1c1c1e; color: #ffffff; border-color: #38383a; }
+      #editFieldSelect { background: #1c1c1e; color: #ffffff; border-color: #38383a; }
       .format-toolbar button { background: #3a3a3c; color: white; border-color: #555; }
       .format-toolbar button:active { background: #2c2c2e; }
-}
+    }
 
     /* Floating Print Basket */
     #printBasket {
@@ -2524,19 +2532,17 @@ display: flex; flex-direction: column;">
     <div id="mainStickyHeader">
       <div class="header-top-row">
         <div>
-          <h1 id="versionTapTarget">Point Database</h1>
-<div style="display: flex; align-items: center; gap: 10px;">
-<p id="resultsCounter" style="margin: 0;">Search Results: 0 of 0</p>
-<button id="addAllCompareBtn" onclick="addAllToCompare()" style="display: none; background: #e3e3e8; color: #007aff; border: none; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; cursor: pointer;">+ Compare All</button>
-
-</div>
-
+          <h1 id="versionTapTarget">TCM Database</h1>
+          <div id="resultsCounterRow" style="display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; height: 20px; overflow-x: auto; overflow-y: hidden; max-width: 100%; -webkit-overflow-scrolling: touch; scrollbar-width: none;">
+            <p id="resultsCounter" style="margin: 0; white-space: nowrap; flex-shrink: 0;">Search Results: 0 of 0</p>
+            <button id="addAllCompareBtn" onclick="addAllToCompare()" style="display: none; background: #e3e3e8; color: #007aff; border: none; padding: 2px 8px; border-radius: 4px; font-size: 11px; line-height: 1.2; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0;">+ cf. 0</button>
+          </div>
           <p id="searchQueryDisplay"></p>
         </div>
         <div class="header-actions">
   <button id="headerClearBtn" class="icon-btn clear-active-btn" onclick="clearAndCloseSearch()" style="display: none;">✕</button>
   <button class="icon-btn" onclick="openToolsHubModal()" title="Quiz, Study Deck & Intake Hub">📋</button>
-  <label class="icon-btn search-toggle-btn" for="searchInput" onclick="toggleSearchDropdown()" style="margin: 0; display: flex;">🔍</label>
+  <label class="icon-btn search-toggle-btn" for="searchInput" onclick="toggleSearchDropdown(event)" style="margin: 0; display: flex;">🔍</label>
   <button class="icon-btn" onclick="openChannelModal()">⚙️</button>
 </div>
       </div>      
@@ -2586,7 +2592,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.11.26.v1";
+const APP_VERSION = "11.11.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3570,8 +3576,8 @@ document.getElementById("lightbox-img").src = getImagePath(point);
   }
   window.addEventListener('resize', debounce(updateStickyHeaderHeights, 150));
 
-        function toggleSearchDropdown() {
-        closeBottomSheet();    
+        function toggleSearchDropdown(e) {
+    closeBottomSheet();    
     const dropdown = document.getElementById("searchDropdown");
     const isExpanded = dropdown.classList.toggle("expanded");
     
@@ -3579,6 +3585,7 @@ document.getElementById("lightbox-img").src = getImagePath(point);
       // The <label> tag natively handles the focus now!
       renderSearchHistory();
     } else {
+      if (e) e.preventDefault(); // Stops <label> from re-focusing searchInput on close
       searchInput.blur();
     }
     updateStickyHeaderHeights(); 
@@ -4074,6 +4081,85 @@ document.getElementById("lightbox-img").src = getImagePath(point);
     renderSearchHistory();
   }
 
+  // --- DESKTOP SCROLLING FOR SEARCH HISTORY & QUERY DISPLAY ---
+  (function initDesktopHistoryScroll() {
+    let dragEl = null;
+    let startX = 0;
+    let startScrollLeft = 0;
+    let wasDragged = false;
+    let isListVertScrolling = false;
+    let listVertScrollTimer = null;
+
+    // Track active vertical scrolling in history containers so passing long rows don't snag the wheel
+    document.addEventListener("scroll", (e) => {
+      if (e.target && (e.target.id === "searchHistoryContainer" || e.target.id === "quickPeekContainer" || e.target.id === "qpResultsList")) {
+        isListVertScrolling = true;
+        clearTimeout(listVertScrollTimer);
+        listVertScrollTimer = setTimeout(() => { isListVertScrolling = false; }, 160);
+      }
+    }, true);
+
+    document.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return; // Left-click only
+      const target = e.target.closest(".history-row .history-item, #searchQueryDisplay, #resultsCounterRow");
+      if (!target || target.scrollWidth <= target.clientWidth) return;
+      e.preventDefault(); // Prevents accidental text selection while dragging
+      dragEl = target;
+      startX = e.pageX;
+      startScrollLeft = target.scrollLeft;
+      wasDragged = false;
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!dragEl) return;
+      const dx = e.pageX - startX;
+      if (Math.abs(dx) > 5) {
+        wasDragged = true;
+        dragEl.scrollLeft = startScrollLeft - dx;
+      }
+    });
+
+    document.addEventListener("mouseup", () => {
+      if (dragEl && wasDragged) {
+        const suppressClick = (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+          window.removeEventListener("click", suppressClick, true);
+        };
+        window.addEventListener("click", suppressClick, true);
+        // Auto-expire if mouseup occurred outside the element and no click event fired
+        setTimeout(() => window.removeEventListener("click", suppressClick, true), 50);
+      }
+      dragEl = null;
+      wasDragged = false;
+    });
+
+    document.addEventListener("wheel", (e) => {
+      const headerScroller = e.target.closest("#searchQueryDisplay, #resultsCounterRow");
+      if (headerScroller && headerScroller.scrollWidth > headerScroller.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        headerScroller.scrollLeft += e.deltaY;
+        return;
+      }
+
+      if (isListVertScrolling && !e.shiftKey) return;
+
+      const histItem = e.target.closest(".history-row .history-item");
+      if (!histItem || histItem.scrollWidth <= histItem.clientWidth + 2) return;
+
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        const maxScrollLeft = histItem.scrollWidth - histItem.clientWidth;
+        const canScrollRight = e.deltaY > 0 && histItem.scrollLeft < maxScrollLeft - 1;
+        const canScrollLeft = e.deltaY < 0 && histItem.scrollLeft > 1;
+
+        if (canScrollRight || canScrollLeft || e.shiftKey) {
+          e.preventDefault();
+          histItem.scrollLeft += e.deltaY;
+        }
+      }
+    }, { passive: false });
+  })();
+
 
 
 
@@ -4245,14 +4331,17 @@ document.getElementById("lightbox-img").src = getImagePath(point);
     isDocumentWideSearch = isDocWide;
     activeTextTerms = textTerms;
 
-    const effectiveQuery = isDocWide ? rawQuery.substring(4).trim() : rawQuery;
     const headerClearBtn = document.getElementById("headerClearBtn");
     const historyContainer = document.getElementById("searchHistoryContainer");
-    if (effectiveQuery.length > 0) {
+    const dropdown = document.getElementById("searchDropdown");
+    if (rawQuery.length > 0) {
       headerClearBtn.style.display = "flex";
       if (historyContainer) historyContainer.style.display = "none";
     } else {
       headerClearBtn.style.display = "none";
+      if (dropdown && dropdown.classList.contains("expanded")) {
+        renderSearchHistory();
+      }
     }
 
     resultsCounter.textContent = "Search Results: " + filteredPoints.length + " of " + points.length;
@@ -4269,8 +4358,10 @@ document.getElementById("lightbox-img").src = getImagePath(point);
     if (rawQuery.length > 0) {
       queryDisplay.textContent = '"' + rawQuery + '"';
       queryDisplay.style.visibility = "visible";
+      queryDisplay.scrollLeft = 0;
     } else {
       queryDisplay.style.visibility = "hidden";
+      queryDisplay.scrollLeft = 0;
     }
 
     setTimeout(updateStickyHeaderHeights, 10);
@@ -4981,7 +5072,7 @@ document.getElementById("lightbox-img").src = getImagePath(point);
 
     // Row 3: Results Counter + "+ cf. All" Button
     const metaRow = document.createElement("div");
-    metaRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#8e8e93; font-weight:600;";
+    metaRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; height:20px; font-size:12px; color:#8e8e93; font-weight:600;";
     metaRow.innerHTML = `
       <span id="qpResultsCounter">Type to search...</span>
       <button id="qpAddAllCompareBtn" onclick="addAllQuickPeekToCompare()" style="display:none; background:#e3e3e8; color:#007aff; border:none; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer;">+ cf.</button>
@@ -5218,7 +5309,11 @@ document.getElementById("lightbox-img").src = getImagePath(point);
   function debounce(fn, delay = 300) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn.apply(this, args), delay); }; }
 
 
-searchInput.addEventListener("input", debounce(() => handleSearch(false), 300));
+const debouncedMainSearch = debounce(() => handleSearch(false), 300);
+searchInput.addEventListener("input", () => {
+  renderSearchHistory();
+  debouncedMainSearch();
+});
 
 searchInput.addEventListener("keydown", e => { 
   const historyContainer = document.getElementById("searchHistoryContainer");
@@ -5235,8 +5330,10 @@ searchInput.addEventListener("keydown", e => {
     const items = historyContainer.querySelectorAll(".history-item");
     if (items.length === 0) return;
 
-    // Calculate next position
-    if (e.key === "ArrowDown") {
+    // Calculate next position cleanly from -1
+    if (historyNavIndex === -1) {
+      historyNavIndex = e.key === "ArrowDown" ? 0 : items.length - 1;
+    } else if (e.key === "ArrowDown") {
       historyNavIndex = (historyNavIndex + 1) % items.length;
     } else if (e.key === "ArrowUp") {
       historyNavIndex = (historyNavIndex - 1 + items.length) % items.length;
@@ -8005,8 +8102,8 @@ document.addEventListener('keyup', (e) => {
   document.getElementById("mainStickyHeader").addEventListener("click", (e) => {
     const sheet = document.getElementById("bottomSheet");
     if (sheet && sheet.classList.contains("open")) {
-      // If they didn't specifically tap a button or input, drop the sheet
-      if (!e.target.closest("button") && !e.target.closest("label") && !e.target.closest("input")) {
+      // If they didn't specifically tap a button, input, or scrollable counter/query row, drop the sheet
+      if (!e.target.closest("button") && !e.target.closest("label") && !e.target.closest("input") && !e.target.closest("#searchQueryDisplay") && !e.target.closest("#resultsCounterRow")) {
         closeBottomSheet();
       }
     }
