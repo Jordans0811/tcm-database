@@ -1768,9 +1768,10 @@ mark.diff-term-mark {
       background: #e3e3e8; color: #007aff; border: none; border-radius: 8px;
       padding: 6px 10px; font-size: 14px; font-weight: 800; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: transform 0.1s, opacity 0.15s;
+      transition: transform 0.1s, opacity 0.15s, background 0.15s, color 0.15s;
     }
     .study-hdr-icon-btn:active { transform: scale(0.94); opacity: 0.75; }
+    .study-hdr-icon-btn.active { background: #cc5500; color: #ffffff; }
 
     /* Embedded Study Modal Occlusion Bar */
     .study-occ-bar {
@@ -1842,6 +1843,7 @@ mark.diff-term-mark {
       .study-back-content { color: #eee; }
       #studyOrderSelect { background: #2c2c2e; color: white; }
       .study-hdr-icon-btn { background: #2c2c2e; color: #0a84ff; }
+      .study-hdr-icon-btn.active { background: #ff9f0a; color: #000000; }
       .grade-btn-wrong { background: rgba(255, 69, 58, 0.2); color: #ff453a; }
       .grade-btn-undo { background: #2c2c2e; color: #aeaeb2; }
       .grade-btn-flip { background: #2c2c2e; color: #0a84ff; }
@@ -2496,6 +2498,7 @@ display: flex; flex-direction: column;">
     <div class="compare-actions">
       <!-- NEW SYNC BUTTON IN HEADER -->
       <button id="studySyncBtnTop" onclick="syncSRSData()" style="display: none; background: #34c759; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Sync (0)</button>
+      <button id="studyAutoImgBtn" class="study-hdr-icon-btn" onclick="toggleStudyAutoRevealImage()" title="Toggle Auto-Reveal Images">🖼️</button>
       <button class="study-hdr-icon-btn" onclick="studyEditCurrentCard()" title="Edit current card">✏️</button>
       <button class="study-hdr-icon-btn" onclick="studyPeekCurrentCard()" title="Quick Peek Search">⚡</button>
       <select id="studyOrderSelect" style="font-size: 13px; font-weight: 800; padding: 6px 10px; border-radius: 6px; background: #e3e3e8; color: #333; border: none; cursor: pointer;">
@@ -2593,7 +2596,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.11.26.v4";
+const APP_VERSION = "11.11.26.v5";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -9498,7 +9501,26 @@ let studyDeckScope = 'current'; // 'current', 'global', or 'single'
 let isCramMode = false; 
 let isImageFirstMode = false;
 let isBackToFrontMode = false;
+let isAutoRevealImage = false;
 let studyChunkSize = 10;
+
+window.toggleStudyAutoRevealImage = function() {
+  isAutoRevealImage = !isAutoRevealImage;
+  const btn = document.getElementById("studyAutoImgBtn");
+  if (btn) btn.classList.toggle("active", isAutoRevealImage);
+
+  // Immediately update the currently open card without losing flip state
+  const imgEl = document.getElementById("studyCardImg");
+  const revBtn = document.getElementById("studyRevealImgBtn");
+  if (imgEl && revBtn) {
+    imgEl.style.display = isAutoRevealImage ? "block" : "none";
+    revBtn.style.display = isAutoRevealImage ? "none" : "inline-block";
+    setTimeout(() => {
+      const wrapper = document.querySelector(".study-back-content-wrapper");
+      if (wrapper) checkStudyScroll(wrapper);
+    }, 50);
+  }
+};
 
 let cardsReviewedInChunk = 0;
 let pendingSRSUpdates = [];
@@ -10647,11 +10669,13 @@ function renderCurrentStudyCard() {
     let imgSrc = getImagePath(cardData.point);
     let safeName = cardData.point["Short Name"].replace(/'/g, "\\'");
     let safeImgId = imageId.replace(/'/g, "\\'");
+    let btnDisplay = isAutoRevealImage ? "none" : "inline-block";
+    let imgDisplay = isAutoRevealImage ? "block" : "none";
     
     imageHtml = `
       <div style="margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px; text-align: center;">
-        <button onclick="event.stopPropagation(); document.getElementById('studyCardImg').style.display='block'; this.style.display='none'; setTimeout(() => checkStudyScroll(document.querySelector('.study-back-content-wrapper')), 100);" style="background: rgba(0, 122, 255, 0.1); color: #007aff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer;">🖼️ Reveal Image</button>
-        <img id="studyCardImg" src="${imgSrc}" style="display: none; max-width: 100%; max-height: 220px; border-radius: 8px; border: 1px solid #d1d1d6; cursor: pointer; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); openLightboxSingle('${safeName}', '${safeImgId}')">
+        <button id="studyRevealImgBtn" onclick="event.stopPropagation(); document.getElementById('studyCardImg').style.display='block'; this.style.display='none'; setTimeout(() => checkStudyScroll(document.querySelector('.study-back-content-wrapper')), 100);" style="display: ${btnDisplay}; background: rgba(0, 122, 255, 0.1); color: #007aff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer;">🖼️ Reveal Image</button>
+        <img id="studyCardImg" src="${imgSrc}" onload="const w = this.closest('.study-back-content-wrapper'); if (w) checkStudyScroll(w);" style="display: ${imgDisplay}; max-width: 100%; max-height: 220px; border-radius: 8px; border: 1px solid #d1d1d6; cursor: pointer; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); openLightboxSingle('${safeName}', '${safeImgId}')">
       </div>
     `;
   }
