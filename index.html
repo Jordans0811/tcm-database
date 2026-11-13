@@ -440,6 +440,20 @@
 #lightbox { background: rgba(0,0,0,0.9); z-index: 10025; flex-direction: column; }
     #lightbox-title { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 16px; letter-spacing: 0.5px; }
     #lightbox img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 8px; }
+    .lightbox-nav-btn {
+      position: fixed; top: 50%; transform: translateY(-50%);
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.25); background: rgba(28,28,30,0.72);
+      color: #ffffff; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; z-index: 10026; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, opacity 0.15s, transform 0.1s;
+    }
+    .lightbox-nav-btn.left { left: 14px; }
+    .lightbox-nav-btn.right { right: 14px; }
+    .lightbox-nav-btn:hover:not(:disabled) { background: rgba(204,85,0,0.9); }
+    .lightbox-nav-btn:active:not(:disabled) { transform: translateY(-50%) scale(0.94); }
+    .lightbox-nav-btn:disabled { opacity: 0.25; cursor: default; }
     
     .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
     .modal-title { margin: 0; font-size: 18px; color: black; }
@@ -817,10 +831,48 @@
 
         /* Compare Matrix Modal Base Layout */
     #compareModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f0f5; z-index: 10020; flex-direction: column; }
-    .compare-content { display: flex; flex-direction: column; height: 100%; width: 100%; }
+    .compare-content { position: relative; display: flex; flex-direction: column; height: 100%; width: 100%; }
     .compare-header { display: flex; justify-content: space-between; align-items: center; padding: calc(15px + env(safe-area-inset-top)) 20px 15px 20px; background: white; border-bottom: 1px solid #d1d1d6; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
     .compare-header h2 { margin: 0; font-size: 22px; color: #333; font-weight: 800; }
-    .compare-table-container { flex: 1; overflow: auto; padding: 0; -webkit-overflow-scrolling: touch; }
+    .compare-table-container { flex: 1; overflow: auto; padding: 0; -webkit-overflow-scrolling: touch; outline: none; }
+    .compare-table-container:focus { outline: none !important; }
+
+    /* Desktop Left/Right Compare Paddles */
+    .compare-paddle {
+      display: none;
+      position: absolute;
+      top: 54%;
+      transform: translateY(-50%);
+      width: 30px;
+      height: 64px;
+      padding: 0;
+      border-radius: 10px;
+      border: 1px solid #d1d1d6;
+      background: rgba(255, 255, 255, 0.94);
+      color: #cc5500;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+      z-index: 25;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease, background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+      user-select: none;
+    }
+    .compare-paddle svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    .compare-paddle.left { left: 8px; }
+    .compare-paddle.right { right: 8px; }
+    .compare-paddle:active { transform: translateY(-50%) scale(0.95); }
+    @media (hover: hover) and (pointer: fine) {
+      .compare-paddle { display: flex; }
+      .compare-content:hover .compare-paddle.can-scroll { opacity: 0.92; pointer-events: auto; }
+      .compare-paddle:hover { opacity: 1; background: #fff3eb; border-color: #cc5500; }
+    }
+    @media (prefers-color-scheme: dark) {
+      .compare-paddle { background: rgba(28, 28, 30, 0.94); border-color: #38383a; color: #ff9f0a; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55); }
+      .compare-paddle:hover { background: #2c221e; border-color: #ff9f0a; }
+    }
     
   /* Compare Modal Header Controls */
     .compare-actions {
@@ -2122,7 +2174,9 @@ mark.diff-term-mark {
 <body>
   <div id="lightbox" onclick="closeLightbox()">
     <div id="lightbox-title"></div>
+    <button type="button" id="lightbox-prev" class="lightbox-nav-btn left" onclick="event.stopPropagation(); navigateLightbox(-1)" aria-label="Previous image"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
     <img id="lightbox-img" src="">
+    <button type="button" id="lightbox-next" class="lightbox-nav-btn right" onclick="event.stopPropagation(); navigateLightbox(1)" aria-label="Next image"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
   </div>
   
   <div id="toast">🔄 Data synced</div>
@@ -2406,8 +2460,13 @@ display: flex; flex-direction: column;">
 
 
       
-    <div class="compare-table-container" id="compareContainer"></div>
-
+    <div class="compare-table-container" id="compareContainer" tabindex="-1"></div>
+    <button type="button" id="comparePaddleLeft" class="compare-paddle left" onclick="scrollCompareHorizontal(-1, false)" aria-label="Scroll compare table left">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </button>
+    <button type="button" id="comparePaddleRight" class="compare-paddle right" onclick="scrollCompareHorizontal(1, false)" aria-label="Scroll compare table right">
+      <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
 
     </div>
   </div>
@@ -2597,7 +2656,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.11.26.v6";
+const APP_VERSION = "11.13.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3504,7 +3563,45 @@ function applySectionFilter() {
 
 
   let currentLightboxIndex = 0; let currentLightboxPoints = []; let currentLightboxScroller = null;
-  let lbTouchStartX = null; let lbTouchStartY = null; let lbWasSwiped = false;
+  let lbTouchStartX = null; let lbTouchStartY = null; let lbWasSwiped = false; let lastLbWheelTime = 0;
+
+  function updateLightboxNavButtons() {
+    const prevBtn = document.getElementById("lightbox-prev");
+    const nextBtn = document.getElementById("lightbox-next");
+    const hasMulti = currentLightboxPoints && currentLightboxPoints.length > 1;
+    if (prevBtn) {
+      prevBtn.style.display = hasMulti ? "flex" : "none";
+      prevBtn.disabled = currentLightboxIndex <= 0;
+    }
+    if (nextBtn) {
+      nextBtn.style.display = hasMulti ? "flex" : "none";
+      nextBtn.disabled = currentLightboxIndex >= currentLightboxPoints.length - 1;
+    }
+  }
+
+  function navigateLightbox(delta) {
+    if (!currentLightboxPoints || currentLightboxPoints.length === 0) return;
+    const newIndex = currentLightboxIndex + delta;
+    if (newIndex < 0 || newIndex >= currentLightboxPoints.length) return;
+
+    currentLightboxIndex = newIndex;
+    const point = currentLightboxPoints[currentLightboxIndex];
+    document.getElementById("lightbox-title").textContent = point["Short Name"];
+    document.getElementById("lightbox-img").src = getImagePath(point);
+    updateLightboxNavButtons();
+
+    // --- NEW BACKGROUND SYNC LOGIC ---
+    // 1. Legacy fallback just in case
+    if (currentLightboxScroller) {
+      const targetCard = currentLightboxScroller.children[currentLightboxIndex];
+      if (targetCard) { targetCard.dataset.isSilentOpen = "true"; targetCard.click(); }
+    }
+    // 2. Sync the Bottom Sheet perfectly behind the scenes!
+    if (document.getElementById('bottomSheet').classList.contains('open')) {
+      currentSheetIndex = currentLightboxIndex;
+      updateSheetUI();
+    }
+  }
 
   function openLightbox(index, pointsList, scrollerEl) {
     viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0");
@@ -3512,13 +3609,16 @@ function applySectionFilter() {
     const point = currentLightboxPoints[currentLightboxIndex];
     document.getElementById("lightbox-title").textContent = point["Short Name"]; 
     document.getElementById("lightbox-img").src = getImagePath(point);
+    updateLightboxNavButtons();
     document.getElementById("lightbox").style.display = "flex";
   }
 
   function openLightboxSingle(pointId, imageId) {
     viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0");
+    currentLightboxIndex = 0; currentLightboxPoints = []; currentLightboxScroller = null;
     document.getElementById("lightbox-title").textContent = pointId; 
     document.getElementById("lightbox-img").src = getImagePath({ "Image ID": imageId });
+    updateLightboxNavButtons();
     document.getElementById("lightbox").style.display = "flex";
   }
 
@@ -3529,50 +3629,49 @@ function applySectionFilter() {
   }
 
   const lightboxEl = document.getElementById("lightbox");
+  const isLightboxZoomed = () => !!(window.visualViewport && window.visualViewport.scale > 1.12);
+
   lightboxEl.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 1 || (window.visualViewport && window.visualViewport.scale > 1.01)) { lbTouchStartX = null; return; }
+    if (e.touches.length > 1 || isLightboxZoomed()) { lbTouchStartX = null; lbTouchStartY = null; lbWasSwiped = false; return; }
     lbTouchStartX = e.changedTouches[0].screenX; lbTouchStartY = e.changedTouches[0].screenY; lbWasSwiped = false;
   }, {passive: true});
   
-   // --- KILLS NATIVE BOUNCE, BUT ALLOWS PINCH-TO-ZOOM ---
+  // --- KILLS NATIVE BOUNCE WHEN NOT ZOOMED, ALLOWS PINCH-TO-ZOOM & 1-FINGER PAN WHEN ZOOMED ---
   lightboxEl.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 1) {
+    if (e.touches.length === 1 && !isLightboxZoomed()) {
       e.preventDefault(); 
     }
   }, { passive: false });
 
-
-
-    lightboxEl.addEventListener('touchend', (e) => {
-    if (lbTouchStartX === null) return;
+  lightboxEl.addEventListener('touchend', (e) => {
+    if (lbTouchStartX === null || e.touches.length > 0) { lbTouchStartX = null; lbTouchStartY = null; return; }
     let touchEndX = e.changedTouches[0].screenX; let touchEndY = e.changedTouches[0].screenY;
     let deltaX = touchEndX - lbTouchStartX; let deltaY = touchEndY - lbTouchStartY;
+    lbTouchStartX = null; lbTouchStartY = null;
     
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50 && currentLightboxPoints.length > 0) {
-      lbWasSwiped = true; let newIndex = currentLightboxIndex;
-      if (deltaX < 0 && currentLightboxIndex < currentLightboxPoints.length - 1) newIndex++; 
-      else if (deltaX > 0 && currentLightboxIndex > 0) newIndex--; 
-      
-      if (newIndex !== currentLightboxIndex) {
-        currentLightboxIndex = newIndex; const point = currentLightboxPoints[currentLightboxIndex];
-        document.getElementById("lightbox-title").textContent = point["Short Name"]; 
-document.getElementById("lightbox-img").src = getImagePath(point);
-
-        
-        // --- NEW BACKGROUND SYNC LOGIC ---
-        // 1. Legacy fallback just in case
-        if (currentLightboxScroller) {
-          const targetCard = currentLightboxScroller.children[currentLightboxIndex];
-          if (targetCard) { targetCard.dataset.isSilentOpen = "true"; targetCard.click(); }
-        }
-        // 2. Sync the Bottom Sheet perfectly behind the scenes!
-        if (document.getElementById('bottomSheet').classList.contains('open')) {
-          currentSheetIndex = currentLightboxIndex;
-          updateSheetUI();
-        }
-      }
+      lbWasSwiped = true;
+      if (deltaX < 0) navigateLightbox(1);
+      else if (deltaX > 0) navigateLightbox(-1);
     }
   }, {passive: true});
+
+  lightboxEl.addEventListener('touchcancel', () => {
+    lbTouchStartX = null; lbTouchStartY = null; lbWasSwiped = false;
+  }, {passive: true});
+
+  lightboxEl.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || isLightboxZoomed()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - lastLbWheelTime < 180) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(delta) > 4) {
+      lastLbWheelTime = now;
+      navigateLightbox(delta > 0 ? 1 : -1);
+    }
+  }, { passive: false });
 
 
   function updateStickyHeaderHeights() {
@@ -6569,8 +6668,74 @@ let comparePinFirst = false;
     if (preserveToggles) {
       container.scrollTop = prevScrollTop;
       container.scrollLeft = prevScrollLeft;
+    } else {
+      compareTargetScrollLeft = 0;
+      container.scrollTop = 0;
+      container.scrollLeft = 0;
+      container.focus({ preventScroll: true });
     }
+    requestAnimationFrame(updateComparePaddles);
   }
+
+  let compareTargetScrollLeft = 0;
+  let lastCompareKeyScrollTime = 0;
+
+  function updateComparePaddles() {
+    const container = document.getElementById("compareContainer");
+    const leftBtn = document.getElementById("comparePaddleLeft");
+    const rightBtn = document.getElementById("comparePaddleRight");
+    if (!container || !leftBtn || !rightBtn) return;
+
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    if (maxScroll <= 4) {
+      leftBtn.classList.remove("can-scroll");
+      rightBtn.classList.remove("can-scroll");
+      return;
+    }
+    leftBtn.classList.toggle("can-scroll", container.scrollLeft > 4);
+    rightBtn.classList.toggle("can-scroll", container.scrollLeft < maxScroll - 4);
+  }
+
+  function scrollCompareHorizontal(direction, isRepeat = false) {
+    const container = document.getElementById("compareContainer");
+    if (!container) return;
+
+    const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+    if (maxScroll <= 0) return;
+
+    const firstGrid = container.querySelector(".compare-section-grid");
+    const colCount = firstGrid ? firstGrid.querySelectorAll(".compare-card-header").length : 1;
+    const colWidth = firstGrid && colCount > 0 ? (firstGrid.scrollWidth / colCount) : Math.max(240, container.clientWidth / 2);
+
+    if (isRepeat) {
+      container.scrollBy({ left: direction * 90, behavior: "auto" });
+      compareTargetScrollLeft = container.scrollLeft;
+      lastCompareKeyScrollTime = Date.now();
+      return;
+    }
+
+    const now = Date.now();
+    const baseLeft = (now - lastCompareKeyScrollTime < 450) ? compareTargetScrollLeft : container.scrollLeft;
+    const targetCol = direction > 0
+      ? Math.min(colCount - 1, Math.floor((baseLeft + 10) / colWidth) + 1)
+      : Math.max(0, Math.ceil((baseLeft - 10) / colWidth) - 1);
+
+    const nextLeft = Math.min(maxScroll, Math.max(0, Math.round(targetCol * colWidth)));
+    compareTargetScrollLeft = nextLeft;
+    lastCompareKeyScrollTime = now;
+    container.scrollTo({ left: nextLeft, behavior: "smooth" });
+  }
+
+  document.getElementById("compareContainer").addEventListener("scroll", updateComparePaddles, { passive: true });
+  window.addEventListener("resize", () => {
+    if (document.getElementById("compareModal")?.style.display === "flex") updateComparePaddles();
+  });
+  document.getElementById("compareContainer").addEventListener("wheel", (e) => {
+    if (e.shiftKey && e.deltaY !== 0 && e.deltaX === 0) {
+      e.preventDefault();
+      e.currentTarget.scrollLeft += e.deltaY;
+    }
+  }, { passive: false });
 
 
 
@@ -7310,27 +7475,31 @@ if (document.getElementById('occStudioModal')?.style.display === 'flex') { stop(
   // 6. LIGHTBOX NAVIGATION
   const lightbox = document.getElementById('lightbox');
   if (lightbox && lightbox.style.display === 'flex') {
-    let newIndex = currentLightboxIndex;
-    if (e.key === 'ArrowRight' && currentLightboxIndex < currentLightboxPoints.length - 1) newIndex++;
-    else if (e.key === 'ArrowLeft' && currentLightboxIndex > 0) newIndex--;
-
-    if (newIndex !== currentLightboxIndex) {
-      currentLightboxIndex = newIndex; 
-      const point = currentLightboxPoints[currentLightboxIndex];
-      document.getElementById("lightbox-title").textContent = point["Short Name"]; 
-document.getElementById("lightbox-img").src = getImagePath(point);
-
-      
-      if (currentLightboxScroller) {
-        const targetCard = currentLightboxScroller.children[currentLightboxIndex];
-        if (targetCard) { targetCard.dataset.isSilentOpen = "true"; targetCard.click(); }
-      }
-      if (document.getElementById('bottomSheet').classList.contains('open')) {
-        currentSheetIndex = currentLightboxIndex;
-        updateSheetUI();
-      }
-    }
+    if (e.key === 'ArrowRight') navigateLightbox(1);
+    else if (e.key === 'ArrowLeft') navigateLightbox(-1);
     return; 
+  }
+
+  // 6b. COMPARE MODAL NAVIGATION
+  const compareModalEl = document.getElementById('compareModal');
+  if (compareModalEl && compareModalEl.style.display === 'flex' &&
+      !isQuickPeekOpen() &&
+      document.getElementById('editModal')?.style.display !== 'flex' &&
+      document.getElementById('srsCardModal')?.style.display !== 'flex') {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      scrollCompareHorizontal(1, e.repeat);
+      return;
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      scrollCompareHorizontal(-1, e.repeat);
+      return;
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const cContainer = document.getElementById('compareContainer');
+      if (cContainer) cContainer.scrollBy({ top: e.key === 'ArrowDown' ? 80 : -80, behavior: 'auto' });
+      return;
+    }
   }
 
   // 7. BOTTOM SHEET NAVIGATION
@@ -10609,10 +10778,10 @@ function renderCurrentStudyCard() {
         <h2 style="color: #cc5500; font-size: 28px; margin-bottom: 5px;">Take a breath.</h2>
         <p style="font-size: 16px; margin-top: 0;">You have done ${studyChunkSize} reviews.</p>
         ${generateStudyStatsHTML()}
-        <p style="font-size: 12px; color: #aaa; margin-top: 5px;">You have ${pendingSRSUpdates.length} pending updates in the queue.</p>
+        <p id="intermissionPendingCount" style="font-size: 12px; color: #aaa; margin-top: 5px;">You have ${pendingSRSUpdates.length} pending updates in the queue.</p>
         <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           <button onclick="continueChunk()" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Continue Deck</button>
-          ${pendingSRSUpdates.length > 0 ? `<button id="intermissionSyncBtn" onclick="syncSRSData(); this.style.display='none';" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
+          ${pendingSRSUpdates.length > 0 ? `<button id="intermissionSyncBtn" onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
         </div>
       </div>`;
     return;
@@ -10942,9 +11111,19 @@ async function syncSRSData() {
 
   isSyncing = true; 
   const btn = document.getElementById("studySyncBtnTop");
-  const origText = btn.textContent;
-  btn.textContent = "Syncing...";
-  btn.disabled = true;
+  const origText = btn ? btn.textContent : "";
+  if (btn) {
+    btn.textContent = "Syncing...";
+    btn.disabled = true;
+  }
+
+  const inlineSyncBtns = Array.from(document.querySelectorAll("#studyCardContainer button[onclick*='syncSRSData']"));
+  const inlineOrigTexts = inlineSyncBtns.map(b => b.textContent);
+  inlineSyncBtns.forEach(b => {
+    b.textContent = "Syncing...";
+    b.disabled = true;
+    b.style.opacity = "0.75";
+  });
 
   let pointsToSave = {}; 
 
@@ -10965,41 +11144,57 @@ async function syncSRSData() {
     }
 
     srsData[section] = calculateNextSRS(srsData[section], update.rating);
-    p["SRS Data"] = JSON.stringify(srsData);
-    pointsToSave[pointId] = p["SRS Data"];
+    pointsToSave[pointId] = JSON.stringify(srsData);
   });
-
-  for (let pointId in pointsToSave) {
-    let p = points.find(x => x["Short Name"] === pointId);
-    await saveSinglePointToVault(p);
-  }
 
   let cloudPayload = Object.keys(pointsToSave).map(id => {
     return { id: id, field: "SRS Data", value: pointsToSave[id] };
   });
 
   try {
-    await fetch(writeUrl, {
+    const resp = await fetch(writeUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: "batchUpdate", updates: cloudPayload })
     });
+    if (resp.type !== 'opaque' && !resp.ok) {
+      throw new Error("HTTP " + resp.status);
+    }
+
+    // Commit to RAM & local Vault only after cloud write succeeds to prevent double-counting on retry
+    for (let pointId in pointsToSave) {
+      let p = points.find(x => x["Short Name"] === pointId);
+      if (p) {
+        p["SRS Data"] = pointsToSave[pointId];
+        await saveSinglePointToVault(p);
+      }
+    }
 
     // 2. SAFELY FILTER out only the updates we just saved
     pendingSRSUpdates = pendingSRSUpdates.filter(u => !updatesBeingProcessed.includes(u));
     
     showToast(`✅ Successfully synced ${updatesBeingProcessed.length} reviews.`);
     saveSRSQueueLocal(); // Update the local storage file with the new pending list
-    updateStudySyncBadge();
 
-    const catchupBtn = document.querySelector("#studyCardContainer button[onclick='syncSRSData()']");
-    if (catchupBtn) catchupBtn.style.display = "none";
+    if (pendingSRSUpdates.length === 0) {
+      inlineSyncBtns.forEach(b => { b.style.display = "none"; });
+      const pendingInfo = document.getElementById("intermissionPendingCount");
+      if (pendingInfo) pendingInfo.textContent = "All updates synced!";
+    }
 
   } catch (err) {
     showToast("⚠️ Cloud Sync failed. Data saved locally.");
   } finally {
-    btn.textContent = origText;
-    btn.disabled = false;
+    if (btn) {
+      btn.textContent = origText;
+      btn.disabled = false;
+    }
+    updateStudySyncBadge();
+    inlineSyncBtns.forEach((b, idx) => {
+      b.textContent = inlineOrigTexts[idx];
+      b.disabled = false;
+      b.style.opacity = "";
+    });
     isSyncing = false; 
   }
 }
