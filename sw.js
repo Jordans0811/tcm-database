@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v127';
+const CACHE_VERSION = 'v128';
 const APP_CACHE = `tcm-app-${CACHE_VERSION}`;
 const IMAGE_CACHE = `tcm-images-${CACHE_VERSION}`;
 
@@ -17,58 +17,79 @@ const INITIAL_CACHED_RESOURCES = [
   './distractors.js'
 ];
 
+const EXTERNAL_PDFJS_RESOURCES = [
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+];
+
 // 1. Install Event: Lock the core files in the vault immediately
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(APP_CACHE).then(cache => cache.addAll(INITIAL_CACHED_RESOURCES))
+    caches.open(APP_CACHE).then(async cache => {
+      await cache.addAll(INITIAL_CACHED_RESOURCES);
+      await Promise.allSettled(
+        EXTERNAL_PDFJS_RESOURCES.map(url => cache.add(new Request(url, { mode: 'cors' })))
+      );
+    })
   );
   self.skipWaiting();
 });
 
-// 2. Activate Event: Clean up old versions if you update the app
+// 2. Activate Event: Clean up only old versioned app/image caches (never delete tcm-data-vault!)
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
       keys.map(key => {
-        if (!key.includes(CACHE_VERSION)) return caches.delete(key);
+        if ((key.startsWith('tcm-app-') || key.startsWith('tcm-images-')) && !key.includes(CACHE_VERSION)) {
+          return caches.delete(key);
+        }
       })
-    ))
+    )).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // 3. Fetch Event: Intercept network traffic
 self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-      // A. Handle Google Apps Script Data (Network First, fallback to offline cache)
-  if (url.hostname.includes('script.google.com')) {
-    // Let the frontend Cache API engine handle offline data natively!
-    return; 
+  // A. Bypass API endpoints & Google Apps Script redirects completely
+  if (
+    url.hostname.includes('script.google.com') ||
+    url.hostname.includes('script.googleusercontent.com') ||
+    url.hostname.includes('workers.dev')
+  ) {
+    return;
   }
 
-
-  // B. Handle Photos (Cache First, fallback to Network, save new photos invisibly)
+  // B. Handle Photos (Cache First, fallback to Network, never cache 404/500 errors)
   if (url.pathname.includes('/DeadmanPhotos/')) {
     event.respondWith(
       caches.match(event.request).then(cachedResponse => {
-        if (cachedResponse) return cachedResponse; // Instantly serve from offline vault
-        
-        // If photo isn't in vault, download it and lock a copy away for next time
+        if (cachedResponse) return cachedResponse;
+
         return fetch(event.request).then(networkResponse => {
-          const clone = networkResponse.clone();
-          caches.open(IMAGE_CACHE).then(cache => cache.put(event.request, clone));
+          if (networkResponse && networkResponse.ok) {
+            const clone = networkResponse.clone();
+            caches.open(IMAGE_CACHE).then(cache => cache.put(event.request, clone));
+          }
           return networkResponse;
-        }).catch(() => new Response('Image offline')); 
+        }).catch(() => new Response('', { status: 503, statusText: 'Image offline' }));
       })
     );
     return;
   }
 
-  // C. Handle Everything Else (HTML, Manifest)
+  // C. Handle Everything Else (HTML, JS, Manifest) with offline navigation fallback
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      return cachedResponse || fetch(event.request);
+    caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
+      if (cachedResponse) return cachedResponse;
+      return fetch(event.request).catch(() => {
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+        return new Response('', { status: 503, statusText: 'Offline' });
+      });
     })
   );
 });

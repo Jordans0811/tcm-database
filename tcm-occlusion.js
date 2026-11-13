@@ -1079,6 +1079,14 @@
   let panzoom = null;
   let db = null;
 
+  function escapeOccHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
   function notify(msg) {
     if (typeof window.showToast === "function") window.showToast(msg);
   }
@@ -1606,7 +1614,7 @@
       }
 
       if (data.hint) {
-        const safeHint = String(data.hint).replace(/\n/g, "<br>");
+        const safeHint = escapeOccHtml(data.hint).replace(/\n/g, "<br>");
         box.innerHTML += `<span class="hint-text">${safeHint}</span>`;
       }
 
@@ -2501,7 +2509,7 @@
         if (hintSpan) {
           if (!value) hintSpan.remove();
           else {
-            hintSpan.innerHTML = String(value).replace(/\n/g, "<br>");
+            hintSpan.innerHTML = escapeOccHtml(value).replace(/\n/g, "<br>");
             autoFitHintText(hintSpan);
           }
         }
@@ -2901,19 +2909,37 @@
       return;
     }
     try {
-      const payload = { pdfName: targetFile, boxes: targetBoxes };
-      await fetch(GOOGLE_WEB_APP_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
-      });
+      const payloadStr = JSON.stringify({ pdfName: targetFile, boxes: targetBoxes });
+      let resp;
+      try {
+        resp = await fetch(GOOGLE_WEB_APP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: payloadStr
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+      } catch (corsOrNetErr) {
+        if (corsOrNetErr.name === "TypeError" && navigator.onLine) {
+          resp = await fetch(GOOGLE_WEB_APP_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: payloadStr
+          });
+        } else {
+          throw corsOrNetErr;
+        }
+      }
       localStorage.removeItem("tcm_dirty_" + targetFile);
       const saveBtn = document.getElementById("occSaveCloudBtn");
       if (saveBtn) saveBtn.innerHTML = "💾";
       cloudSyncTimer = null;
       if (manual) notify("Synced to Google Sheets ☁️");
-    } catch (e) {}
+    } catch (e) {
+      const saveBtn = document.getElementById("occSaveCloudBtn");
+      if (saveBtn) saveBtn.innerHTML = "⚠️";
+      if (manual) notify("⚠️ Cloud sync failed -- kept in local dirty queue");
+    }
   }
 
   window.occSyncFromCloud = async function (isBackground = false) {
@@ -2996,6 +3022,12 @@
       cloudSyncTimer = null;
       pushToCloud(false);
     } else if (document.visibilityState === "visible" && isOcclusionModalOpen() && currentFileName) {
+      occSyncFromCloud(true);
+    }
+  });
+
+  window.addEventListener("online", () => {
+    if (currentFileName && (cloudSyncTimer || localStorage.getItem("tcm_dirty_" + currentFileName) === "1")) {
       occSyncFromCloud(true);
     }
   });
@@ -3327,11 +3359,7 @@
     });
 
     window.addEventListener("keydown", e => {
-      if (!isOcclusionModalOpen()) return;
-      if (typeof isQuickPeekOpen === "function" && isQuickPeekOpen()) return;
-      if (document.getElementById("compareModal")?.style.display === "flex") return;
-      if (document.getElementById("occSearchModal")?.style.display === "flex") return;
-      if (document.getElementById("occLibraryModal")?.style.display === "flex") return;
+      if (window.ModalStack ? window.ModalStack.getTopId() !== "occStudioModal" : !isOcclusionModalOpen()) return;
 
       const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
       if (["input", "textarea", "select"].includes(activeTag)) return;

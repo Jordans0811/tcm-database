@@ -266,11 +266,13 @@
     wrapper.innerHTML = `
       <!-- 1. STUDY, QUIZ & TOOLS HUB MODAL -->
       <div id="toolsHubModal" onclick="if(event.target===this) closeToolsHubModal()">
-        <div class="modal-content" style="max-width: 420px; gap: 10px;">
+        <div class="modal-content" style="max-width: 420px; max-height: 88dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; gap: 10px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
             <h3 class="modal-title">Study & Clinical Tools</h3>
             <button onclick="closeToolsHubModal()" style="background:transparent; border:none; font-size:26px; color:#8e8e93; cursor:pointer; line-height:1;">&times;</button>
           </div>
+
+          <div id="hubReadinessBanner" style="background:rgba(204,85,0,0.08); border:1px solid rgba(204,85,0,0.25); border-radius:10px; padding:10px 12px; font-size:12.5px; line-height:1.4;"></div>
 
           <button class="hub-card-btn" onclick="closeToolsHubModal(); openQuizModal('patterns');">
             <div class="hub-card-icon">☯️</div>
@@ -360,6 +362,8 @@
               <option value="15">15 Cards per Batch</option>
               <option value="20">20 Cards per Batch</option>
               <option value="25">25 Cards per Batch</option>
+              <option value="weakest_15">🔥 Weakest 15 (Most Missed)</option>
+              <option value="weakest_all">🔥 All Previously Missed</option>
             </select>
             <button class="quiz-pill-btn" style="flex:1; padding:9px;" onclick="openQuizDistractorModal()">🛡️ Answer Pool</button>
           </div>
@@ -546,6 +550,26 @@
   let currentClueQueue = [];
   let qzScore = 0;
   let qzTotalAnswered = 0;
+  let pendingCaseChainTarget = null;
+
+  function getQuizMasteryKey(track = currentTrack) {
+    return `tcmQuizMastery_${track}`;
+  }
+  function loadQuizMastery(track = currentTrack) {
+    try { return JSON.parse(localStorage.getItem(getQuizMasteryKey(track)) || "{}"); } catch (e) { return {}; }
+  }
+  function recordQuizMasteryResult(pointId, wasCorrect) {
+    if (!pointId) return;
+    const map = loadQuizMastery(currentTrack);
+    const rec = map[pointId] || { a: 0, m: 0, lm: 0 };
+    rec.a += 1;
+    if (!wasCorrect) {
+      rec.m += 1;
+      rec.lm = Date.now();
+    }
+    map[pointId] = rec;
+    try { localStorage.setItem(getQuizMasteryKey(currentTrack), JSON.stringify(map)); } catch (e) {}
+  }
 
   function syncQuizSettingCheckboxes() {
     const revEl = document.getElementById("qzRequireRevealToggle");
@@ -1250,10 +1274,12 @@
         if (qzSubMode === "combinations_mcq") return Boolean((p["Combinations"] && String(p["Combinations"]).trim()) || (p["SS Combo"] && String(p["SS Combo"]).trim()));
         if (qzSubMode === "point_categories_mcq") return parsePointClinicalLines(p, "categories").lines.length > 0;
         if (qzSubMode === "needling_cautions_mcq") return Boolean((p["Needling"] && String(p["Needling"]).trim()) || (p["Cautions"] && String(p["Cautions"]).trim()));
+        if (qzSubMode === "anatomy_biomed_mcq") return Boolean(p["Muscle"] || p["Artery"] || p["Innervation"] || p["Cautions"]);
         return true;
       }
       if (currentTrack === "patterns") {
         const pr = parseManifestationRecord(p);
+        if (qzSubMode === "case_chain") return Boolean(pr.txPrinciple || pr.rxPointsLine || pr.suppLines.length > 0);
         if (qzSubMode === "tongue_pulse") return Boolean(pr.tongue || pr.pulse);
         if (qzSubMode === "tx_prescription") return Boolean(pr.txPrinciple || pr.rxPointsLine || pr.rxMethodLine || pr.rxLines.length > 0);
         if (qzSubMode === "rx_rationale") return pr.rxExplanations.length > 0 || Boolean(pr.rxPointsLine);
@@ -1277,6 +1303,53 @@
     const subEl = document.getElementById("hubPatternCountSub");
     if (subEl && patternCount > 0) {
       subEl.textContent = `${patternCount} patterns • Vignettes, Triads, Sibling Diff, Pathology, Tongue/Pulse & Rx Rationales`;
+    }
+
+    const banner = document.getElementById("hubReadinessBanner");
+    if (banner && typeof points !== "undefined") {
+      const now = Date.now();
+      let srsDue = 0, srsTotal = 0, leechCount = 0;
+      points.forEach(p => {
+        if (!p["SRS Data"]) return;
+        try {
+          const srs = JSON.parse(p["SRS Data"]);
+          TCM_SECTIONS.forEach(sec => {
+            const st = typeof getVirtualSRS === "function" ? getVirtualSRS(p, sec.label) : srs[sec.label];
+            if (st && Array.isArray(st)) {
+              srsTotal++;
+              if (st[0] === 0 || st[1] <= now) srsDue++;
+              if (st.length > 3 && Number(st[3]) >= 4) leechCount++;
+            }
+          });
+        } catch (e) {}
+      });
+
+      const patMastery = loadQuizMastery("patterns");
+      const ptMastery = loadQuizMastery("clinical_points");
+      const channelMisses = {};
+      [patMastery, ptMastery].forEach(masteryObj => {
+        Object.entries(masteryObj).forEach(([id, st]) => {
+          if ((st.m || 0) > 0) {
+            const pt = points.find(x => x["Short Name"] === id);
+            const ch = (pt && (pt["Channel Short Name"] || pt[" Channel Short Name"] || pt["Channel Full Name"])) || "Other";
+            channelMisses[ch] = (channelMisses[ch] || 0) + st.m;
+          }
+        });
+      });
+
+      const weakList = Object.entries(channelMisses).sort((a, b) => b[1] - a[1]).slice(0, 3)
+        .map(([ch, m]) => `${escapeHTML(ch)} (${m})`);
+
+      banner.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; font-weight:800; color:#cc5500; margin-bottom:4px;">
+          <span>📊 Board Readiness</span>
+          <span>SRS Due: ${srsDue} / ${srsTotal}${leechCount ? ` • 🩸 ${leechCount} Leeches` : ""}</span>
+        </div>
+        <div style="color:#666;">
+          <b>Quizzed:</b> ${Object.keys(patMastery).length} Patterns • ${Object.keys(ptMastery).length} Points<br>
+          <b>Top Weak Spots:</b> ${weakList.length > 0 ? weakList.join(", ") : "None logged yet -- run a batch!"}
+        </div>
+      `;
     }
 
     document.getElementById("toolsHubModal").style.display = "flex";
@@ -1407,10 +1480,12 @@
       subSel.add(new Option("🏷️ Point Categories (5-Shu, Mu/Shu, Luo/Xi, Confluent)", "point_categories_mcq"));
       subSel.add(new Option("🔗 Point Combinations & Synergy", "combinations_mcq"));
       subSel.add(new Option("⚠️ Needling Depth, Moxa & Safety Cautions", "needling_cautions_mcq"));
+      subSel.add(new Option("🦴 Anatomy & Safety (Muscle/Artery/Nerve)", "anatomy_biomed_mcq"));
       subSel.add(new Option("🚫 Odd Action/Indication Out (EXCEPT Only)", "except_mcq"));
       subSel.add(new Option("📝 Clinical Fill in the Blank", "fitb_clinical"));
     } else if (currentTrack === "patterns") {
       subSel.add(new Option("☯️ Comprehensive Mastery (All 8 NCBAHM Pattern Modes)", "mixed_mastery", true, true));
+      subSel.add(new Option("🩺➡️🌿 2-Step Case Chain (Dx ➔ Tx/Rx)", "case_chain"));
       subSel.add(new Option("🩺 Clinical Vignette ➔ Pattern (+Clue Ladder)", "vignette"));
       subSel.add(new Option("🎯 Cardinal Triad (Key Symptoms ⇄ Pattern)", "cardinal_triad"));
       subSel.add(new Option("⚖️ Sibling Differential & Odd-Sign-Out (EXCEPT)", "differential"));
@@ -1976,6 +2051,21 @@
       return;
     }
 
+    if (pendingCaseChainTarget) {
+      currentTargetPoint = pendingCaseChainTarget;
+      pendingCaseChainTarget = null;
+      currentIsRequeuedTry = false;
+      buildPatternStepTwoQuestion(currentTargetPoint);
+      if (qzRequireReveal) {
+        optionsGrid.style.display = "none";
+        revealBtn.style.display = "block";
+      } else {
+        optionsGrid.style.display = "flex";
+        revealBtn.style.display = "none";
+      }
+      return;
+    }
+
     if (remainingQuizQueue.length === 0) {
       showQuizSummaryScreen();
       return;
@@ -2166,6 +2256,38 @@
         availableModes.push("needling_cautions_mcq");
       }
       effectivePointMode = availableModes[Math.floor(Math.random() * availableModes.length)];
+    }
+
+    // 0. ANATOMY & BIOMED SAFETY SUB-MODE
+    if (effectivePointMode === "anatomy_biomed_mcq") {
+      const bioFields = [
+        { key: "Muscle", label: "Musculature" },
+        { key: "Artery", label: "Vascular / Artery" },
+        { key: "Innervation", label: "Innervation / Nerve" },
+        { key: "Cautions", label: "Needling Safety Caution" }
+      ].filter(f => targetPoint[f.key] && String(targetPoint[f.key]).trim() !== "");
+
+      if (bioFields.length > 0) {
+        currentQuestionSubMode = "anatomy_biomed_mcq";
+        const chosen = bioFields[Math.floor(Math.random() * bioFields.length)];
+        const valStr = cleanSectionLines(targetPoint[chosen.key]).join(" • ");
+        labelEl.textContent = `Biomed & Anatomy • ${chosen.label}`;
+        bodyEl.innerHTML = `
+          <div style="font-size:13px; color:#8e8e93; margin-bottom:6px;">Which acupuncture point corresponds to this anatomical / safety profile?</div>
+          <div class="quiz-diag-box"><b>${escapeHTML(chosen.label)}:</b> ${maskSelfSpoilers(escapeHTML(valStr), targetPoint)}</div>
+        `;
+        const normVal = normalizeSymptomClause(valStr);
+        const shownPts = [targetPoint, ...distractors.slice(0, 5)];
+        const validNames = shownPts
+          .filter(p => normalizeSymptomClause(cleanSectionLines(p[chosen.key] || "").join(" • ")) === normVal)
+          .map(p => standardizeTCMTerminology(p["Short Name"]));
+        setCorrectQuizAnswers(stdTargetName, validNames);
+        renderQuizOptionButtons(shuffleArr(shownPts.map(p => ({
+          text: standardizeTCMTerminology(p["Short Name"]),
+          pointId: p["Short Name"]
+        }))));
+        return;
+      }
     }
 
     // 1. POINT CATEGORIES SUB-MODE (Five-Shu, Yuan, Luo, Xi-Cleft, Front-Mu, Back-Shu, Confluent, Hui-Meeting)
@@ -3099,8 +3221,10 @@
     }
 
     // SUB-MODE 8 (DEFAULT): PROGRESSIVE CLINICAL VIGNETTE ➔ IDENTIFY THE PATTERN (+Clue Ladder)
-    currentQuestionSubMode = "vignette";
-    labelEl.textContent = "Identify the Pattern from Clinical Manifestations";
+    currentQuestionSubMode = (effectiveMode === "case_chain") ? "case_chain_step1" : "vignette";
+    labelEl.textContent = (effectiveMode === "case_chain")
+      ? "Case Step 1/2 • Identify the Pattern"
+      : "Identify the Pattern from Clinical Manifestations";
     let html = "";
     const clueQueue = [];
     let displayedSyms = [];
@@ -3172,6 +3296,61 @@
     renderQuizOptionButtons(shuffleArr(opts));
   }
 
+  function buildPatternStepTwoQuestion(targetPattern) {
+    const parsed = parseManifestationRecord(targetPattern);
+    const distractors = getSmartPatternDistractors(targetPattern, 6);
+    const labelEl = document.getElementById("qzQuestionLabel");
+    const bodyEl = document.getElementById("qzQuestionBody");
+    currentQuestionSubMode = "tx_prescription";
+
+    if (parsed.suppLines.length > 0 && Math.random() < 0.45) {
+      const line = parsed.suppLines[Math.floor(Math.random() * parsed.suppLines.length)];
+      const exp = extractPointRationaleFromLine(line);
+      if (exp) {
+        labelEl.textContent = `Case Step 2/2 • Supplementary Modification (${targetPattern["Short Name"]})`;
+        bodyEl.innerHTML = `
+          <div style="font-size:13px; color:#8e8e93; margin-bottom:6px;">Confirmed Diagnosis: <b style="color:#cc5500;">${escapeHTML(targetPattern["Short Name"])}</b></div>
+          <div class="quiz-diag-box">Which supplementary point should be added for: <b>${escapeHTML(exp.explanation)}</b>?</div>
+        `;
+        setCorrectQuizAnswers(exp.pointLabel);
+        let opts = [{ text: escapeHTML(exp.pointLabel), rawCompare: exp.pointLabel }];
+        parsed.suppLines.forEach(sl => {
+          const sExp = extractPointRationaleFromLine(sl);
+          if (sExp && sExp.pointLabel !== exp.pointLabel && opts.length < 5) {
+            opts.push({ text: escapeHTML(sExp.pointLabel), rawCompare: sExp.pointLabel });
+          }
+        });
+        for (const d of distractors) {
+          if (opts.length >= 5) break;
+          const dExp = parseManifestationRecord(d).rxExplanations[0];
+          if (dExp && !opts.some(o => o.rawCompare === dExp.pointLabel)) {
+            opts.push({ text: escapeHTML(dExp.pointLabel), rawCompare: dExp.pointLabel });
+          }
+        }
+        if (opts.length >= 3) { renderQuizOptionButtons(shuffleArr(opts)); return; }
+      }
+    }
+
+    labelEl.textContent = `Case Step 2/2 • Treatment & Formula (${targetPattern["Short Name"]})`;
+    const useRx = Boolean(parsed.rxPointsLine) && (!parsed.txPrinciple || Math.random() < 0.6);
+    const targetVal = useRx ? parsed.rxPointsLine : (parsed.txPrinciple || parsed.rxPointsLine || targetPattern["Short Name"]);
+    bodyEl.innerHTML = `
+      <div style="font-size:13px; color:#8e8e93; margin-bottom:6px;">Confirmed Diagnosis: <b style="color:#cc5500;">${escapeHTML(targetPattern["Short Name"])}</b></div>
+      <div style="color:#007aff; font-weight:700;">Select the best ${useRx ? "Point Prescription" : "Treatment Principle"} for this patient:</div>
+    `;
+    setCorrectQuizAnswers(targetVal);
+    let opts = [{ text: escapeHTML(targetVal), rawCompare: targetVal, pointId: targetPattern["Short Name"] }];
+    for (const d of distractors) {
+      if (opts.length >= 5) break;
+      const dPr = parseManifestationRecord(d);
+      const cand = useRx ? dPr.rxPointsLine : dPr.txPrinciple;
+      if (cand && !opts.some(o => o.rawCompare.toLowerCase() === cand.toLowerCase())) {
+        opts.push({ text: escapeHTML(cand), rawCompare: cand, pointId: d["Short Name"] });
+      }
+    }
+    renderQuizOptionButtons(shuffleArr(opts));
+  }
+
   // --- 12. RENDER OPTION BUTTONS, INTRA-BATCH RE-QUEUE, CLINICAL DIGEST & GRADE ANSWERS ---
   function renderQuizOptionButtons(optionsData) {
     const grid = document.getElementById("qzOptionsGrid");
@@ -3204,6 +3383,7 @@
       : (pickedVal === targetVal);
     lastAnswerWasCorrect = isCorrect;
     const cardId = currentTargetPoint ? currentTargetPoint["Short Name"] : "";
+    if (!currentIsRequeuedTry) recordQuizMasteryResult(cardId, isCorrect);
 
     if (isCorrect) {
       selectedBtn.classList.add("correct");
@@ -3258,11 +3438,17 @@
     renderPostAnswerDigest(isCorrect);
     renderPostAnswerInspectionBar();
 
+    if (currentQuestionSubMode === "case_chain_step1" && currentTargetPoint) {
+      pendingCaseChainTarget = currentTargetPoint;
+    }
+
     const nextBtn = document.getElementById("qzNextBtn");
     const bottomBar = document.getElementById("qzBottomBar");
-    nextBtn.innerHTML = remainingQuizQueue.length === 0
-      ? `Finish & See Results ➔ <span style="font-size:12px; opacity:0.85;">(Enter)</span>`
-      : `Next Question ➔ <span style="font-size:12px; opacity:0.85;">(Enter / Space)</span>`;
+    nextBtn.innerHTML = pendingCaseChainTarget
+      ? `Continue Case (Step 2: Tx & Rx) ➔ <span style="font-size:12px; opacity:0.85;">(Enter / Space)</span>`
+      : (remainingQuizQueue.length === 0
+          ? `Finish & See Results ➔ <span style="font-size:12px; opacity:0.85;">(Enter)</span>`
+          : `Next Question ➔ <span style="font-size:12px; opacity:0.85;">(Enter / Space)</span>`);
     nextBtn.style.display = "block";
     bottomBar.style.display = "block";
 
@@ -3868,12 +4054,56 @@
     }
   };
 
+  window.drillCompareList = function () {
+    if (typeof compareList === "undefined" || compareList.length === 0) return;
+    const ids = [...compareList];
+    if (typeof closeCompareModal === "function") closeCompareModal();
+
+    const master = typeof points !== "undefined" ? points : [];
+    const selectedPts = ids.map(id => master.find(p => p["Short Name"] === id)).filter(Boolean);
+    const hasPatterns = selectedPts.some(p => p["Clinical Manifestations"] && String(p["Clinical Manifestations"]).trim() !== "");
+
+    injectQuizHubDOM();
+    document.getElementById("quizModal").style.display = "flex";
+    switchQuizTrack(hasPatterns ? "patterns" : "clinical_points");
+    document.getElementById("quizResumeModal").style.display = "none";
+
+    const matched = trackEligiblePoints.filter(p => ids.includes(p["Short Name"]));
+    if (matched.length > 0) {
+      trackFilteredPoints = matched;
+      if (matched.length >= 4) trackDistractorPoints = matched;
+      const limitEl = document.getElementById("qzLimitSelect");
+      if (limitEl) limitEl.value = "all";
+      retakeQuizWholePool();
+      if (typeof showToast === "function") showToast(`🎯 Drilling ${matched.length} compared items`);
+    }
+  };
+
   window.retakeQuizWholePool = function () {
     const limitVal = document.getElementById("qzLimitSelect").value;
     const eligibleFiltered = getSubModeEligiblePool(trackFilteredPoints);
 
     if (eligibleFiltered.length === 0) {
       activeQuizPool = [];
+      startQuizRound();
+      return;
+    }
+
+    if (limitVal === "weakest_15" || limitVal === "weakest_all") {
+      const mastery = loadQuizMastery(currentTrack);
+      const missedOnly = eligibleFiltered
+        .filter(p => (mastery[p["Short Name"]]?.m || 0) > 0)
+        .sort((a, b) => {
+          const mA = mastery[a["Short Name"]];
+          const mB = mastery[b["Short Name"]];
+          return (mB.m / Math.max(1, mB.a)) - (mA.m / Math.max(1, mA.a)) || (mB.m - mA.m);
+        });
+      if (missedOnly.length === 0) {
+        if (typeof showToast === "function") showToast("No missed items logged in this track yet!");
+        activeQuizPool = shuffleArr(eligibleFiltered).slice(0, 15);
+      } else {
+        activeQuizPool = limitVal === "weakest_15" ? missedOnly.slice(0, 15) : missedOnly;
+      }
       startQuizRound();
       return;
     }
@@ -3922,6 +4152,7 @@
   function startQuizRound() {
     qzScore = 0;
     qzTotalAnswered = 0;
+    pendingCaseChainTarget = null;
     sessionMisses = [];
     requeuedCardCounts = {};
     remainingQuizQueue = shuffleArr([...activeQuizPool]);
@@ -4481,16 +4712,7 @@
       return;
     }
 
-    const qzModal = document.getElementById("quizModal");
-    if (!qzModal || qzModal.style.display !== "flex") return;
-
-    if (typeof isQuickPeekOpen === "function" && isQuickPeekOpen()) return;
-    if (document.getElementById("compareModal")?.style.display === "flex") return;
-    if (document.getElementById("lightbox")?.style.display === "flex") return;
-    if (document.getElementById("editModal")?.style.display === "flex") return;
-    if (document.getElementById("quizFilterModal")?.style.display === "flex") return;
-    if (document.getElementById("quizDistractorModal")?.style.display === "flex") return;
-    if (document.getElementById("quizResumeModal")?.style.display === "flex") return;
+    if (window.ModalStack ? window.ModalStack.getTopId() !== "quizModal" : document.getElementById("quizModal")?.style.display !== "flex") return;
 
     if (isTyping) return;
 
