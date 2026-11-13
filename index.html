@@ -2666,7 +2666,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.13.26.v2";
+const APP_VERSION = "11.13.26.v3";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3359,7 +3359,11 @@ else setTimeout(warmPdfJsCache, 3500);
     const oldMap = {};
     points.forEach(p => oldMap[p["Short Name"]] = p);
 
-    const processed = dataArray.map(point => {
+    const metaRow = dataArray.find(p => String(p["Short Name"] || "").trim().toLowerCase() === "metadata");
+    window.tcmMetaDataRow = metaRow ? Object.assign({}, metaRow) : null;
+    const filteredData = dataArray.filter(p => String(p["Short Name"] || "").trim().toLowerCase() !== "metadata");
+
+    const processed = filteredData.map(point => {
       const old = oldMap[point["Short Name"]];
       if (old && JSON.stringify(stripDerivedFields(old)) === JSON.stringify(stripDerivedFields(point))) {
         point._searchIndex = old._searchIndex;
@@ -3594,6 +3598,9 @@ function applySectionFilter() {
 
       if (typeof syncSearchHistoryFromPoints === "function") {
         syncSearchHistoryFromPoints(points);
+      }
+      if (typeof window.pullQuizLedgerFromCloud === "function") {
+        window.pullQuizLedgerFromCloud(true);
       }
 
       showToast("🔄 Data synced");
@@ -3958,6 +3965,7 @@ function applySectionFilter() {
   }
 
   function getHistoryCarrierPoint(ptsArray) {
+    if (window.tcmMetaDataRow) return window.tcmMetaDataRow;
     const list = ptsArray || points;
     if (!Array.isArray(list) || list.length === 0) return null;
     return list.find(p => p["Short Name"] === "LU-1") || list[0];
@@ -3967,8 +3975,18 @@ function applySectionFilter() {
     const carrier = getHistoryCarrierPoint(ptsArray);
     if (!carrier) return;
 
+    let rawCloudHistory = carrier[SEARCH_HISTORY_FIELD];
+    let wasMigratingFromLegacy = false;
+    if (!rawCloudHistory && carrier === window.tcmMetaDataRow) {
+      const legacyCarrier = (ptsArray || points).find(p => p["Short Name"] === "LU-1");
+      if (legacyCarrier && legacyCarrier[SEARCH_HISTORY_FIELD]) {
+        rawCloudHistory = legacyCarrier[SEARCH_HISTORY_FIELD];
+        wasMigratingFromLegacy = true;
+      }
+    }
+
     // If the Google Sheet cell is completely empty on first setup, push local history up once
-    if (!carrier[SEARCH_HISTORY_FIELD]) {
+    if (!rawCloudHistory) {
       const local = getSearchHistoryState();
       if (local.pinned.length > 0 || local.recent.length > 0) {
         queueSearchHistoryCloudSync();
@@ -3977,7 +3995,7 @@ function applySectionFilter() {
     }
 
     try {
-      const cloud = JSON.parse(carrier[SEARCH_HISTORY_FIELD]);
+      const cloud = JSON.parse(rawCloudHistory);
       if (!cloud || typeof cloud !== "object") return;
 
       const local = getSearchHistoryState();
@@ -4027,12 +4045,12 @@ function applySectionFilter() {
       saveSearchHistoryStateLocal(mergedState);
       carrier[SEARCH_HISTORY_FIELD] = JSON.stringify(mergedState);
 
-      // Record what the cloud actually has right now
-      setLastSyncedSignature(cloudSig);
+      // Record what the cloud actually has right now (leave blank when migrating so MetaData receives its initial write)
+      setLastSyncedSignature(wasMigratingFromLegacy ? "" : cloudSig);
 
       // If merging local offline/unsynced changes produced a newer state than what's on the cloud, queue a sync!
       const mergedSig = getHistorySignature(mergedState);
-      if (mergedSig !== cloudSig) {
+      if (mergedSig !== cloudSig || wasMigratingFromLegacy) {
         queueSearchHistoryCloudSync();
       } else {
         setHistoryDirtyFlag(false);
@@ -4100,6 +4118,9 @@ function applySectionFilter() {
     const carrier = getHistoryCarrierPoint(points);
     if (carrier) {
       carrier[SEARCH_HISTORY_FIELD] = JSON.stringify(state);
+      if (typeof saveSinglePointToVault === "function") {
+        saveSinglePointToVault(carrier);
+      }
     }
 
     setHistoryDirtyFlag(true);

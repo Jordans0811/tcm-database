@@ -42,6 +42,43 @@
       .hub-card-title { font-size: 15px; font-weight: 800; color: #cc5500; margin-bottom: 2px; }
       .hub-card-sub { font-size: 12px; color: #666; line-height: 1.3; }
 
+      .hub-readiness-summary { cursor: pointer; user-select: none; }
+      .hub-readiness-details {
+        display: none; flex-direction: column; gap: 10px;
+        margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(204,85,0,0.3);
+      }
+      .hub-readiness-details.open { display: flex; }
+      .hub-track-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+      @media (max-width: 400px) { .hub-track-grid { grid-template-columns: 1fr; } }
+      .hub-track-box {
+        background: #ffffff; border: 1px solid #d1d1d6; border-radius: 8px;
+        padding: 7px 8px; display: flex; flex-direction: column; gap: 4px;
+      }
+      .hub-mini-btn {
+        border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px;
+        font-weight: 800; cursor: pointer; background: #e3e3e8; color: #007aff;
+        white-space: nowrap;
+      }
+      .hub-mini-btn:active { transform: scale(0.95); }
+      .hub-mini-btn.primary { background: #cc5500; color: #ffffff; }
+      .hub-weak-list {
+        display: flex; flex-direction: column; gap: 5px;
+        max-height: 150px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      }
+      .hub-weak-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 6px;
+        background: #ffffff; border: 1px solid #e5e5ea; border-radius: 7px; padding: 5px 8px;
+      }
+      .hub-weak-name {
+        font-weight: 700; color: #007aff; cursor: pointer; flex: 1; min-width: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .hub-section-subhdr {
+        font-size: 11px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: 0.4px; color: #8e8e93; margin-bottom: 4px;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+
       /* Quiz Top Track Switcher & Header */
       .quiz-top-bar {
         display: flex; justify-content: space-between; align-items: center; gap: 8px;
@@ -234,6 +271,10 @@
         .hub-card-icon { background: #1c1c1e; }
         .hub-card-title { color: #ff9f0a; }
         .hub-card-sub { color: #aeaeb2; }
+        .hub-track-box, .hub-weak-row { background: #2c2c2e; border-color: #38383a; color: #f2f2f7; }
+        .hub-mini-btn { background: #3a3a3c; color: #0a84ff; }
+        .hub-mini-btn.primary { background: #ff9f0a; color: #000000; }
+        .hub-weak-name { color: #64b5f6; }
         .quiz-top-bar, .quiz-settings-panel, .quiz-bottom-bar { background: #1c1c1e; border-color: #38383a; }
         .quiz-subtoolbar { background: #121214; border-color: #38383a; }
         .quiz-track-tabs { background: #2c2c2e; }
@@ -591,6 +632,7 @@
         showDigest: qzShowDigest,
         masteryRequeue: qzMasteryRequeue
       }));
+      markQuizLedgerDirty();
     } catch (e) {}
 
     const allBtns = Array.from(document.querySelectorAll("#qzOptionsGrid .quiz-opt-btn"));
@@ -1296,6 +1338,7 @@
   window.openToolsHubModal = function () {
     injectQuizHubDOM();
     if (typeof closeBottomSheet === "function") closeBottomSheet();
+    pullQuizLedgerFromCloud(false);
 
     const patternCount = (typeof points !== "undefined" ? points : []).filter(
       p => p["Clinical Manifestations"] && String(p["Clinical Manifestations"]).trim() !== ""
@@ -1309,6 +1352,8 @@
     if (banner && typeof points !== "undefined") {
       const now = Date.now();
       let srsDue = 0, srsTotal = 0, leechCount = 0;
+      const leechItems = [];
+
       points.forEach(p => {
         if (!p["SRS Data"]) return;
         try {
@@ -1318,41 +1363,236 @@
             if (st && Array.isArray(st)) {
               srsTotal++;
               if (st[0] === 0 || st[1] <= now) srsDue++;
-              if (st.length > 3 && Number(st[3]) >= 4) leechCount++;
+              const lapses = st.length > 3 ? (Number(st[3]) || 0) : 0;
+              if (lapses >= 4) {
+                leechCount++;
+                leechItems.push({ id: p["Short Name"], section: sec.label, lapses, interval: Number(st[0]) || 0 });
+              }
             }
           });
         } catch (e) {}
       });
+      leechItems.sort((a, b) => b.lapses - a.lapses);
 
-      const patMastery = loadQuizMastery("patterns");
-      const ptMastery = loadQuizMastery("clinical_points");
-      const channelMisses = {};
-      [patMastery, ptMastery].forEach(masteryObj => {
-        Object.entries(masteryObj).forEach(([id, st]) => {
-          if ((st.m || 0) > 0) {
+      const trackMeta = [
+        { key: "patterns", icon: "☯️", label: "Patterns", data: loadQuizMastery("patterns") },
+        { key: "clinical_points", icon: "⚡", label: "Act/Ind", data: loadQuizMastery("clinical_points") },
+        { key: "location", icon: "📍", label: "Location", data: loadQuizMastery("location") }
+      ];
+
+      const channelMissMap = {};
+      const missedItemList = [];
+
+      trackMeta.forEach(tm => {
+        let attempts = 0, misses = 0;
+        const entries = Object.entries(tm.data);
+        entries.forEach(([id, st]) => {
+          const a = Number(st.a || 0);
+          const m = Number(st.m || 0);
+          attempts += a;
+          misses += m;
+          if (m > 0) {
             const pt = points.find(x => x["Short Name"] === id);
-            const ch = (pt && (pt["Channel Short Name"] || pt[" Channel Short Name"] || pt["Channel Full Name"])) || "Other";
-            channelMisses[ch] = (channelMisses[ch] || 0) + st.m;
+            const chShort = (pt && (pt["Channel Short Name"] || pt[" Channel Short Name"] || pt["Channel Full Name"])) || "Other";
+            const chFull = (pt && (pt["Channel Full Name"] || pt[" Channel Full Name"])) || "Other";
+            const cKey = tm.key + "||" + chFull;
+            if (!channelMissMap[cKey]) {
+              channelMissMap[cKey] = { track: tm.key, icon: tm.icon, chShort, chFull, misses: 0 };
+            }
+            channelMissMap[cKey].misses += m;
+
+            missedItemList.push({
+              id,
+              track: tm.key,
+              icon: tm.icon,
+              misses: m,
+              attempts: a,
+              rate: m / Math.max(1, a),
+              lastMissed: Number(st.lm || 0)
+            });
           }
         });
+        tm.quizzed = entries.length;
+        tm.attempts = attempts;
+        tm.misses = misses;
+        tm.acc = attempts > 0 ? Math.round(((attempts - misses) / attempts) * 100) : null;
       });
 
-      const weakList = Object.entries(channelMisses).sort((a, b) => b[1] - a[1]).slice(0, 3)
-        .map(([ch, m]) => `${escapeHTML(ch)} (${m})`);
+      const weakChannels = Object.values(channelMissMap).sort((a, b) => b.misses - a.misses);
+      missedItemList.sort((a, b) => b.misses - a.misses || b.rate - a.rate || b.lastMissed - a.lastMissed);
+      const topWeakChannelsStr = weakChannels.slice(0, 3)
+        .map(w => `${w.icon} ${escapeHTML(w.chShort)} (${w.misses})`)
+        .join(", ");
+
+      const trackCardsHtml = trackMeta.map(tm => `
+        <div class="hub-track-box">
+          <div style="font-weight:800; font-size:12px;">${tm.icon} ${tm.label}</div>
+          <div style="font-size:11px; color:#8e8e93;">
+            <b>${tm.quizzed}</b> quizzed${tm.acc !== null ? ` • <b>${tm.acc}%</b>` : ""}<br>
+            Misses: <b>${tm.misses}</b>
+          </div>
+          <button type="button" class="hub-mini-btn primary" style="margin-top:auto;" onclick="event.stopPropagation(); drillWeakestInTrack('${tm.key}')">🔥 Drill Weakest</button>
+        </div>
+      `).join("");
+
+      const weakChannelsHtml = weakChannels.length > 0
+        ? weakChannels.slice(0, 8).map(w => {
+            const safeChan = w.chFull.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            return `
+              <div class="hub-weak-row">
+                <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700;">
+                  ${w.icon} ${escapeHTML(w.chShort)} <span style="color:#ff3b30;">(${w.misses})</span>
+                </span>
+                <button type="button" class="hub-mini-btn" onclick="event.stopPropagation(); focusChannelOnMainScreen('${safeChan}')" title="Filter main screen to this channel">🔍 View</button>
+                <button type="button" class="hub-mini-btn primary" onclick="event.stopPropagation(); drillChannelInQuiz('${w.track}', '${safeChan}')" title="Quiz this channel">🎯 Drill</button>
+              </div>
+            `;
+          }).join("")
+        : `<div style="font-size:12px; color:#8e8e93;">No missed channels yet -- run a batch!</div>`;
+
+      const missedItemsHtml = missedItemList.length > 0
+        ? missedItemList.slice(0, 12).map(item => {
+            const safeId = item.id.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            const inCmp = typeof compareList !== "undefined" && compareList.includes(item.id);
+            return `
+              <div class="hub-weak-row">
+                <span class="hub-weak-name" onclick="event.stopPropagation(); openQuickPeekById('${safeId}')" title="Tap for Quick Peek">
+                  ${item.icon} ${escapeHTML(item.id)}
+                </span>
+                <span style="font-size:11px; color:#ff3b30; font-weight:800; white-space:nowrap;">${item.misses}/${item.attempts}</span>
+                <button type="button" class="hub-mini-btn" style="${inCmp ? 'background:#cc5500;color:#fff;' : ''}" onclick="event.stopPropagation(); toggleHubCompareItem(this, '${safeId}')" title="Add to Compare">${inCmp ? '✓' : '+ cf.'}</button>
+              </div>
+            `;
+          }).join("")
+        : `<div style="font-size:12px; color:#8e8e93;">No missed items logged yet.</div>`;
+
+      const leechesHtml = leechItems.length > 0
+        ? leechItems.slice(0, 8).map(l => {
+            const safeId = l.id.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            return `
+              <div class="hub-weak-row">
+                <span class="hub-weak-name" onclick="event.stopPropagation(); openQuickPeekById('${safeId}')">
+                  🩸 ${escapeHTML(l.id)} <span style="color:#8e8e93; font-weight:500;">(${escapeHTML(l.section)})</span>
+                </span>
+                <span style="font-size:11px; color:#ff3b30; font-weight:800; white-space:nowrap;">${l.lapses} lapses</span>
+              </div>
+            `;
+          }).join("")
+        : `<div style="font-size:12px; color:#8e8e93;">No SRS leeches (4+ lapses).</div>`;
+
+      const topMissedIdsForCompare = missedItemList.slice(0, 10).map(i => i.id);
+      const safeTopCompareArg = JSON.stringify(topMissedIdsForCompare).replace(/"/g, "&quot;");
+      const wasOpen = window._hubReadinessExpanded === true;
 
       banner.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; font-weight:800; color:#cc5500; margin-bottom:4px;">
-          <span>📊 Board Readiness</span>
-          <span>SRS Due: ${srsDue} / ${srsTotal}${leechCount ? ` • 🩸 ${leechCount} Leeches` : ""}</span>
+        <div class="hub-readiness-summary" onclick="toggleHubReadinessExpand()">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-weight:800; color:#cc5500; margin-bottom:4px; gap:6px;">
+            <span>📊 Board Readiness <span id="hubReadinessChev">${wasOpen ? "▲" : "▼"}</span></span>
+            <span style="font-size:11.5px;">SRS Due: ${srsDue}/${srsTotal}${leechCount ? ` • 🩸 ${leechCount}` : ""}</span>
+          </div>
+          <div style="color:#666; font-size:12px;">
+            <b>Quizzed:</b> ${trackMeta[0].quizzed} Patterns • ${trackMeta[1].quizzed} Act/Ind • ${trackMeta[2].quizzed} Loc<br>
+            <b>Weak Spots:</b> ${topWeakChannelsStr || "None logged yet -- tap to inspect"}
+          </div>
         </div>
-        <div style="color:#666;">
-          <b>Quizzed:</b> ${Object.keys(patMastery).length} Patterns • ${Object.keys(ptMastery).length} Points<br>
-          <b>Top Weak Spots:</b> ${weakList.length > 0 ? weakList.join(", ") : "None logged yet -- run a batch!"}
+        <div id="hubReadinessDetails" class="hub-readiness-details${wasOpen ? " open" : ""}">
+          <div>
+            <div class="hub-section-subhdr"><span>Quiz Mastery by Track</span><span>Uses Weakest 15</span></div>
+            <div class="hub-track-grid">${trackCardsHtml}</div>
+          </div>
+          <div>
+            <div class="hub-section-subhdr"><span>Weak Channels / Categories</span><span>Tap 🔍 View or 🎯 Drill</span></div>
+            <div class="hub-weak-list">${weakChannelsHtml}</div>
+          </div>
+          <div>
+            <div class="hub-section-subhdr">
+              <span>Most Missed (Tap to Peek)</span>
+              ${topMissedIdsForCompare.length > 0 ? `<button type="button" class="hub-mini-btn" onclick="event.stopPropagation(); compareQuizItems(${safeTopCompareArg})">⚖️ Compare Top ${topMissedIdsForCompare.length}</button>` : ""}
+            </div>
+            <div class="hub-weak-list">${missedItemsHtml}</div>
+          </div>
+          <div>
+            <div class="hub-section-subhdr">
+              <span>SRS Due &amp; Leeches</span>
+              <button type="button" class="hub-mini-btn primary" onclick="event.stopPropagation(); closeToolsHubModal(); openStudySettingsModal();">🧠 Study Due (${srsDue})</button>
+            </div>
+            <div class="hub-weak-list">${leechesHtml}</div>
+          </div>
         </div>
       `;
     }
 
     document.getElementById("toolsHubModal").style.display = "flex";
+  };
+
+  window.toggleHubReadinessExpand = function () {
+    const det = document.getElementById("hubReadinessDetails");
+    const chev = document.getElementById("hubReadinessChev");
+    if (!det) return;
+    const isOpen = det.classList.toggle("open");
+    window._hubReadinessExpanded = isOpen;
+    if (chev) chev.textContent = isOpen ? "▲" : "▼";
+  };
+
+  window.toggleHubCompareItem = function (btnEl, id) {
+    if (typeof toggleCompare !== "function") return;
+    toggleCompare(id);
+    const added = typeof compareList !== "undefined" && compareList.includes(id);
+    btnEl.style.background = added ? "#cc5500" : "";
+    btnEl.style.color = added ? "#ffffff" : "";
+    btnEl.textContent = added ? "✓" : "+ cf.";
+  };
+
+  window.drillWeakestInTrack = function (track) {
+    closeToolsHubModal();
+    injectQuizHubDOM();
+    if (typeof closeBottomSheet === "function") closeBottomSheet();
+    document.getElementById("quizModal").style.display = "flex";
+    switchQuizTrack(track, true);
+    document.getElementById("quizResumeModal").style.display = "none";
+    const limitEl = document.getElementById("qzLimitSelect");
+    if (limitEl) limitEl.value = "weakest_15";
+    retakeQuizWholePool();
+  };
+
+  window.drillChannelInQuiz = function (track, channelFullName) {
+    closeToolsHubModal();
+    injectQuizHubDOM();
+    if (typeof closeBottomSheet === "function") closeBottomSheet();
+    document.getElementById("quizModal").style.display = "flex";
+    switchQuizTrack(track, true);
+    document.getElementById("quizResumeModal").style.display = "none";
+    let matched = trackEligiblePoints.filter(p => (p["Channel Full Name"] || p[" Channel Full Name"] || "Other") === channelFullName);
+    if (matched.length === 0 && typeof points !== "undefined") {
+      const rawIds = new Set(
+        points
+          .filter(p => (p["Channel Full Name"] || p[" Channel Full Name"] || "Other") === channelFullName)
+          .map(p => p["Short Name"])
+      );
+      matched = trackEligiblePoints.filter(p => rawIds.has(p["Short Name"]));
+    }
+    if (matched.length > 0) {
+      trackFilteredPoints = matched;
+      document.querySelectorAll("#qzChannelTree .qz-pt-cb").forEach(cb => {
+        cb.checked = matched.some(m => m["Short Name"] === cb.value);
+      });
+      document.querySelectorAll("#qzChannelTree .qf-group").forEach(g => {
+        if (!g.querySelector("#qzSelectAllGlobal")) syncSingleQuizGroup(g);
+      });
+      retakeQuizWholePool();
+      if (typeof showToast === "function") showToast(`🎯 Drilling ${channelFullName} (${matched.length})`);
+    }
+  };
+
+  window.focusChannelOnMainScreen = function (channelFullName) {
+    closeToolsHubModal();
+    if (typeof activeChannels !== "undefined") {
+      const hasChannel = typeof points !== "undefined" && points.some(p => (p["Channel Full Name"] || p[" Channel Full Name"] || "") === channelFullName);
+      activeChannels = hasChannel ? [channelFullName] : ["All"];
+      if (typeof initDropdown === "function") initDropdown();
+      if (typeof handleSearch === "function") handleSearch();
+      if (typeof showToast === "function") showToast(hasChannel ? `🔍 Filtered main screen: ${channelFullName}` : `Showing All Channels`);
+    }
   };
 
   window.closeToolsHubModal = function () {
@@ -1382,7 +1622,7 @@
   };
 
   // --- 8. TRACK INITIALIZATION & DROPDOWN CONFIGURATION ---
-  window.switchQuizTrack = function (track) {
+  window.switchQuizTrack = function (track, skipResumePrompt = false) {
     currentTrack = track;
     pullQuizLedgerFromCloud(false);
     document.getElementById("tabQuizLocation").classList.toggle("active", track === "location");
@@ -1461,7 +1701,7 @@
     updatePoolSummaryBanner();
     updateQuizCloudSyncBtnUI();
 
-    if (!checkSavedQuizSession()) {
+    if (!skipResumePrompt && !checkSavedQuizSession()) {
       retakeQuizWholePool();
     }
   };
@@ -1484,7 +1724,7 @@
       subSel.add(new Option("🚫 Odd Action/Indication Out (EXCEPT Only)", "except_mcq"));
       subSel.add(new Option("📝 Clinical Fill in the Blank", "fitb_clinical"));
     } else if (currentTrack === "patterns") {
-      subSel.add(new Option("☯️ Comprehensive Mastery (All 8 NCBAHM Pattern Modes)", "mixed_mastery", true, true));
+      subSel.add(new Option("☯️ Comprehensive Mastery (All 9 NCBAHM Pattern Modes)", "mixed_mastery", true, true));
       subSel.add(new Option("🩺➡️🌿 2-Step Case Chain (Dx ➔ Tx/Rx)", "case_chain"));
       subSel.add(new Option("🩺 Clinical Vignette ➔ Pattern (+Clue Ladder)", "vignette"));
       subSel.add(new Option("🎯 Cardinal Triad (Key Symptoms ⇄ Pattern)", "cardinal_triad"));
@@ -2041,6 +2281,7 @@
     currentQuestionSubMode = qzSubMode;
     currentPathologySubLabel = "";
     setupClueLadder([]);
+    if (requeueBadge) requeueBadge.style.display = "none";
 
     const activeView = document.getElementById("qzActiveView");
     if (activeView) activeView.scrollTop = 0;
@@ -2254,6 +2495,9 @@
       }
       if (parsePointClinicalLines(targetPoint, "needling").lines.some(l => /caution|contraindicated|moxa|artery|pneumothorax/i.test(l)) && Math.random() < 0.2) {
         availableModes.push("needling_cautions_mcq");
+      }
+      if ((targetPoint["Muscle"] || targetPoint["Artery"] || targetPoint["Innervation"] || targetPoint["Cautions"]) && Math.random() < 0.2) {
+        availableModes.push("anatomy_biomed_mcq");
       }
       effectivePointMode = availableModes[Math.floor(Math.random() * availableModes.length)];
     }
@@ -2656,6 +2900,9 @@
         parsed.mechanismSentences.length > 0
       ) {
         candidateModes.push("pathology_chain");
+      }
+      if (parsed.txPrinciple || parsed.rxPointsLine || parsed.suppLines.length > 0) {
+        candidateModes.push("case_chain");
       }
 
       const lastMode = lastUsedSubModeByCard[cardId];
@@ -3603,6 +3850,13 @@
         const needlingBlock = needlingLines.length > 0
           ? `<div><b>Needling & Cautions:</b> ${bbcodeToHtml(needlingLines.slice(0, 3).join(" • "))}</div>`
           : "";
+        const bioParts = [
+          pObj["Muscle"] ? `<b>Muscle:</b> ${escapeHTML(cleanSectionLines(pObj["Muscle"]).join(" • "))}` : "",
+          pObj["Artery"] ? `<b>Artery:</b> ${escapeHTML(cleanSectionLines(pObj["Artery"]).join(" • "))}` : "",
+          pObj["Innervation"] ? `<b>Innervation:</b> ${escapeHTML(cleanSectionLines(pObj["Innervation"]).join(" • "))}` : "",
+          pObj["Cautions"] ? `<b>Cautions:</b> ${escapeHTML(cleanSectionLines(pObj["Cautions"]).join(" • "))}` : ""
+        ].filter(Boolean);
+        const bioBlock = bioParts.length > 0 ? `<div>${bioParts.join("<br>")}</div>` : "";
 
         let primaryParts = [];
         let extraParts = [];
@@ -3628,6 +3882,10 @@
           primaryParts.push(needlingBlock || actBlock);
           extraParts.push(catBlock, actBlock, indBlock, combBlock);
           summaryLabel = "Expand Categories, Actions & Indications";
+        } else if (activeMode === "anatomy_biomed_mcq") {
+          primaryParts.push(bioBlock || needlingBlock || actBlock);
+          extraParts.push(needlingBlock, catBlock, actBlock, indBlock);
+          summaryLabel = "Expand Needling, Categories & Actions";
         } else {
           // both_mcq, except_mcq, fitb_clinical
           primaryParts.push(actBlock, indBlock);
@@ -3786,14 +4044,22 @@
   // --- 13. POOL MANAGEMENT, CLOUD SYNC, RETAKE MISSED & SUMMARY ---
   let qzSyncDirty = false;
   let qzIsCloudSyncing = false;
+  const dirtyQuizTracks = new Set();
   const QUIZ_TRACK_ORDER = ["location", "clinical_points", "patterns"];
+  const METADATA_TRACK_FIELDS = {
+    patterns: "SRS Data",
+    clinical_points: "Notes",
+    location: "CAM Notes"
+  };
 
   function getSeenKey() { return `tcmSeen_${currentTrack}_${qzSubMode}`; }
   function getStateKey() { return `tcmQuizState_${currentTrack}`; }
 
-  // Dynamically locates whichever row holds this track's "__quiz_sync__" ledger
-  // (immune to row insertions, deletions, or sheet sorting), falling back to points[0..2] on first init.
+  // Prefers the dedicated "MetaData" row if present; falls back to legacy "__quiz_sync__" rows or points[0..2].
   function getQuizSyncAnchorPoint(trackName = currentTrack) {
+    if (typeof window !== "undefined" && window.tcmMetaDataRow) {
+      return window.tcmMetaDataRow;
+    }
     if (typeof points === "undefined" || !Array.isArray(points) || points.length === 0) return null;
     for (let i = 0; i < points.length; i++) {
       const rawSrs = points[i]["SRS Data"];
@@ -3829,8 +4095,9 @@
     }
   }
 
-  function markQuizLedgerDirty() {
+  function markQuizLedgerDirty(trackName = currentTrack) {
     qzSyncDirty = true;
+    if (trackName) dirtyQuizTracks.add(trackName);
     localStorage.setItem("tcmQuizLocalUpdatedAt", String(Date.now()));
     updateQuizCloudSyncBtnUI();
   }
@@ -3882,6 +4149,13 @@
       sessionObj = { cleared: true, updatedAt: clearedAt };
     }
 
+    const masteryRaw = loadQuizMastery(trackName);
+    const masteryEncoded = {};
+    Object.entries(masteryRaw).forEach(([id, st]) => {
+      const a = Number(st.a || 0), m = Number(st.m || 0), lm = Number(st.lm || 0);
+      masteryEncoded[encodeId(id)] = lm > 0 ? [a, m, lm] : [a, m];
+    });
+
     return {
       v: 2,
       track: trackName,
@@ -3893,97 +4167,220 @@
       },
       d: dict,
       seen: seenMap,
+      mastery: masteryEncoded,
       session: sessionObj
     };
   }
 
+  function buildMetaDataQuizBundle() {
+    const dict = [];
+    const idToIdx = new Map();
+    const encodeId = (id) => {
+      if (!idToIdx.has(id)) {
+        idToIdx.set(id, dict.length);
+        dict.push(id);
+      }
+      return idToIdx.get(id);
+    };
+
+    const tracks = {};
+    QUIZ_TRACK_ORDER.forEach(trk => {
+      const single = buildTrackQuizLedgerPayload(trk);
+      const localDict = single.d || [];
+      const remapSeen = {};
+      Object.entries(single.seen || {}).forEach(([subKey, entry]) => {
+        remapSeen[subKey] = {
+          ids: (entry.ids || []).map(i => encodeId(typeof i === "number" ? localDict[i] : i)),
+          r: entry.r || 0
+        };
+      });
+      const remapMastery = {};
+      Object.entries(single.mastery || {}).forEach(([k, arr]) => {
+        const rawId = /^\d+$/.test(k) ? localDict[Number(k)] : k;
+        if (rawId) remapMastery[encodeId(rawId)] = arr;
+      });
+      tracks[trk] = {
+        seen: remapSeen,
+        mastery: remapMastery,
+        session: single.session
+      };
+    });
+
+    return {
+      v: 3,
+      updatedAt: Number(localStorage.getItem("tcmQuizLocalUpdatedAt") || Date.now()),
+      prefs: {
+        requireReveal: qzRequireReveal,
+        showDigest: qzShowDigest,
+        masteryRequeue: qzMasteryRequeue
+      },
+      d: dict,
+      tracks
+    };
+  }
+
+  function mergeTrackLedgerFromCloud(trk, cloud, dict, fallbackUpdatedAt) {
+    let changed = false;
+    const prefix = `tcmSeen_${trk}_`;
+
+    if (cloud.seen && typeof cloud.seen === "object") {
+      Object.keys(cloud.seen).forEach(rawKey => {
+        const cEntry = cloud.seen[rawKey];
+        if (!cEntry || !Array.isArray(cEntry.ids)) return;
+
+        const sKey = rawKey.startsWith("tcmSeen_") ? rawKey : (prefix + rawKey);
+        const cIds = dict
+          ? cEntry.ids.map(idx => (typeof idx === "number" ? dict[idx] : idx)).filter(Boolean)
+          : cEntry.ids;
+
+        const cReset = Number(cEntry.r !== undefined ? cEntry.r : (cEntry.resetAt || 0));
+        const lReset = Number(localStorage.getItem(sKey + "_resetAt") || 0);
+        let lIds = [];
+        try { lIds = JSON.parse(localStorage.getItem(sKey) || "[]"); } catch (e) {}
+
+        if (cReset > lReset) {
+          localStorage.setItem(sKey, JSON.stringify(cIds));
+          localStorage.setItem(sKey + "_resetAt", String(cReset));
+          changed = true;
+        } else if (cReset === lReset) {
+          const merged = [...new Set([...lIds, ...cIds])];
+          if (merged.length !== lIds.length) {
+            localStorage.setItem(sKey, JSON.stringify(merged));
+            changed = true;
+          }
+        }
+      });
+    }
+
+    if (cloud.mastery && typeof cloud.mastery === "object") {
+      const localMap = loadQuizMastery(trk);
+      let masteryChanged = false;
+      Object.entries(cloud.mastery).forEach(([k, arr]) => {
+        if (!Array.isArray(arr)) return;
+        const id = (dict && /^\d+$/.test(k)) ? dict[Number(k)] : k;
+        if (!id) return;
+        const cA = Number(arr[0] || 0), cM = Number(arr[1] || 0), cLm = Number(arr[2] || 0);
+        const prev = localMap[id] || { a: 0, m: 0, lm: 0 };
+        const nA = Math.max(prev.a || 0, cA);
+        const nM = Math.max(prev.m || 0, cM);
+        const nLm = Math.max(prev.lm || 0, cLm);
+        if (nA !== prev.a || nM !== prev.m || nLm !== prev.lm) {
+          localMap[id] = { a: nA, m: nM, lm: nLm };
+          masteryChanged = true;
+        }
+      });
+      if (masteryChanged) {
+        try { localStorage.setItem(getQuizMasteryKey(trk), JSON.stringify(localMap)); } catch (e) {}
+        changed = true;
+      }
+    }
+
+    const cSess = cloud.session || (cloud.sessions && cloud.sessions[trk]);
+    if (cSess) {
+      const sKey = `tcmQuizState_${trk}`;
+      const lCleared = Number(localStorage.getItem(sKey + "_clearedAt") || 0);
+      let lSess = null;
+      try {
+        const raw = localStorage.getItem(sKey);
+        if (raw) lSess = JSON.parse(raw);
+      } catch (e) {}
+      const lTime = Math.max(Number(lSess?.updatedAt || 0), lCleared);
+      const cTime = Number(cSess.updatedAt || fallbackUpdatedAt || 0);
+
+      if (cTime > lTime) {
+        if (cSess.cleared) {
+          localStorage.removeItem(sKey);
+          localStorage.setItem(sKey + "_clearedAt", String(cTime));
+        } else {
+          localStorage.setItem(sKey, JSON.stringify(cSess));
+        }
+        changed = true;
+      }
+    }
+
+    return changed;
+  }
+
   function pullQuizLedgerFromCloud(forceRefreshUI = false) {
-    if (typeof points === "undefined" || !Array.isArray(points) || points.length === 0) return false;
     let changed = false;
 
-    QUIZ_TRACK_ORDER.forEach(trk => {
-      const anchor = getQuizSyncAnchorPoint(trk);
-      if (!anchor || !anchor["SRS Data"]) return;
-
-      let srsObj = {};
-      try { srsObj = JSON.parse(anchor["SRS Data"] || "{}"); } catch (e) { return; }
-      const cloud = srsObj["__quiz_sync__"];
-      if (!cloud || typeof cloud !== "object") return;
-
-      const dict = Array.isArray(cloud.d) ? cloud.d : null;
-      const prefix = `tcmSeen_${trk}_`;
-
-      // 1. Merge Seen Pools for this Track (supports both v2 dictionary-compressed and v1 raw IDs)
-      if (cloud.seen && typeof cloud.seen === "object") {
-        Object.keys(cloud.seen).forEach(rawKey => {
-          const cEntry = cloud.seen[rawKey];
-          if (!cEntry || !Array.isArray(cEntry.ids)) return;
-
-          const sKey = rawKey.startsWith("tcmSeen_") ? rawKey : (prefix + rawKey);
-          const cIds = dict
-            ? cEntry.ids.map(idx => (typeof idx === "number" ? dict[idx] : idx)).filter(Boolean)
-            : cEntry.ids;
-
-          const cReset = Number(cEntry.r !== undefined ? cEntry.r : (cEntry.resetAt || 0));
-          const lReset = Number(localStorage.getItem(sKey + "_resetAt") || 0);
-          let lIds = [];
-          try { lIds = JSON.parse(localStorage.getItem(sKey) || "[]"); } catch (e) {}
-
-          if (cReset > lReset) {
-            localStorage.setItem(sKey, JSON.stringify(cIds));
-            localStorage.setItem(sKey + "_resetAt", String(cReset));
-            changed = true;
-          } else if (cReset === lReset) {
-            const merged = [...new Set([...lIds, ...cIds])];
-            if (merged.length !== lIds.length) {
-              localStorage.setItem(sKey, JSON.stringify(merged));
+    // 1. Read per-track columns (and any legacy bundle) from dedicated MetaData row
+    if (typeof window !== "undefined" && window.tcmMetaDataRow) {
+      QUIZ_TRACK_ORDER.forEach(trk => {
+        const fieldName = METADATA_TRACK_FIELDS[trk] || "SRS Data";
+        const rawCell = window.tcmMetaDataRow[fieldName];
+        if (!rawCell) return;
+        try {
+          const cellObj = JSON.parse(rawCell || "{}");
+          if (cellObj["__quiz_sync__"] && typeof cellObj["__quiz_sync__"] === "object") {
+            const cloud = cellObj["__quiz_sync__"];
+            const dict = Array.isArray(cloud.d) ? cloud.d : null;
+            if (mergeTrackLedgerFromCloud(trk, cloud, dict, cloud.updatedAt)) {
+              changed = true;
+            }
+            const localUpd = Number(localStorage.getItem("tcmQuizLocalUpdatedAt") || 0);
+            if (cloud.prefs && Number(cloud.updatedAt || 0) > localUpd) {
+              if (typeof cloud.prefs.requireReveal === "boolean") qzRequireReveal = cloud.prefs.requireReveal;
+              if (typeof cloud.prefs.showDigest === "boolean") qzShowDigest = cloud.prefs.showDigest;
+              if (typeof cloud.prefs.masteryRequeue === "boolean") qzMasteryRequeue = cloud.prefs.masteryRequeue;
+              localStorage.setItem("tcmQuizPrefs", JSON.stringify(cloud.prefs));
+              syncQuizSettingCheckboxes();
               changed = true;
             }
           }
-        });
-      }
-
-      // 2. Sync Active / Paused Session for this Track
-      const cSess = cloud.session || (cloud.sessions && cloud.sessions[trk]);
-      if (cSess) {
-        const sKey = `tcmQuizState_${trk}`;
-        const lCleared = Number(localStorage.getItem(sKey + "_clearedAt") || 0);
-        let lSess = null;
-        try {
-          const raw = localStorage.getItem(sKey);
-          if (raw) lSess = JSON.parse(raw);
         } catch (e) {}
-        const lTime = Math.max(Number(lSess?.updatedAt || 0), lCleared);
-        const cTime = Number(cSess.updatedAt || cloud.updatedAt || 0);
+      });
 
-        if (cTime > lTime) {
-          if (cSess.cleared) {
-            localStorage.removeItem(sKey);
-            localStorage.setItem(sKey + "_clearedAt", String(cTime));
-          } else {
-            localStorage.setItem(sKey, JSON.stringify(cSess));
+      if (window.tcmMetaDataRow["SRS Data"]) {
+        try {
+          const metaSrs = JSON.parse(window.tcmMetaDataRow["SRS Data"] || "{}");
+          const bundle = metaSrs["__quiz_sync_bundle__"];
+          if (bundle && bundle.tracks) {
+            const sharedDict = Array.isArray(bundle.d) ? bundle.d : null;
+            QUIZ_TRACK_ORDER.forEach(trk => {
+              if (bundle.tracks[trk]) {
+                if (mergeTrackLedgerFromCloud(trk, bundle.tracks[trk], sharedDict, bundle.updatedAt)) {
+                  changed = true;
+                }
+              }
+            });
           }
-          changed = true;
-        }
+        } catch (e) {}
       }
+    }
 
-      // 3. Sync Checkbox Preferences if Cloud is Newer
-      const localUpd = Number(localStorage.getItem("tcmQuizLocalUpdatedAt") || 0);
-      if (cloud.prefs && Number(cloud.updatedAt || 0) > localUpd) {
-        if (typeof cloud.prefs.requireReveal === "boolean") qzRequireReveal = cloud.prefs.requireReveal;
-        if (typeof cloud.prefs.showDigest === "boolean") qzShowDigest = cloud.prefs.showDigest;
-        if (typeof cloud.prefs.masteryRequeue === "boolean") qzMasteryRequeue = cloud.prefs.masteryRequeue;
-        localStorage.setItem("tcmQuizPrefs", JSON.stringify(cloud.prefs));
-        syncQuizSettingCheckboxes();
-        changed = true;
-      }
-    });
+    // 2. Also read legacy per-point "__quiz_sync__" ledgers (migrates seamlessly into MetaData on next sync)
+    if (typeof points !== "undefined" && Array.isArray(points) && points.length > 0) {
+      points.forEach(pt => {
+        const rawSrs = pt["SRS Data"];
+        if (!rawSrs || !rawSrs.includes('"__quiz_sync__"')) return;
+        try {
+          const srsObj = JSON.parse(rawSrs);
+          const cloud = srsObj["__quiz_sync__"];
+          if (!cloud || !cloud.track) return;
+          const dict = Array.isArray(cloud.d) ? cloud.d : null;
+          if (mergeTrackLedgerFromCloud(cloud.track, cloud, dict, cloud.updatedAt)) {
+            changed = true;
+          }
+          const localUpd = Number(localStorage.getItem("tcmQuizLocalUpdatedAt") || 0);
+          if (cloud.prefs && Number(cloud.updatedAt || 0) > localUpd) {
+            if (typeof cloud.prefs.requireReveal === "boolean") qzRequireReveal = cloud.prefs.requireReveal;
+            if (typeof cloud.prefs.showDigest === "boolean") qzShowDigest = cloud.prefs.showDigest;
+            if (typeof cloud.prefs.masteryRequeue === "boolean") qzMasteryRequeue = cloud.prefs.masteryRequeue;
+            localStorage.setItem("tcmQuizPrefs", JSON.stringify(cloud.prefs));
+            syncQuizSettingCheckboxes();
+            changed = true;
+          }
+        } catch (e) {}
+      });
+    }
 
     if (changed && forceRefreshUI) {
       updatePoolSummaryBanner();
     }
     return changed;
   }
+  window.pullQuizLedgerFromCloud = pullQuizLedgerFromCloud;
 
   window.syncQuizWithCloud = async function (isManualTap = false) {
     if (qzIsCloudSyncing) return;
@@ -3999,12 +4396,12 @@
       // 1. Stamp current local quiz state first so cloud pull never clobbers newer local progress
       saveQuizSessionState();
 
-      // 2. Always pull latest Sheet data first so we never overwrite a recent SRS review on the anchor row
-      if (typeof loadTCMData === "function") {
+      // 2. Pull latest Sheet data only on manual Sync taps (auto-sync on close/batch-end stays lightweight)
+      if (isManualTap && typeof loadTCMData === "function") {
         await loadTCMData(true);
       }
 
-      // 3. Merge cloud seen lists & newer sessions
+      // 3. Merge cloud seen lists, mastery & newer sessions
       const pulledChanges = pullQuizLedgerFromCloud(true);
 
       // 4. If user enrolled any quiz cards via "+SRS", flush them to their respective Google Sheet rows first
@@ -4012,36 +4409,64 @@
         await syncSRSData();
       }
 
-      // 5. Write this track's compact ledger into its dedicated anchor row (points[0], points[1], or points[2])
-      const anchor = getQuizSyncAnchorPoint(currentTrack);
-      if (!anchor) throw new Error("Database not loaded");
+      // 5. Write dirty track ledger(s) into MetaData columns (or legacy fallback row)
+      const useMetaRow = Boolean(typeof window !== "undefined" && window.tcmMetaDataRow);
+      const tracksToWrite = new Set(dirtyQuizTracks);
+      if (tracksToWrite.size === 0 || isManualTap) tracksToWrite.add(currentTrack);
 
-      let srsObj = {};
-      try { srsObj = JSON.parse(anchor["SRS Data"] || "{}"); } catch (e) { srsObj = {}; }
-
-      srsObj["__quiz_sync__"] = buildTrackQuizLedgerPayload(currentTrack);
-      anchor["SRS Data"] = JSON.stringify(srsObj);
-
-      if (typeof saveSinglePointToVault === "function") {
-        await saveSinglePointToVault(anchor);
-      }
-
-      if (typeof writeUrl !== "undefined") {
-        await fetch(writeUrl, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({
-            id: anchor["Short Name"],
-            field: "SRS Data",
-            value: anchor["SRS Data"]
-          })
+      if (useMetaRow && isManualTap) {
+        // Auto-migrate any other track with local progress whose MetaData column is still empty
+        QUIZ_TRACK_ORDER.forEach(trk => {
+          const fld = METADATA_TRACK_FIELDS[trk] || "SRS Data";
+          if (!window.tcmMetaDataRow[fld] && Object.keys(loadQuizMastery(trk)).length > 0) {
+            tracksToWrite.add(trk);
+          }
         });
       }
 
+      const updatesPayload = [];
+      for (const trk of tracksToWrite) {
+        const anchor = getQuizSyncAnchorPoint(trk);
+        if (!anchor) continue;
+
+        const targetField = (anchor === window.tcmMetaDataRow)
+          ? (METADATA_TRACK_FIELDS[trk] || "SRS Data")
+          : "SRS Data";
+
+        let fieldObj = {};
+        try { fieldObj = JSON.parse(anchor[targetField] || "{}"); } catch (e) { fieldObj = {}; }
+
+        if (anchor === window.tcmMetaDataRow && targetField === "SRS Data") {
+          delete fieldObj["__quiz_sync_bundle__"];
+        }
+        fieldObj["__quiz_sync__"] = buildTrackQuizLedgerPayload(trk);
+        anchor[targetField] = JSON.stringify(fieldObj);
+
+        if (typeof saveSinglePointToVault === "function") {
+          await saveSinglePointToVault(anchor);
+        }
+        updatesPayload.push({ id: anchor["Short Name"], field: targetField, value: anchor[targetField] });
+      }
+
+      if (updatesPayload.length === 0) throw new Error("Database not loaded");
+
+      if (typeof writeUrl !== "undefined") {
+        const reqBody = updatesPayload.length === 1
+          ? updatesPayload[0]
+          : { action: "batchUpdate", updates: updatesPayload };
+        await fetch(writeUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(reqBody)
+        });
+      }
+
+      dirtyQuizTracks.clear();
       qzSyncDirty = false;
       updatePoolSummaryBanner();
       if (isManualTap && typeof showToast === "function") {
-        showToast(pulledChanges ? `☁️ Synced & merged (${anchor["Short Name"]})!` : `☁️ Synced to Sheet (${anchor["Short Name"]} -> SRS Data)!`);
+        const destLabel = useMetaRow ? `MetaData (${updatesPayload.map(u => u.field).join(", ")})` : updatesPayload[0].id;
+        showToast(pulledChanges ? `☁️ Synced & merged (${destLabel})!` : `☁️ Synced to Sheet (${destLabel})!`);
       }
     } catch (err) {
       console.warn("Quiz cloud sync error:", err);
