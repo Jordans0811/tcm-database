@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -2632,6 +2632,7 @@ display: flex; flex-direction: column;">
       </div>
       
       <div id="searchHelpTooltip">
+  <div class="help-row"><span>List</span> Paste points with <b>, + /</b> (e.g., <i>St36, Lv3, Bitong, SP4+PC6</i>)</div>
   <div class="help-row"><span>space</span> AND in same section (e.g., <i>night insomnia</i>)</div>
   <div class="help-row"><span>all:</span> AND anywhere on card (e.g., <i>all: red insomnia</i>)</div>
   <div class="help-row"><span>|</span> OR (e.g., <i>cough | asthma</i>)</div>
@@ -2666,7 +2667,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.13.26.v3";
+const APP_VERSION = "11.19.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -2833,9 +2834,16 @@ function stripDerivedFields(p) {
   return clean;
 }
 
-function normalizeSearchSpelling(str) {
+function normalizeSearchSpelling(str, splitHyphens = true) {
   if (!str) return "";
-  return String(str)
+  let s = String(str);
+  if (/[^\x00-\x7F]/.test(s)) {
+    s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+  if (splitHyphens && s.indexOf("-") !== -1) {
+    s = s.replace(/([a-zA-Z]{3,})-(?=[a-zA-Z]{3,})/g, "$1 ");
+  }
+  return s
     .replace(/\bdiarrhoe?a\b/gi, "diarrhea")
     .replace(/\boedema\b/gi, "edema")
     .replace(/\bamenorrhoe?a\b/gi, "amenorrhea")
@@ -3078,6 +3086,11 @@ let activeParsedIncludes = [];
 let lastGlobalClickTime = 0; 
 let activeChannels = ["All"];
 let isDocumentWideSearch = false;
+let bypassAutoPointList = false;
+let qpBypassAutoPointList = false;
+let knownPointLookup = new Map();
+let multiWordPointNames = [];
+let multiWordPointRegex = null;
 
 const appContainer = document.getElementById("appContainer");
 const cardContainer = document.getElementById("cardContainer");
@@ -3355,6 +3368,197 @@ else setTimeout(warmPdfJsCache, 3500);
     return wrapper;
   }
 
+  function rebuildKnownPointIndex(pointsArray) {
+    knownPointLookup = new Map();
+    const multiWordSet = new Set();
+
+    const addLookupKey = (rawKey, shortName) => {
+      if (!rawKey) return;
+      const cleanKey = normalizeSearchSpelling(String(rawKey)).toLowerCase().replace(/[\s\-\.]/g, "");
+      if (!cleanKey) return;
+      if (!knownPointLookup.has(cleanKey)) knownPointLookup.set(cleanKey, new Set());
+      knownPointLookup.get(cleanKey).add(shortName);
+    };
+
+    const stdCodeRegex = /^(LU|LI|L\.I\.|ST|SP|HT|HE|SI|BL|UB|KI|KD|KID|PC|P|SJ|TE|TB|TH|TW|GB|LR|LIV|LV|DU|GV|RN|REN|CV|EX-[A-Z]+)\s*-?\s*\d+$/i;
+    const nonPointFields = [
+      "Clinical Manifestations", "Aetiology", "Patterns", "Diagnosis & Differentiation",
+      "Analysis", "Treatment Principle", "Point Prescription", "Precursors of Pattern",
+      "Developments From Pattern", "Origin", "Insertion", "Muscle Actions",
+      "Primary Sx", "Secondary Sx", "Referral Pattern"
+    ];
+
+    pointsArray.forEach(p => {
+      const shortName = p["Short Name"];
+      if (!shortName) return;
+
+      const trimmedShort = shortName.trim();
+      const lowerShort = normalizeSearchSpelling(trimmedShort).toLowerCase();
+      const hasNonPointData = nonPointFields.some(f => Boolean(p[f] && String(p[f]).trim()));
+      const isNamedExtra = (MENTION_NAMED_REGEX.lastIndex = 0, MENTION_NAMED_REGEX.test(trimmedShort));
+      const isGenericKeyword = typeof TCM_KEYWORDS !== "undefined" && TCM_KEYWORDS.has(lowerShort);
+
+      const isPointRecord = stdCodeRegex.test(trimmedShort) ||
+                            Boolean(p["Location "] || p["Location"] || p["Needling"]) ||
+                            isNamedExtra ||
+                            (!hasNonPointData && !isGenericKeyword && trimmedShort.split(/\s+/).length <= 3);
+
+      if (!isPointRecord) return;
+
+      const cleanShortLower = normalizeSearchSpelling(shortName).toLowerCase().trim();
+      addLookupKey(cleanShortLower, shortName);
+      if (cleanShortLower.includes(" ")) multiWordSet.add(cleanShortLower);
+
+      expandTCMPoint(cleanShortLower, false).forEach(variant => addLookupKey(variant, shortName));
+
+      const fullName = p["Full Name"] || p[" Full Name"] || "";
+      if (fullName) {
+        const primaryFull = normalizeSearchSpelling(fullName).split(/[(\/,;]/)[0].trim().toLowerCase();
+        const spacelessFull = primaryFull.replace(/[\s\-\.]/g, "");
+        if (spacelessFull.length >= 4 && primaryFull.split(/\s+/).length <= 4 &&
+            !(typeof TCM_KEYWORDS !== "undefined" && TCM_KEYWORDS.has(primaryFull))) {
+          addLookupKey(spacelessFull, shortName);
+          if (primaryFull.includes(" ")) multiWordSet.add(primaryFull);
+        }
+      }
+    });
+
+    multiWordPointNames = Array.from(multiWordSet).sort((a, b) => b.length - a.length);
+    multiWordPointRegex = multiWordPointNames.length > 0
+      ? new RegExp("\\b(?:" + multiWordPointNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')).join("|") + ")\\b", "gi")
+      : null;
+  }
+
+  let searchVocabFreq = new Map();
+  let searchVocabByLen = new Map();
+
+  function addTextToSearchVocab(text) {
+    if (!text) return;
+    const words = text.match(/\b[a-z]{4,24}\b/g);
+    if (!words) return;
+    const seenInCard = new Set(words);
+    seenInCard.forEach(w => {
+      const prev = searchVocabFreq.get(w) || 0;
+      searchVocabFreq.set(w, prev + 1);
+      if (prev === 0) {
+        const len = w.length;
+        if (!searchVocabByLen.has(len)) searchVocabByLen.set(len, []);
+        searchVocabByLen.get(len).push(w);
+      }
+    });
+  }
+
+  function rebuildSearchVocabulary(pointsArray) {
+    searchVocabFreq = new Map();
+    searchVocabByLen = new Map();
+    pointsArray.forEach(pt => addTextToSearchVocab(pt._searchIndex));
+  }
+
+  function damerauDistBounded(a, b, maxDist) {
+    const la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > maxDist) return maxDist + 1;
+    let prev2 = new Int16Array(lb + 1);
+    let prev1 = new Int16Array(lb + 1);
+    let curr = new Int16Array(lb + 1);
+    for (let j = 0; j <= lb; j++) prev1[j] = j;
+
+    for (let i = 1; i <= la; i++) {
+      curr[0] = i;
+      let rowMin = i;
+      const ai = a.charCodeAt(i - 1);
+      for (let j = 1; j <= lb; j++) {
+        const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
+        let val = Math.min(prev1[j] + 1, curr[j - 1] + 1, prev1[j - 1] + cost);
+        if (i > 1 && j > 1 && ai === b.charCodeAt(j - 2) && a.charCodeAt(i - 2) === b.charCodeAt(j - 1)) {
+          val = Math.min(val, prev2[j - 2] + 1);
+        }
+        curr[j] = val;
+        if (val < rowMin) rowMin = val;
+      }
+      if (rowMin > maxDist) return maxDist + 1;
+      const tmp = prev2; prev2 = prev1; prev1 = curr; curr = tmp;
+    }
+    return prev1[lb];
+  }
+
+  function findClosestVocabWord(word) {
+    const w = word.toLowerCase();
+    if (w.length < 4 || searchVocabFreq.has(w)) return null;
+    const maxDist = w.length <= 5 ? 1 : 2;
+    let bestWord = null;
+    let bestDist = maxDist + 1;
+    let bestSameFirst = false;
+    let bestFreq = 0;
+
+    for (let len = Math.max(4, w.length - maxDist); len <= w.length + maxDist; len++) {
+      const bucket = searchVocabByLen.get(len);
+      if (!bucket) continue;
+      for (let i = 0; i < bucket.length; i++) {
+        const cand = bucket[i];
+        const d = damerauDistBounded(w, cand, Math.min(maxDist, bestDist));
+        if (d > maxDist) continue;
+        const sameFirst = cand.charCodeAt(0) === w.charCodeAt(0);
+        const freq = searchVocabFreq.get(cand) || 0;
+        if (
+          d < bestDist ||
+          (d === bestDist && sameFirst && !bestSameFirst) ||
+          (d === bestDist && sameFirst === bestSameFirst && freq > bestFreq)
+        ) {
+          bestWord = cand;
+          bestDist = d;
+          bestSameFirst = sameFirst;
+          bestFreq = freq;
+        }
+      }
+    }
+    return bestWord;
+  }
+
+  function getZeroResultSuggestions(rawQuery, respectActiveChannels = true) {
+    const trimmed = (rawQuery || "").trim();
+    if (trimmed.length < 4 || searchVocabFreq.size === 0) return null;
+
+    const words = trimmed.match(/(?:^|[\s"|])([a-zA-Z]{4,24})(?=$|[\s"|.,;:!?])/g);
+    let correctedQuery = trimmed;
+    let changed = false;
+
+    if (words) {
+      const seen = new Set();
+      words.forEach(chunk => {
+        const word = chunk.replace(/^[\s"|]+/, "");
+        const norm = normalizeSearchSpelling(word, true).toLowerCase();
+        if (!norm || seen.has(norm) || !/^[a-z]{4,24}$/.test(norm)) return;
+        seen.add(norm);
+        if (searchVocabFreq.has(norm)) return;
+        const fix = findClosestVocabWord(norm);
+        if (fix) {
+          correctedQuery = correctedQuery.replace(
+            new RegExp("(^|[\\s\"|])" + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "(?=$|[\\s\"|.,;:!?])", "g"),
+            "$1" + fix
+          );
+          changed = true;
+        }
+      });
+    }
+
+    if (changed && correctedQuery.toLowerCase() !== trimmed.toLowerCase()) {
+      const testRes = runSearchQuery(correctedQuery, { respectActiveChannels, allowAutoPointList: true });
+      if (testRes.results.length > 0) {
+        return { label: "Did you mean:", query: correctedQuery, count: testRes.results.length };
+      }
+    }
+
+    if (!/^all:/i.test(trimmed) && /\s+/.test(trimmed) && !/^[@#!]/.test(trimmed)) {
+      const broadQuery = "all: " + trimmed;
+      const broadRes = runSearchQuery(broadQuery, { respectActiveChannels, allowAutoPointList: false });
+      if (broadRes.results.length > 0) {
+        return { label: "Search across entire card:", query: broadQuery, count: broadRes.results.length };
+      }
+    }
+
+    return null;
+  }
+
   function processPoints(dataArray) {
     const oldMap = {};
     points.forEach(p => oldMap[p["Short Name"]] = p);
@@ -3399,6 +3603,8 @@ else setTimeout(warmPdfJsCache, 3500);
     });
 
     rebuildReverseMentionMap(processed);
+    rebuildKnownPointIndex(processed);
+    rebuildSearchVocabulary(processed);
     return processed;
   }
 
@@ -3828,27 +4034,30 @@ function applySectionFilter() {
     return [term]; // If it's not a range, return it normally so standard search doesn't break
   }
 
-  
-  
-  
-  
-
-    function expandTCMPoint(term) {
+    function expandTCMPoint(term, allowLetterOnlyExpansion = true) {
     term = term.trim();
     
     const aliases = {
       'li': ['li', 'l.i.'], 'ht': ['ht', 'he'], 'he': ['ht', 'he'],
-      'sj': ['sj', 'te', 'tb', 't.b.', 'th'], 'te': ['sj', 'te', 'tb', 't.b.', 'th'],
-      'tb': ['sj', 'te', 'tb', 't.b.', 'th'], 'th': ['sj', 'te', 'tb', 't.b.', 'th'],
+      'sj': ['sj', 'te', 'tb', 't.b.', 'th', 'tw'], 'te': ['sj', 'te', 'tb', 't.b.', 'th', 'tw'],
+      'tb': ['sj', 'te', 'tb', 't.b.', 'th', 'tw'], 'th': ['sj', 'te', 'tb', 't.b.', 'th', 'tw'],
+      'tw': ['sj', 'te', 'tb', 't.b.', 'th', 'tw'],
       'pc': ['pc', 'p'], 'p':  ['pc', 'p'], 'lr': ['lr', 'liv', 'lv'], 'liv': ['lr', 'liv', 'lv'], 'lv': ['lr', 'liv', 'lv'],
-      'ki': ['ki', 'kd', 'kid'], 'kd': ['ki', 'kd', 'kid'], 'bl': ['bl', 'ub'], 'ub': ['bl', 'ub'],
+      'ki': ['ki', 'kd', 'kid'], 'kd': ['ki', 'kd', 'kid'], 'kid': ['ki', 'kd', 'kid'], 'bl': ['bl', 'ub'], 'ub': ['bl', 'ub'],
       'cv': ['cv', 'rn', 'ren'], 'rn': ['cv', 'rn', 'ren'], 'ren':['cv', 'rn', 'ren'],
       'gv': ['gv', 'du'], 'du': ['gv', 'du']
     };
 
-    // Fix: Allow pure letter searches (like "@cv") to trigger alias expansion
+    const digitAliases = {
+      ...aliases,
+      'h': ['ht', 'he', 'h'],
+      'k': ['ki', 'kd', 'kid', 'k']
+    };
+
+    // Only expand pure letter codes (e.g., "@cv") when explicitly requested (@ or #)
     const lettersOnlyMatch = term.match(/^([a-z\.]+)$/i);
     if (lettersOnlyMatch) {
+       if (!allowLetterOnlyExpansion) return [term];
        let rawLetters = lettersOnlyMatch[1].toLowerCase().replace(/\./g, "");
        return aliases[rawLetters] || [term];
     }
@@ -3857,20 +4066,15 @@ function applySectionFilter() {
     if (!match) return [term];
 
     let rawLetters = match[1].toLowerCase().replace(/\./g, ""); 
-    let numbers = match[2];
+    let numbers = match[2].replace(/^0+(?=\d)/, "");
 
-    let baseLetters = aliases[rawLetters] || [rawLetters];
+    let baseLetters = digitAliases[rawLetters] || [rawLetters];
     let variations = new Set();
     
     baseLetters.forEach(base => {
       variations.add(base + numbers);         
       variations.add(base + "-" + numbers);   
       variations.add(base + " " + numbers);   
-      if (base.includes('.')) {
-        variations.add(base + numbers);       
-        variations.add(base + "-" + numbers); 
-        variations.add(base + " " + numbers); 
-      }
     });
     return Array.from(variations);
   }
@@ -4341,13 +4545,131 @@ function applySectionFilter() {
     }, { passive: false });
   })();
 
+  function handleSearchPasteCleanup(e, onAfterPaste) {
+    const text = (e.clipboardData || window.clipboardData)?.getData("text/plain");
+    if (!text || !/[\r\n]/.test(text)) return;
+    e.preventDefault();
+    const cleaned = text
+      .split(/\r?\n/)
+      .map(line => line.trim().replace(/^[,;•·*\-\s]+|[,;]+$/g, "").trim())
+      .filter(Boolean)
+      .join(", ");
+    const el = e.target;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    el.value = el.value.slice(0, start) + cleaned + el.value.slice(end);
+    const nextPos = start + cleaned.length;
+    el.setSelectionRange(nextPos, nextPos);
+    if (typeof onAfterPaste === "function") onAfterPaste();
+  }
 
+  function preNormalizePointListText(str) {
+    let s = normalizeSearchSpelling(str || "").trim();
+    s = s.replace(/[\u2010-\u2015\u2212]/g, "-");
+    s = s.replace(/[†‡§°®™]/g, " ");
+    s = s.replace(/^(?:points?|acupoints?|tx|rx|prescription|formula)\s*:\s*/i, "");
+    s = s.replace(/[\(\[][^\)\]]*[\)\]]/g, " ");
+    s = s.replace(/(?:^|[\s,;])\d{1,2}[.)](?=\s)/g, ", ");
+    s = s.replace(/\b(?:bilat(?:eral)?|unilat(?:eral)?|b\/l|e-?stim|moxa)\b\.?/gi, " ");
+    if (multiWordPointRegex && /\s/.test(s)) {
+      s = s.replace(multiWordPointRegex, m => m.replace(/\s+/g, ""));
+    }
+    s = s.replace(/\b(EX)\s*-?\s*([A-Z]+)\s*-?\s*0*([1-9]\d?)\b/gi, "$1-$2-$3");
+    s = s.replace(/\b(LU|LI|L\.I\.|ST|SP|HT|HE|H|SI|BL|UB|KI|KD|KID|K|PC|P|SJ|TE|TB|TH|TW|GB|LR|LIV|LV|DU|GV|RN|REN|CV)\s*-?\s*0*([1-9]\d?)\b/gi, "$1-$2");
+    s = s.replace(/\b([A-Za-z\.]+)-?(\d{1,2})\s*-\s*(?=(?:([A-Za-z\.]+)-?)?(\d{1,2})\b)/g, (_, c1, n1, c2) => {
+      if (!c2) return `${c1}-${n1}-`;
+      const p1 = c1.toUpperCase().replace(/\./g, "");
+      const p2 = c2.toUpperCase().replace(/\./g, "");
+      const canon1 = CANONICAL_CHAN_MAP[p1] || p1;
+      const canon2 = CANONICAL_CHAN_MAP[p2] || p2;
+      return canon1 === canon2 ? `${c1}-${n1}-` : `${c1}-${n1}, `;
+    });
+    return s;
+  }
 
+  function resolvePointTokenToShortNames(token) {
+    const clean = token.toLowerCase().replace(/[\s\-\.]/g, "");
+    if (!clean) return [];
+    const direct = knownPointLookup.get(clean);
+    if (direct) return Array.from(direct);
 
-  
+    const variants = expandTCMPoint(token, false);
+    const out = new Set();
+    variants.forEach(v => {
+      const hit = knownPointLookup.get(v.toLowerCase().replace(/[\s\-\.]/g, ""));
+      if (hit) hit.forEach(name => out.add(name));
+    });
+    return Array.from(out);
+  }
 
-    function runSearchQuery(rawQuery, options = { respectActiveChannels: true }) {
-    let query = normalizeSearchSpelling((rawQuery || "").trim());
+  function tryParsePointList(rawStr) {
+    const pre = preNormalizePointListText(rawStr);
+    const hasListDelimiters = /[,+&;•·*\n\r\/]/.test(pre);
+    const segments = pre.split(/[,+&;•·*\n\r\/|]+/).map(s => s.trim()).filter(Boolean);
+    const tokens = [];
+
+    segments.forEach(seg => {
+      const joinedHits = resolvePointTokenToShortNames(seg);
+      if (joinedHits.length > 0) {
+        tokens.push(seg.replace(/\s+/g, ""));
+      } else {
+        seg.split(/\s+/).forEach(w => {
+          const cleanW = w.replace(/^[:\-*•·]+|[:.\-*•·]+$/g, "").trim();
+          if (cleanW) tokens.push(cleanW);
+        });
+      }
+    });
+
+    if (tokens.length === 0) return null;
+
+    const orderedShortNames = [];
+    const matchedSet = new Set();
+    const unmatchedTokens = [];
+    let hasRange = false;
+
+    tokens.forEach(tok => {
+      const rangeExpanded = expandPointRange(tok);
+      if (rangeExpanded.length > 1 || (rangeExpanded.length === 1 && rangeExpanded[0] !== tok && /\d+\s*-\s*\d+/.test(tok))) {
+        hasRange = true;
+        let anyInRange = false;
+        rangeExpanded.forEach(rt => {
+          const hits = resolvePointTokenToShortNames(rt);
+          if (hits.length > 0) {
+            anyInRange = true;
+            hits.forEach(name => {
+              if (!matchedSet.has(name)) { matchedSet.add(name); orderedShortNames.push(name); }
+            });
+          }
+        });
+        if (!anyInRange) unmatchedTokens.push(tok);
+      } else {
+        const hits = resolvePointTokenToShortNames(tok);
+        if (hits.length > 0) {
+          hits.forEach(name => {
+            if (!matchedSet.has(name)) { matchedSet.add(name); orderedShortNames.push(name); }
+          });
+        } else {
+          unmatchedTokens.push(tok);
+        }
+      }
+    });
+
+    const looksLikePointCode = t => /^[a-z]{1,4}(?:-[a-z]{1,3})?-?\d{1,2}$/i.test(t);
+    const acceptableUnmatched = unmatchedTokens.length > 0 && hasListDelimiters &&
+      (unmatchedTokens.every(looksLikePointCode) || (orderedShortNames.length >= 3 && unmatchedTokens.length <= 2));
+
+    // Space-only pairs (e.g., "ST36 SP6") stay Text Search; delimiters (,/+/&/;) or 3+ points trigger Point-List Mode
+    const qualifies = (orderedShortNames.length >= 2 && hasListDelimiters && (unmatchedTokens.length === 0 || acceptableUnmatched)) ||
+                      (orderedShortNames.length >= 3 && unmatchedTokens.length === 0) ||
+                      (hasRange && orderedShortNames.length >= 1 && unmatchedTokens.length === 0);
+
+    if (!qualifies) return null;
+
+    return { orderedShortNames, matchedSet, unmatchedTokens, hasListDelimiters };
+  }
+
+    function runSearchQuery(rawQuery, options = { respectActiveChannels: true, allowAutoPointList: true }) {
+    let query = normalizeSearchSpelling((rawQuery || "").trim(), false);
     let isDocWide = false;
 
     if (query.toLowerCase().startsWith("all:")) {
@@ -4356,83 +4678,189 @@ function applySectionFilter() {
     }
 
     if (!query && !options.respectActiveChannels) {
-      return { results: [], highlightRegex: null, parsedIncludes: [], isDocWide: false, textTerms: [] };
+      return {
+        results: [], highlightRegex: null, parsedIncludes: [], isDocWide: false,
+        textTerms: [], isAutoPointList: false, canBePointList: false, unmatchedPointTokens: []
+      };
     }
 
-    query = query.replace(/\s*\|\s*/g, "|");
-    const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
-    const rawKeywords = query.match(tokenRegex) || [];
+    const hasExplicitOperators = /(?:^|\s)[@#<>!]|["|]/.test(query) || isDocWide;
+    const autoPointMatch = !hasExplicitOperators ? tryParsePointList(query) : null;
 
     const headers = [];
+    const exactMatchedShortNames = new Set();
+    let orderedPointList = [];
+    let isAutoPointList = false;
+    let unmatchedPointTokens = [];
+
     const fullNamesGroups = [];
     const exclude = [];
     const parsedIncludes = [];
     const strictImportance = [];
 
-    rawKeywords.forEach(token => {
-      if (token.match(/^!+$/)) {
-        strictImportance.push(token);
-      } else if (token.startsWith("<>")) {
-        const terms = token.slice(2).toLowerCase().split(",");
-        terms.forEach(t => exclude.push(...expandTCMPoint(t)));
-      } else if (token.startsWith("@")) {
-        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
-        const terms = cleanToken.split(",");
-        terms.forEach(t => {
-          const rangeTerms = expandPointRange(t);
-          rangeTerms.forEach(rt => headers.push(...expandTCMPoint(rt)));
-        });
-      } else if (token.startsWith("#")) {
-        const cleanToken = token.slice(1).replace(/"/g, "").toLowerCase();
-        const terms = cleanToken.split(",");
-        const orGroup = [];
-        terms.forEach(t => orGroup.push(...expandTCMPoint(t)));
-        if (orGroup.length > 0) fullNamesGroups.push(orGroup);
-      } else {
-        const parts = token.split("|").filter(Boolean);
-        const orGroup = [];
-        parts.forEach(part => {
-          if (part.startsWith('"') && part.endsWith('"') && part.length >= 2) {
-            const phrase = part.slice(1, -1).toLowerCase();
-            const safePhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            orGroup.push({ type: 'exact', regex: new RegExp("\\b" + safePhrase + "\\b", "i"), regexString: "\\b" + safePhrase + "\\b", text: phrase });
-          } else {
-            const phrase = part.toLowerCase();
-            const expandedTerms = expandTCMPoint(phrase);
-            expandedTerms.forEach(ext => {
-              const safePhrase = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              orGroup.push({ type: 'substring', regexString: safePhrase, text: ext });
-            });
+    if (autoPointMatch && options.allowAutoPointList !== false) {
+      isAutoPointList = true;
+      orderedPointList = autoPointMatch.orderedShortNames;
+      autoPointMatch.matchedSet.forEach(n => exactMatchedShortNames.add(n));
+      unmatchedPointTokens = autoPointMatch.unmatchedTokens;
+    } else {
+      query = query.replace(/\s*\|\s*/g, "|");
+      query = query.replace(/"[^"]*"|<>[^\s"]+|#[^\s"]+|@[^\s"]+|([a-z0-9])([+\/&])(?=[a-z0-9])/gi, (m, a) => a ? `${a} ` : m);
+      const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
+      const rawKeywords = query.match(tokenRegex) || [];
+
+      const isListConnector = t => /^[,+&;\/]+$/.test(t);
+      const endsWithConnector = t => /[,+&;\/]$/.test(t);
+
+      for (let idx = 0; idx < rawKeywords.length; idx++) {
+        const token = rawKeywords[idx];
+
+        if (/^!+$/.test(token)) {
+          strictImportance.push(token);
+        } else if (token.startsWith("<>")) {
+          const terms = normalizeSearchSpelling(token.slice(2), true).toLowerCase().split(",");
+          terms.forEach(t => { if (t) exclude.push(...expandTCMPoint(t, false)); });
+        } else if (token.startsWith("@")) {
+          const rawAtBody = token.slice(1);
+          if (rawAtBody.startsWith('"') && rawAtBody.endsWith('"') && rawAtBody.length >= 2) {
+            const quotedVal = normalizeSearchSpelling(rawAtBody.slice(1, -1), true).toLowerCase().trim();
+            if (quotedVal) {
+              const resolved = resolvePointTokenToShortNames(quotedVal);
+              if (resolved.length > 0 && (/\d/.test(quotedVal) || quotedVal.length >= 4)) {
+                resolved.forEach(name => exactMatchedShortNames.add(name));
+              }
+              headers.push(...expandTCMPoint(quotedVal, true));
+            }
+            continue;
           }
-        });
-        if (orGroup.length > 0) parsedIncludes.push(orGroup);
+
+          let atChunk = rawAtBody;
+          while (idx + 1 < rawKeywords.length) {
+            const nextTok = rawKeywords[idx + 1];
+            if (/^[@#<>!"]/.test(nextTok)) break;
+
+            if (/^[\-\u2010-\u2015\u2212]$/.test(nextTok) &&
+                idx + 2 < rawKeywords.length &&
+                /^(?:[a-z\.]+-?)?\d{1,2}[,+&;\/]?$/i.test(rawKeywords[idx + 2])) {
+              atChunk += " " + nextTok + " " + rawKeywords[idx + 2];
+              idx += 2;
+              continue;
+            }
+
+            const prevConnected = endsWithConnector(rawKeywords[idx]) || isListConnector(nextTok);
+            const cleanNext = nextTok.replace(/[,+&;\/]+$/, "");
+            const tailSegment = atChunk.split(/[,+&;\/]+/).pop().trim();
+            const tailWords = tailSegment.split(/\s+/).filter(Boolean);
+            const lastWord = tailWords.length > 0 ? tailWords[tailWords.length - 1] : "";
+            const isJoinedPoint =
+              (tailSegment && resolvePointTokenToShortNames(tailSegment + " " + cleanNext).length > 0) ||
+              (lastWord && resolvePointTokenToShortNames(lastWord + " " + cleanNext).length > 0);
+            const isNextStandalonePoint = cleanNext.length > 0 && (
+              resolvePointTokenToShortNames(cleanNext).length > 0 ||
+              expandPointRange(cleanNext).length > 1
+            );
+
+            if (prevConnected || isJoinedPoint || isNextStandalonePoint) {
+              atChunk += " " + nextTok;
+              idx++;
+            } else {
+              break;
+            }
+          }
+
+          const cleanPre = preNormalizePointListText(atChunk);
+          const atTokens = cleanPre.split(/[\s,+&;•·*\n\r\/|]+/).map(t => t.replace(/"/g, "").trim()).filter(Boolean);
+          atTokens.forEach(t => {
+            const rangeTerms = expandPointRange(t);
+            rangeTerms.forEach(rt => {
+              const resolved = resolvePointTokenToShortNames(rt);
+              if (resolved.length > 0 && (rangeTerms.length > 1 || /\d/.test(rt) || rt.length >= 4)) {
+                resolved.forEach(name => exactMatchedShortNames.add(name));
+              }
+              headers.push(...expandTCMPoint(rt, true));
+            });
+          });
+        } else if (token.startsWith("#")) {
+          const cleanToken = normalizeSearchSpelling(token.slice(1).replace(/"/g, ""), true).toLowerCase();
+          const terms = cleanToken.split(",");
+          const orGroup = [];
+          terms.forEach(t => { if (t) orGroup.push(...expandTCMPoint(t, true)); });
+          if (orGroup.length > 0) fullNamesGroups.push(orGroup);
+        } else {
+          const parts = token.split("|").filter(Boolean);
+          const orGroup = [];
+          parts.forEach(part => {
+            if (part.startsWith('"') && part.endsWith('"') && part.length >= 2) {
+              const phrase = normalizeSearchSpelling(part.slice(1, -1)).toLowerCase();
+              const safePhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              orGroup.push({ type: 'exact', regex: new RegExp("\\b" + safePhrase + "\\b", "i"), regexString: "\\b" + safePhrase + "\\b", text: phrase });
+            } else {
+              const cleanPart = part.replace(/^[,;(+&\/]+|[,;)+&\/]+$/g, "");
+              if (!cleanPart) return;
+              const phrase = normalizeSearchSpelling(cleanPart).toLowerCase();
+              const expandedTerms = expandTCMPoint(phrase, false);
+              expandedTerms.forEach(ext => {
+                const safePhrase = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                orGroup.push({ type: 'substring', regexString: safePhrase, text: ext });
+              });
+            }
+          });
+          if (orGroup.length > 0) parsedIncludes.push(orGroup);
+        }
       }
-    });
+    }
 
     const regexParts = [];
     const textTerms = [];
 
-    parsedIncludes.forEach(group => {
-      group.forEach(item => {
-        regexParts.push(item.regexString);
-        textTerms.push(item.text);
+    if (!isAutoPointList) {
+      parsedIncludes.forEach(group => {
+        group.forEach(item => {
+          const len = item.text.trim().length;
+          if (len >= 3) {
+            regexParts.push(item.regexString);
+            textTerms.push(item.text);
+          } else if (len === 2) {
+            regexParts.push("\\b" + item.regexString + "\\b");
+            textTerms.push(item.text);
+          }
+        });
       });
-    });
-    headers.forEach(h => {
-      regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-      textTerms.push(h);
-    });
-    fullNamesGroups.forEach(group => {
-      group.forEach(f => {
-        regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-        textTerms.push(f);
+      headers.forEach(h => {
+        if (h.trim().length > 2) {
+          regexParts.push(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+          textTerms.push(h);
+        }
       });
-    });
+      fullNamesGroups.forEach(group => {
+        group.forEach(f => {
+          if (f.trim().length > 2) {
+            regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+            textTerms.push(f);
+          }
+        });
+      });
+    }
 
-    const validRegexParts = regexParts.filter(t => t.trim().length > 2).sort((a, b) => b.length - a.length);
+    const validRegexParts = [...new Set(regexParts)].sort((a, b) => b.length - a.length);
     const highlightRegex = validRegexParts.length > 0 ? new RegExp("(" + validRegexParts.join("|") + ")", "gi") : null;
 
-    const results = points.filter(point => {
+    const headerMatchers = [];
+    if (headers.length > 0) {
+      const seenCleanH = new Set();
+      headers.forEach(h => {
+        const cleanH = h.replace(/[\s\-\.]/g, "");
+        if (!cleanH || seenCleanH.has(cleanH)) return;
+        seenCleanH.add(cleanH);
+        if (/^[a-z].*\d$/i.test(cleanH)) {
+          headerMatchers.push({ type: "regex", regex: new RegExp("^" + cleanH.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "(?:$|[^0-9])", "i") });
+        } else {
+          headerMatchers.push({ type: "substr", text: cleanH });
+        }
+      });
+    }
+
+    let results = points.filter(point => {
       // 1. CHANNEL CHECK
       if (options.respectActiveChannels) {
         const chanFull = point["Channel Full Name"] || point[" Channel Full Name"] || "";
@@ -4448,20 +4876,21 @@ function applySectionFilter() {
       // 3. EXCLUSIONS <>
       if (exclude.length > 0 && !exclude.every(k => !point._searchIndex.includes(k))) return false;
 
-      // 4. SHORT NAMES @
-      if (headers.length > 0 && !headers.some(h => {
-        if (/\d$/.test(h)) {
-          return new RegExp(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "i").test(point._shortNameLower);
-        }
-        let cleanH = h.replace(/[\s\-]/g, "");
-        let cleanName = point._shortNameLower.replace(/[\s\-]/g, "");
-        return cleanName.includes(cleanH);
-      })) return false;
+      // 4. SHORT NAMES @ or Auto Point-List
+      if (exactMatchedShortNames.size > 0 || headerMatchers.length > 0) {
+        const matchesExact = exactMatchedShortNames.has(point["Short Name"]);
+        const cleanPointName = point._shortNameLower.replace(/[\s\-\.]/g, "");
+        const matchesHeader = headerMatchers.some(m => m.type === "regex" ? m.regex.test(cleanPointName) : cleanPointName.includes(m.text));
+        if (!matchesExact && !matchesHeader) return false;
+      }
 
       // 5. FULL NAMES & CHANNELS #
       if (fullNamesGroups.length > 0) {
-        const hashTarget = ((point["Full Name"] || point[" Full Name"] || "") + " " +
-                           (point["Channel Short Name"] || point[" Channel Short Name"] || "")).toLowerCase();
+        const hashTarget = normalizeSearchSpelling(
+          (point["Full Name"] || point[" Full Name"] || "") + " " +
+          (point["Channel Short Name"] || point[" Channel Short Name"] || ""),
+          true
+        ).toLowerCase();
         const passesAllHashGroups = fullNamesGroups.every(group => group.some(f => hashTarget.includes(f)));
         if (!passesAllHashGroups) return false;
       }
@@ -4494,8 +4923,26 @@ function applySectionFilter() {
       return true;
     });
 
-    return { results, highlightRegex, parsedIncludes, isDocWide, textTerms };
+    if (isAutoPointList && orderedPointList.length > 0) {
+      const orderMap = new Map();
+      orderedPointList.forEach((name, i) => orderMap.set(name, i));
+      results.sort((a, b) => {
+        const ia = orderMap.has(a["Short Name"]) ? orderMap.get(a["Short Name"]) : 99999;
+        const ib = orderMap.has(b["Short Name"]) ? orderMap.get(b["Short Name"]) : 99999;
+        return ia - ib;
+      });
+    }
+
+    return {
+      results, highlightRegex, parsedIncludes, isDocWide, textTerms,
+      isAutoPointList, canBePointList: Boolean(autoPointMatch), unmatchedPointTokens
+    };
   }
+
+  window.toggleAutoPointListMode = function() {
+    bypassAutoPointList = !bypassAutoPointList;
+    handleSearch(false);
+  };
 
   function handleSearch(preserveState = false) {
     let currentScroll = 0;
@@ -4504,7 +4951,13 @@ function applySectionFilter() {
     }
 
     const rawQuery = searchInput.value.trim();
-    const { results, highlightRegex, parsedIncludes, isDocWide, textTerms } = runSearchQuery(rawQuery, { respectActiveChannels: true });
+    const {
+      results, highlightRegex, parsedIncludes, isDocWide, textTerms,
+      isAutoPointList, canBePointList, unmatchedPointTokens
+    } = runSearchQuery(rawQuery, {
+      respectActiveChannels: true,
+      allowAutoPointList: !bypassAutoPointList
+    });
 
     filteredPoints = results;
     activeHighlightRegex = highlightRegex;
@@ -4535,7 +4988,7 @@ function applySectionFilter() {
       addAllBtn.style.display = "none";
     }
 
-    bestDirectMatchPoint = findBestDirectMatch(rawQuery, filteredPoints);
+    bestDirectMatchPoint = isAutoPointList ? null : findBestDirectMatch(rawQuery, filteredPoints);
     const jumpBtn = document.getElementById("directJumpBtn");
     if (jumpBtn) {
       if (bestDirectMatchPoint) {
@@ -4548,7 +5001,11 @@ function applySectionFilter() {
 
     const queryDisplay = document.getElementById("searchQueryDisplay");
     if (rawQuery.length > 0) {
-      queryDisplay.textContent = '"' + rawQuery + '"';
+      let displayMsg = '"' + rawQuery + '"';
+      if (isAutoPointList && unmatchedPointTokens.length > 0) {
+        displayMsg += `  •  Not found: ${unmatchedPointTokens.join(", ")}`;
+      }
+      queryDisplay.textContent = displayMsg;
       queryDisplay.style.visibility = "visible";
       queryDisplay.scrollLeft = 0;
     } else {
@@ -4868,12 +5325,36 @@ function applySectionFilter() {
 
 
 
-// --- QUICK PEEK SESSION STATE & SEARCH ENGINE ---
+/// --- QUICK PEEK SESSION STATE & SEARCH ENGINE ---
   let qpHistory = [];
   let qpCurrentState = null; // { mode: 'point' | 'search', pointId: '', query: '', highlightRegex: null, scrollTop: 0 }
   let qpSearchResults = [];
   let qpSearchHighlightRegex = null;
+  let qpSearchParsedIncludes = [];
   let qpCloseTimer = null;
+
+  function scrollToFirstHighlight(container, topOffset = 12) {
+    if (!container) return;
+    const marks = container.querySelectorAll(".section-content mark");
+    let firstVisibleMark = null;
+    for (let i = 0; i < marks.length; i++) {
+      if (marks[i].offsetParent !== null && !marks[i].closest(".hidden-section")) {
+        firstVisibleMark = marks[i];
+        break;
+      }
+    }
+    if (!firstVisibleMark) return;
+
+    const cRect = container.getBoundingClientRect();
+    const mRect = firstVisibleMark.getBoundingClientRect();
+    const visibleTop = cRect.top + topOffset;
+    const visibleBottom = cRect.bottom - 40;
+
+    if (mRect.top > visibleBottom || mRect.top < visibleTop) {
+      const targetTop = container.scrollTop + (mRect.top - cRect.top) - topOffset;
+      container.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+    }
+  }
   let qpNavIndex = -1;
   let lastQpInputTime = 0;
 
@@ -5013,10 +5494,29 @@ function applySectionFilter() {
         saveSearchHistory(input.value.trim());
       }
     }
-    openQuickPeekPointObject(targetPoint, fromQuickPeekSearch ? qpSearchHighlightRegex : undefined);
+    let shouldAutoScroll = false;
+    if (fromQuickPeekSearch && qpSearchHighlightRegex && qpSearchParsedIncludes.length > 0) {
+      const headerText = normalizeSearchSpelling(
+        (targetPoint["Short Name"] || "") + " " +
+        (targetPoint["Full Name"] || targetPoint[" Full Name"] || "")
+      ).toLowerCase();
+      const headerNoSpace = headerText.replace(/[\s\-\.]/g, "");
+      const matchesOwnHeader = qpSearchParsedIncludes.every(orGroup =>
+        orGroup.some(term => {
+          if (term.type === "exact") {
+            term.regex.lastIndex = 0;
+            return term.regex.test(headerText);
+          }
+          return headerText.includes(term.text) ||
+            (term.text.length >= 4 && headerNoSpace.includes(term.text.replace(/[\s\-\.]/g, "")));
+        })
+      );
+      shouldAutoScroll = !matchesOwnHeader;
+    }
+    openQuickPeekPointObject(targetPoint, fromQuickPeekSearch ? qpSearchHighlightRegex : undefined, shouldAutoScroll);
   };
 
-  function openQuickPeekPointObject(targetPoint, customHighlightRegex) {
+  function openQuickPeekPointObject(targetPoint, customHighlightRegex, autoScrollToMatch = false) {
     const modal = document.getElementById("quickPeekModal");
     if (qpCloseTimer) {
       clearTimeout(qpCloseTimer);
@@ -5046,9 +5546,16 @@ function applySectionFilter() {
 
     buildQuickPeekDOM(targetPoint, regexToUse);
     modal.style.display = "flex";
-    document.getElementById("quickPeekContainer").scrollTop = 0;
+    const qpContainer = document.getElementById("quickPeekContainer");
+    qpContainer.scrollTop = 0;
     updateQuickPeekHeaderHeight();
-  }
+    if (autoScrollToMatch && regexToUse) {
+      setTimeout(() => {
+        const qpHdr = qpContainer.querySelector(".qp-sticky-header");
+        scrollToFirstHighlight(qpContainer, (qpHdr ? qpHdr.offsetHeight : 90) + 42);
+      }, 45);
+    }
+  } 
 
   window.openQuickPeekSearch = function(initialQuery = "") {
     const modal = document.getElementById("quickPeekModal");
@@ -5083,7 +5590,7 @@ function applySectionFilter() {
 
     setTimeout(() => {
       const input = document.getElementById("qpSearchInput");
-      if (input) input.focus();
+      if (input) { input.focus(); input.select(); }
     }, 50);
   };
 
@@ -5108,6 +5615,10 @@ function applySectionFilter() {
 
     const stickyHeader = document.createElement("div");
     stickyHeader.className = "qp-sticky-header";
+    stickyHeader.onclick = (e) => {
+      if (e.target.closest("button, img, input, a")) return;
+      container.scrollTo({ top: 0, behavior: "smooth" });
+    };
 
     // Row 1: Navigation & Actions (Back, Search, Compare, Close)
     const navRow = document.createElement("div");
@@ -5169,6 +5680,8 @@ function applySectionFilter() {
     const titleGroup = document.createElement("div");
     titleGroup.className = "detail-title-group";
     titleGroup.style.paddingRight = "0";
+    titleGroup.style.cursor = "pointer";
+    titleGroup.title = "Tap to scroll to top";
 
     const imp = point.Important ? String(point.Important).trim() : "";
     const impHtml = imp !== "" ? `<span class="importance-badge">${imp}</span>` : "";
@@ -5286,7 +5799,20 @@ function applySectionFilter() {
       renderQuickPeekSearchResults(inputEl.value);
     }, 200);
 
+    inputEl.addEventListener("paste", (e) => {
+      handleSearchPasteCleanup(e, () => {
+        qpBypassAutoPointList = false;
+        lastQpInputTime = Date.now();
+        debouncedQpSearch.cancel();
+        if (qpCurrentState && qpCurrentState.mode === "search") {
+          qpCurrentState.query = inputEl.value;
+        }
+        renderQuickPeekSearchResults(inputEl.value);
+      });
+    });
+
     inputEl.addEventListener("input", () => {
+      qpBypassAutoPointList = false;
       lastQpInputTime = Date.now();
       debouncedQpSearch();
     });
@@ -5306,12 +5832,17 @@ function applySectionFilter() {
       } else if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
+        debouncedQpSearch.cancel();
+        if (qpCurrentState && qpCurrentState.mode === "search") {
+          qpCurrentState.query = inputEl.value;
+        }
         const listEl = document.getElementById("qpResultsList");
         const items = listEl ? listEl.querySelectorAll(".qp-result-card, .history-item") : [];
         if (qpNavIndex >= 0 && items[qpNavIndex]) {
           items[qpNavIndex].click();
           return;
         }
+        renderQuickPeekSearchResults(inputEl.value);
         if (inputEl.value.trim().length > 1) saveSearchHistory(inputEl.value.trim());
         inputEl.blur();
       } else if (e.key === "Backspace" && inputEl.value.length === 0 && qpHistory.length > 0) {
@@ -5359,21 +5890,77 @@ function applySectionFilter() {
     if (input) renderQuickPeekSearchResults(input.value);
   };
 
-  function getMatchingSnippet(point, highlightRegex) {
+  function getMatchingSnippet(point, highlightRegex, parsedIncludes = null) {
     if (!highlightRegex) return "";
+    const hasGroups = Array.isArray(parsedIncludes) && parsedIncludes.length > 0;
+    let bestLine = null;
+    let bestLabel = "";
+    let bestScore = 0;
+
     for (let sec of TCM_SECTIONS) {
       let val = point[sec.key] || point[sec.altKey];
       if (!val) continue;
       let lines = String(val).split(/\r?\n/);
       for (let line of lines) {
-        let cleanLine = stripBBCode(line).trim();
-        highlightRegex.lastIndex = 0;
-        if (highlightRegex.test(cleanLine)) {
-          return `<strong>${sec.label}:</strong> ` + highlightText(cleanLine, highlightRegex);
+        let rawTrim = line.trim();
+        if (!rawTrim || /^\|(?:[\s\-:]+\|)+$/.test(rawTrim)) continue;
+        let displayLine = (rawTrim.startsWith("|") && rawTrim.endsWith("|"))
+          ? rawTrim.slice(1, -1).split("|").map(c => c.trim()).filter(Boolean).join(" • ")
+          : rawTrim;
+        let normLine = normalizeSearchSpelling(stripBBCode(displayLine)).toLowerCase();
+
+        let score = 0;
+        if (hasGroups) {
+          for (let orGroup of parsedIncludes) {
+            const matchedGroup = orGroup.some(term => {
+              if (term.type === "exact") {
+                term.regex.lastIndex = 0;
+                return term.regex.test(normLine);
+              }
+              return normLine.includes(term.text);
+            });
+            if (matchedGroup) score++;
+          }
+          if (score === parsedIncludes.length) {
+            bestLine = displayLine;
+            bestLabel = sec.label;
+            bestScore = score;
+            break;
+          }
+        } else {
+          highlightRegex.lastIndex = 0;
+          if (highlightRegex.test(normLine)) {
+            bestLine = displayLine;
+            bestLabel = sec.label;
+            bestScore = 1;
+            break;
+          }
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestLine = displayLine;
+          bestLabel = sec.label;
         }
       }
+      if (hasGroups ? (bestScore === parsedIncludes.length) : (bestScore > 0)) break;
     }
-    return "";
+
+    if (!bestLine) return "";
+
+    const plainBest = stripBBCode(bestLine);
+    if (plainBest.length > 140) {
+      highlightRegex.lastIndex = 0;
+      const m = highlightRegex.exec(plainBest);
+      if (m && m.index > 75) {
+        const cutStart = Math.max(0, m.index - 35);
+        const spaceIdx = plainBest.indexOf(" ", cutStart);
+        const startIdx = (spaceIdx !== -1 && spaceIdx < m.index) ? spaceIdx + 1 : cutStart;
+        bestLine = "…" + plainBest.slice(startIdx);
+      }
+    }
+
+    return `<strong>${bestLabel}:</strong> ` + highlightText(bestLine, highlightRegex);
   }
 
   function renderQuickPeekSearchResults(rawQuery) {
@@ -5389,6 +5976,7 @@ function applySectionFilter() {
     if (cleanQuery.length === 0) {
       qpSearchResults = [];
       qpSearchHighlightRegex = null;
+      qpSearchParsedIncludes = [];
       if (addAllBtn) addAllBtn.style.display = "none";
 
       const state = getSearchHistoryState();
@@ -5424,11 +6012,19 @@ function applySectionFilter() {
       return;
     }
 
-    const evalObj = runSearchQuery(cleanQuery, { respectActiveChannels: false });
+    const evalObj = runSearchQuery(cleanQuery, {
+      respectActiveChannels: false,
+      allowAutoPointList: !qpBypassAutoPointList
+    });
     qpSearchResults = evalObj.results;
     qpSearchHighlightRegex = evalObj.highlightRegex;
+    qpSearchParsedIncludes = evalObj.parsedIncludes || [];
 
-    counterEl.textContent = `Results: ${qpSearchResults.length} of ${points.length}`;
+    let qpCountText = `Results: ${qpSearchResults.length} of ${points.length}`;
+    if (evalObj.isAutoPointList && evalObj.unmatchedPointTokens.length > 0) {
+      qpCountText += ` • Not found: ${evalObj.unmatchedPointTokens.join(", ")}`;
+    }
+    counterEl.textContent = qpCountText;
 
     if (addAllBtn) {
       if (qpSearchResults.length > 0 && qpSearchResults.length <= 40) {
@@ -5441,6 +6037,18 @@ function applySectionFilter() {
 
     if (qpSearchResults.length === 0) {
       listEl.innerHTML = `<div style="text-align:center; padding:30px 15px; color:#8e8e93;">No points match "${escapeHTML(cleanQuery)}".</div>`;
+      const suggestion = getZeroResultSuggestions(cleanQuery, false);
+      if (suggestion) {
+        const chipWrap = document.createElement("div");
+        chipWrap.style.cssText = "text-align:center; margin-top:-12px;";
+        const chipBtn = document.createElement("button");
+        chipBtn.type = "button";
+        chipBtn.style.cssText = "background:rgba(0,122,255,0.12); color:#007aff; border:1px solid rgba(0,122,255,0.35); border-radius:16px; padding:7px 14px; font-size:13px; font-weight:700; cursor:pointer;";
+        chipBtn.textContent = `${suggestion.label} ${suggestion.query} (${suggestion.count})`;
+        chipBtn.onclick = () => applyQuickPeekHistorySearch(suggestion.query);
+        chipWrap.appendChild(chipBtn);
+        listEl.appendChild(chipWrap);
+      }
       return;
     }
 
@@ -5453,7 +6061,7 @@ function applySectionFilter() {
       const imp = p.Important ? String(p.Important).trim() : "";
       const impHtml = imp !== "" ? `<span class="importance-badge" style="font-size:14px; margin-left:5px;">${imp}</span>` : "";
       const isCompared = compareList.includes(shortName);
-      const snippetHtml = getMatchingSnippet(p, qpSearchHighlightRegex);
+      const snippetHtml = getMatchingSnippet(p, qpSearchHighlightRegex, qpSearchParsedIncludes);
 
       html += `
         <div class="qp-result-card" onclick="openQuickPeekById('${safeName}', true)">
@@ -5498,11 +6106,28 @@ function applySectionFilter() {
   }
 
 
-  function debounce(fn, delay = 300) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn.apply(this, args), delay); }; }
+  function debounce(fn, delay = 300) {
+    let timeout;
+    const debounced = function (...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => fn.apply(this, args), delay);
+    };
+    debounced.cancel = () => clearTimeout(timeout);
+    return debounced;
+  }
 
 
 const debouncedMainSearch = debounce(() => handleSearch(false), 300);
+searchInput.addEventListener("paste", (e) => {
+  handleSearchPasteCleanup(e, () => {
+    bypassAutoPointList = false;
+    renderSearchHistory();
+    debouncedMainSearch.cancel();
+    handleSearch(false);
+  });
+});
 searchInput.addEventListener("input", () => {
+  bypassAutoPointList = false;
   renderSearchHistory();
   debouncedMainSearch();
 });
@@ -5554,6 +6179,10 @@ searchInput.addEventListener("keydown", e => {
         return;
       }
     }
+
+    // Flush any pending debounced search so bestDirectMatchPoint & results are never stale
+    debouncedMainSearch.cancel();
+    handleSearch(false);
 
     // Jump straight to exact match on Enter if there's a unique/exact hit
     if (bestDirectMatchPoint) {
@@ -5716,8 +6345,14 @@ searchInput.addEventListener("keydown", e => {
   function findBestDirectMatch(rawQuery, results) {
     if (!rawQuery || results.length === 0) return null;
     if (results.length === 1) return results[0];
-    const clean = rawQuery.replace(/^[@#]/, "").trim().toLowerCase().replace(/[\s\-]/g, "");
-    return results.find(p => p._shortNameLower.replace(/[\s\-]/g, "") === clean) || null;
+    const clean = rawQuery.replace(/^[@#]/, "").trim().toLowerCase().replace(/[\s\-\.]/g, "");
+    const direct = results.find(p => p._shortNameLower.replace(/[\s\-\.]/g, "") === clean);
+    if (direct) return direct;
+    const resolved = resolvePointTokenToShortNames(rawQuery.replace(/^[@#]/, "").trim());
+    if (resolved.length === 1) {
+      return results.find(p => p["Short Name"] === resolved[0]) || null;
+    }
+    return null;
   }
 
   window.jumpToBestMatch = function () {
@@ -5752,7 +6387,7 @@ searchInput.addEventListener("keydown", e => {
         const fullName = p["Full Name"] || p[" Full Name"] || "";
         const chan = p["Channel Short Name"] || p[" Channel Short Name"] || "";
         const imp = p.Important ? String(p.Important).trim() : "";
-        const snippet = typeof getMatchingSnippet === "function" ? getMatchingSnippet(p, activeHighlightRegex) : "";
+        const snippet = typeof getMatchingSnippet === "function" ? getMatchingSnippet(p, activeHighlightRegex, activeParsedIncludes) : "";
         const safeName = p["Short Name"].replace(/'/g, "\\'");
         const isCmp = compareList.includes(p["Short Name"]);
 
@@ -5830,8 +6465,25 @@ searchInput.addEventListener("keydown", e => {
 
     if (filteredPoints.length === 0) {
       const noResults = document.createElement("div");
-      noResults.style.cssText = "text-align:center; padding: 40px; color:#888;";
-      noResults.textContent = "No points match your search.";
+      noResults.style.cssText = "text-align:center; padding: 40px 20px; color:#888;";
+      const msgDiv = document.createElement("div");
+      msgDiv.textContent = "No points match your search.";
+      noResults.appendChild(msgDiv);
+
+      const suggestion = getZeroResultSuggestions(searchInput.value.trim(), true);
+      if (suggestion) {
+        const chipBtn = document.createElement("button");
+        chipBtn.type = "button";
+        chipBtn.style.cssText = "margin-top:14px; background:rgba(0,122,255,0.12); color:#007aff; border:1px solid rgba(0,122,255,0.35); border-radius:18px; padding:8px 16px; font-size:13.5px; font-weight:700; cursor:pointer;";
+        chipBtn.textContent = `${suggestion.label} ${suggestion.query} (${suggestion.count})`;
+        chipBtn.onclick = () => {
+          searchInput.value = suggestion.query;
+          bypassAutoPointList = false;
+          saveSearchHistory(suggestion.query);
+          handleSearch(false);
+        };
+        noResults.appendChild(chipBtn);
+      }
       fragment.appendChild(noResults);
     } else {
       const grouped = {};
@@ -7314,6 +7966,7 @@ async function completeSave(newValue) {
     currentEditingPoint._searchIndex = generateSearchIndex(currentEditingPoint);
     currentEditingPoint._outgoingMentions = extractOutgoingMentions(currentEditingPoint);
     rebuildReverseMentionMap(points);
+    addTextToSearchVocab(currentEditingPoint._searchIndex);
 
     // 3. Rebuild the Paragraph Array for the Search Engine
         let fields = [
@@ -7536,7 +8189,9 @@ if (!isFullScreenToolOpen && (((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.
       if (dropdown && !dropdown.classList.contains("expanded")) {
         toggleSearchDropdown();
       }
-      document.getElementById("searchInput").focus();
+      const inputEl = document.getElementById("searchInput");
+      inputEl.focus();
+      inputEl.select();
       return;
     }
   }
@@ -8010,11 +8665,18 @@ document.addEventListener('keyup', (e) => {
   renderPills(isInitialOpen);
   renderSheetContent(point);
   
-  // If saving an edit, hold the position. If swiping/tapping a new point, snap to top.
+  // If saving an edit, hold the position. If swiping/tapping a new point, snap to top (or first match in all: mode).
   if (preserveScroll) {
     sheetContent.scrollTop = currentScroll; 
   } else {
-    sheetContent.scrollTop = 0; 
+    sheetContent.scrollTop = 0;
+    if (isDocumentWideSearch && activeHighlightRegex) {
+      requestAnimationFrame(() => {
+        const jumpBar = sheetContent.querySelector(".section-jump-bar");
+        const jumpH = (jumpBar && jumpBar.style.display !== "none") ? jumpBar.offsetHeight : 0;
+        scrollToFirstHighlight(sheetContent, jumpH + 46);
+      });
+    }
   }
 }
 
