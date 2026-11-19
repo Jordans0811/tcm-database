@@ -2667,7 +2667,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.19.26.v1";
+const APP_VERSION = "11.19.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -4672,9 +4672,9 @@ function applySectionFilter() {
     let query = normalizeSearchSpelling((rawQuery || "").trim(), false);
     let isDocWide = false;
 
-    if (query.toLowerCase().startsWith("all:")) {
+    if (/(?:^|\s)all:(?=\s|$)/i.test(query)) {
       isDocWide = true;
-      query = query.substring(4).trim();
+      query = query.replace(/(?:^|\s)all:(?=\s|$)/gi, " ").trim();
     }
 
     if (!query && !options.respectActiveChannels) {
@@ -4704,6 +4704,7 @@ function applySectionFilter() {
       autoPointMatch.matchedSet.forEach(n => exactMatchedShortNames.add(n));
       unmatchedPointTokens = autoPointMatch.unmatchedTokens;
     } else {
+      query = query.replace(/(^|\s)(<>|[@#])\s+(?=[^\s@#<>!])/g, "$1$2");
       query = query.replace(/\s*\|\s*/g, "|");
       query = query.replace(/"[^"]*"|<>[^\s"]+|#[^\s"]+|@[^\s"]+|([a-z0-9])([+\/&])(?=[a-z0-9])/gi, (m, a) => a ? `${a} ` : m);
       const tokenRegex = /(?:[^\s"]+|"[^"]*")+/g;
@@ -4715,21 +4716,46 @@ function applySectionFilter() {
       for (let idx = 0; idx < rawKeywords.length; idx++) {
         const token = rawKeywords[idx];
 
-        if (/^!+$/.test(token)) {
-          strictImportance.push(token);
+        if (/^!+(?:\|!+)*$/.test(token)) {
+          token.split("|").forEach(imp => strictImportance.push(imp));
         } else if (token.startsWith("<>")) {
-          const terms = normalizeSearchSpelling(token.slice(2), true).toLowerCase().split(",");
-          terms.forEach(t => { if (t) exclude.push(...expandTCMPoint(t, false)); });
+          let exChunk = token.slice(2);
+          while (exChunk.endsWith(",") && idx + 1 < rawKeywords.length) {
+            const nextTok = rawKeywords[idx + 1];
+            if (/^[@#<>!]/.test(nextTok)) break;
+            exChunk += " " + nextTok;
+            idx++;
+          }
+          const segRegex = /"([^"]+)"|([^,|"]+)/g;
+          let m;
+          while ((m = segRegex.exec(exChunk)) !== null) {
+            const t = normalizeSearchSpelling((m[1] || m[2] || ""), true).toLowerCase().trim();
+            if (t) exclude.push(...expandTCMPoint(t, false));
+          }
         } else if (token.startsWith("@")) {
           const rawAtBody = token.slice(1);
-          if (rawAtBody.startsWith('"') && rawAtBody.endsWith('"') && rawAtBody.length >= 2) {
-            const quotedVal = normalizeSearchSpelling(rawAtBody.slice(1, -1), true).toLowerCase().trim();
-            if (quotedVal) {
-              const resolved = resolvePointTokenToShortNames(quotedVal);
-              if (resolved.length > 0 && (/\d/.test(quotedVal) || quotedVal.length >= 4)) {
+          if (rawAtBody.includes('"')) {
+            let quotedChunk = rawAtBody;
+            while (idx + 1 < rawKeywords.length) {
+              const nextTok = rawKeywords[idx + 1];
+              if (/^[@#<>!]/.test(nextTok)) break;
+              if (endsWithConnector(quotedChunk) || isListConnector(nextTok)) {
+                quotedChunk += " " + nextTok;
+                idx++;
+              } else {
+                break;
+              }
+            }
+            const segRegex = /"([^"]+)"|([^,|+&;\/"]+)/g;
+            let m;
+            while ((m = segRegex.exec(quotedChunk)) !== null) {
+              const segVal = normalizeSearchSpelling((m[1] || m[2] || ""), true).toLowerCase().trim();
+              if (!segVal) continue;
+              const resolved = resolvePointTokenToShortNames(segVal);
+              if (resolved.length > 0 && (/\d/.test(segVal) || segVal.length >= 4)) {
                 resolved.forEach(name => exactMatchedShortNames.add(name));
               }
-              headers.push(...expandTCMPoint(quotedVal, true));
+              headers.push(...expandTCMPoint(segVal, true));
             }
             continue;
           }
@@ -4781,21 +4807,33 @@ function applySectionFilter() {
             });
           });
         } else if (token.startsWith("#")) {
-          const cleanToken = normalizeSearchSpelling(token.slice(1).replace(/"/g, ""), true).toLowerCase();
-          const terms = cleanToken.split(",");
+          let hashChunk = token.slice(1);
+          while (hashChunk.endsWith(",") && idx + 1 < rawKeywords.length) {
+            const nextTok = rawKeywords[idx + 1];
+            if (/^[@#<>!]/.test(nextTok)) break;
+            hashChunk += " " + nextTok;
+            idx++;
+          }
           const orGroup = [];
-          terms.forEach(t => { if (t) orGroup.push(...expandTCMPoint(t, true)); });
+          const segRegex = /"([^"]+)"|([^,|"]+)/g;
+          let m;
+          while ((m = segRegex.exec(hashChunk)) !== null) {
+            const t = normalizeSearchSpelling((m[1] || m[2] || ""), true).toLowerCase().trim();
+            if (t) orGroup.push(...expandTCMPoint(t, true));
+          }
           if (orGroup.length > 0) fullNamesGroups.push(orGroup);
         } else {
           const parts = token.split("|").filter(Boolean);
           const orGroup = [];
           parts.forEach(part => {
-            if (part.startsWith('"') && part.endsWith('"') && part.length >= 2) {
-              const phrase = normalizeSearchSpelling(part.slice(1, -1)).toLowerCase();
+            const trimmedPart = part.replace(/^[,;(+&\/]+|[,;)+&\/]+$/g, "");
+            if (!trimmedPart) return;
+            if (trimmedPart.startsWith('"') && trimmedPart.endsWith('"') && trimmedPart.length >= 2) {
+              const phrase = normalizeSearchSpelling(trimmedPart.slice(1, -1)).toLowerCase();
               const safePhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               orGroup.push({ type: 'exact', regex: new RegExp("\\b" + safePhrase + "\\b", "i"), regexString: "\\b" + safePhrase + "\\b", text: phrase });
             } else {
-              const cleanPart = part.replace(/^[,;(+&\/]+|[,;)+&\/]+$/g, "");
+              const cleanPart = trimmedPart.replace(/^"+|"+$/g, "");
               if (!cleanPart) return;
               const phrase = normalizeSearchSpelling(cleanPart).toLowerCase();
               const expandedTerms = expandTCMPoint(phrase, false);
