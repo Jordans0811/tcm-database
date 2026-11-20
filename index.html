@@ -2600,11 +2600,11 @@ display: flex; flex-direction: column;">
 
   <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
       <label class="study-setting-toggle">
-        <input type="checkbox" id="backToFrontToggle" onchange="if(this.checked) document.getElementById('imageFirstToggle').checked = false;" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
+        <input type="checkbox" id="backToFrontToggle" onchange="onStudySettingsModeToggle('backToFrontToggle')" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
         🔄 Back-to-Front Mode (Text First)
       </label>
       <label class="study-setting-toggle">
-        <input type="checkbox" id="imageFirstToggle" onchange="if(this.checked) document.getElementById('backToFrontToggle').checked = false;" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
+        <input type="checkbox" id="imageFirstToggle" onchange="onStudySettingsModeToggle('imageFirstToggle')" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
         🖼️ Image-First Mode (Hides Name)
       </label>
     </div>
@@ -2772,7 +2772,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.20.26.v1";
+const APP_VERSION = "11.20.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -9065,13 +9065,20 @@ document.addEventListener('keyup', (e) => {
       }
       
       const safePtId = point["Short Name"].replace(/'/g, "\\'");
-      const safeSecLabel = label.replace(/'/g, "\\'");
       const editIcon = `<button class="section-edit-btn" onclick="event.stopPropagation(); window.triggerEdit('${safePtId}', '${fieldName}')">✏️</button>`;
       
-      // --- SRS Status Badge for Enrolled Sections ---
+      // --- SRS Status Badges for Enrolled Section Modes ---
       let srsBadgeHtml = "";
-      const cardSrs = getVirtualSRS(point, label);
-      if (cardSrs && Array.isArray(cardSrs)) {
+      [
+        { mode: 'standard', prefix: '' },
+        { mode: 'back', prefix: '🔄 ' },
+        { mode: 'image', prefix: '🖼️ ' }
+      ].forEach(({ mode, prefix }) => {
+        const srsKey = getSrsKey(label, mode);
+        const cardSrs = getVirtualSRS(point, srsKey);
+        if (!cardSrs || !Array.isArray(cardSrs)) return;
+
+        const safeKey = srsKey.replace(/'/g, "\\'");
         const srsInterval = Number(cardSrs[0]) || 0;
         const srsDue = Number(cardSrs[1]) || 0;
         const srsStreak = cardSrs.length > 2 ? (Number(cardSrs[2]) || 0) : 0;
@@ -9079,13 +9086,13 @@ document.addEventListener('keyup', (e) => {
         const leechTag = srsLapses >= 4 ? ` 🩸` : "";
 
         if (srsInterval === 0) {
-          srsBadgeHtml = `<span class="srs-status-badge srs-badge-learning" onclick="event.stopPropagation(); openSrsCardModal('${safePtId}', '${safeSecLabel}')" title="Manage SRS Card">🔥 ${srsStreak}/3${leechTag}</span>`;
+          srsBadgeHtml += `<span class="srs-status-badge srs-badge-learning" onclick="event.stopPropagation(); openSrsCardModal('${safePtId}', '${safeKey}')" title="Manage SRS Card">${prefix}🔥 ${srsStreak}/3${leechTag}</span>`;
         } else if (srsDue <= Date.now()) {
-          srsBadgeHtml = `<span class="srs-status-badge srs-badge-due" onclick="event.stopPropagation(); openSrsCardModal('${safePtId}', '${safeSecLabel}')" title="Manage SRS Card">📅 Due (${srsInterval}d)${leechTag}</span>`;
+          srsBadgeHtml += `<span class="srs-status-badge srs-badge-due" onclick="event.stopPropagation(); openSrsCardModal('${safePtId}', '${safeKey}')" title="Manage SRS Card">${prefix}📅 Due (${srsInterval}d)${leechTag}</span>`;
         } else {
-          srsBadgeHtml = `<span class="srs-status-badge srs-badge-graduated" onclick="event.stopPropagation(); openSrsCardModal('${safePtId}', '${safeSecLabel}')" title="Manage SRS Card">📅 ${srsInterval}d${leechTag}</span>`;
+          srsBadgeHtml += `<span class="srs-status-badge srs-badge-graduated" onclick="event.stopPropagation(); openSrsCardModal('${safePtId}', '${safeKey}')" title="Manage SRS Card">${prefix}📅 ${srsInterval}d${leechTag}</span>`;
         }
-      }
+      });
 
       // --- Inject the Mark All Button ONLY if Mark Mode is ON ---
       let markAllIcon = "";
@@ -10806,19 +10813,64 @@ let studySelectedSections = null;    // null = all available sections; array = e
 let activeStudyDeckLabel = "";
 let activeStudySectionSummary = "";
 
+function getStudyCardMode() {
+  return isBackToFrontMode ? 'back' : (isImageFirstMode ? 'image' : 'standard');
+}
+
+function getSrsKey(sectionLabel, mode = 'standard') {
+  if (mode === 'back') return `${sectionLabel} [Back]`;
+  if (mode === 'image') return `${sectionLabel} [Img]`;
+  return sectionLabel;
+}
+
+function parseSrsKey(srsKey) {
+  if (!srsKey) return { sectionLabel: '', mode: 'standard' };
+  if (srsKey.endsWith(' [Back]')) return { sectionLabel: srsKey.slice(0, -7), mode: 'back' };
+  if (srsKey.endsWith(' [Img]')) return { sectionLabel: srsKey.slice(0, -6), mode: 'image' };
+  return { sectionLabel: srsKey, mode: 'standard' };
+}
+
+function hasValidStudyImage(point) {
+  const imageId = point && point["Image ID"] ? String(point["Image ID"]).trim() : "";
+  return Boolean(imageId && !imageId.toLowerCase().includes("yinyangph"));
+}
+
+window.onStudySettingsModeToggle = function(changedId) {
+  const backCb = document.getElementById('backToFrontToggle');
+  const imgCb = document.getElementById('imageFirstToggle');
+  if (changedId === 'backToFrontToggle' && backCb.checked) imgCb.checked = false;
+  if (changedId === 'imageFirstToggle' && imgCb.checked) backCb.checked = false;
+  isBackToFrontMode = backCb.checked;
+  isImageFirstMode = imgCb.checked;
+  renderStudySourceAndSections();
+};
+
 function syncStudyCardModeSelect() {
   const sel = document.getElementById("studyCardModeSelect");
   if (!sel) return;
-  sel.value = isBackToFrontMode ? "back" : (isImageFirstMode ? "image" : "standard");
+  sel.style.display = (studyDeckScope === 'global') ? 'none' : 'inline-block';
+  sel.value = getStudyCardMode();
 }
 
 window.changeStudyCardMode = function(mode) {
   const sel = document.getElementById("studyCardModeSelect");
   if (sel) sel.blur();
+  const prevBack = isBackToFrontMode;
+  const prevImg = isImageFirstMode;
   isBackToFrontMode = (mode === "back");
   isImageFirstMode = (mode === "image");
-  renderCurrentStudyCard();
-  saveSessionLocal();
+
+  if (studyDeckScope === 'global') {
+    renderCurrentStudyCard();
+    saveSessionLocal();
+  } else {
+    const launched = openStudyModal(isCramMode, true);
+    if (launched === false) {
+      isBackToFrontMode = prevBack;
+      isImageFirstMode = prevImg;
+      syncStudyCardModeSelect();
+    }
+  }
 };
 
 window.toggleStudyAutoRevealImage = function() {
@@ -10923,28 +10975,30 @@ function openStudySettingsModal() {
 
     if (!channelStats[cKey]) channelStats[cKey] = { due: 0, total: 0, sections: {} };
     
-    // Iterate in canonical TCM_SECTIONS order so sections appear consistently
+    // Iterate in canonical TCM_SECTIONS order across enrolled modes only (lazy-enrolled)
     TCM_SECTIONS.forEach(secObj => {
-      const section = secObj.label;
-      if (!srsData.hasOwnProperty(section)) return;
-      let cardSrs = getVirtualSRS(p, section);
-      if (cardSrs) {
-        const isDue = (cardSrs[0] === 0 || cardSrs[1] <= now);
-        channelStats[cKey].total++;
-        if (isDue) channelStats[cKey].due++;
+      ['standard', 'back', 'image'].forEach(mode => {
+        const srsKey = getSrsKey(secObj.label, mode);
+        if (!srsData.hasOwnProperty(srsKey)) return;
+        let cardSrs = getVirtualSRS(p, srsKey);
+        if (cardSrs) {
+          const isDue = (cardSrs[0] === 0 || cardSrs[1] <= now);
+          channelStats[cKey].total++;
+          if (isDue) channelStats[cKey].due++;
 
-        if (!channelStats[cKey].sections[section]) {
-          channelStats[cKey].sections[section] = { due: 0, total: 0 };
-        }
-        channelStats[cKey].sections[section].total++;
-        if (isDue) channelStats[cKey].sections[section].due++;
+          if (!channelStats[cKey].sections[srsKey]) {
+            channelStats[cKey].sections[srsKey] = { due: 0, total: 0 };
+          }
+          channelStats[cKey].sections[srsKey].total++;
+          if (isDue) channelStats[cKey].sections[srsKey].due++;
 
-        if (!globalSectionTotals[section]) {
-          globalSectionTotals[section] = { due: 0, total: 0 };
+          if (!globalSectionTotals[srsKey]) {
+            globalSectionTotals[srsKey] = { due: 0, total: 0 };
+          }
+          globalSectionTotals[srsKey].total++;
+          if (isDue) globalSectionTotals[srsKey].due++;
         }
-        globalSectionTotals[section].total++;
-        if (isDue) globalSectionTotals[section].due++;
-      }
+      });
     });
   });
 
@@ -11205,17 +11259,20 @@ function renderStudySourceAndSections() {
     });
   }
 
-  // 2. Section Pills with Live Due Counts for Active Source
+  // 2. Section Pills with Live Due Counts for Active Source & Mode
   const activeContextList = getActiveStudySourcePoints();
+  const activeMode = getStudyCardMode();
   const availableSections = getAvailableSectionsForPoints(activeContextList);
   const sectionDueCounts = {};
 
   availableSections.forEach(sec => {
     let due = 0;
+    const srsKey = getSrsKey(sec.label, activeMode);
     activeContextList.forEach(p => {
+      if (activeMode === 'image' && !hasValidStudyImage(p)) return;
       const val = p[sec.key] || p[sec.altKey] || "";
       if (val && String(val).trim() !== "") {
-        const cardSrs = getVirtualSRS(p, sec.label);
+        const cardSrs = getVirtualSRS(p, srsKey);
         if (!cardSrs || cardSrs[0] === 0 || cardSrs[1] <= now) due++;
       }
     });
@@ -11262,10 +11319,11 @@ function renderStudySourceAndSections() {
   let singleDueCount = 0;
 
   activeContextList.forEach(p => {
+    if (activeMode === 'image' && !hasValidStudyImage(p)) return;
     sectionsToUse.forEach(sec => {
       const val = p[sec.key] || p[sec.altKey] || "";
       if (val && String(val).trim() !== "") {
-        const cardSrs = getVirtualSRS(p, sec.label);
+        const cardSrs = getVirtualSRS(p, getSrsKey(sec.label, activeMode));
         if (!cardSrs || cardSrs[0] === 0 || cardSrs[1] <= now) {
           currentDueCount++;
           if (singlePointId && p["Short Name"] === singlePointId) singleDueCount++;
@@ -11399,8 +11457,9 @@ function startStudyFromSettings(scope) {
       showToast("Please select at least one section.");
       return;
     }
+    const modeTag = isBackToFrontMode ? " • Text 1st" : (isImageFirstMode ? " • Img 1st" : "");
     activeStudyDeckLabel = (scope === 'single' && srcPts[0]) ? srcPts[0]["Short Name"] : getCurrentStudySourceLabel();
-    activeStudySectionSummary = getStudySectionSummary(srcPts);
+    activeStudySectionSummary = getStudySectionSummary(srcPts) + modeTag;
   }
 
   confirmStudyLaunch(true);
@@ -11451,23 +11510,27 @@ function openGlobalReview(forceCram = false, forceRestart = false) {
     let srsData = {};
     try { srsData = JSON.parse(p["SRS Data"]); } catch(e) { return; }
     
-    Object.keys(srsData).forEach(section => {
-      let comboKey = cKey + "||" + section;
+    Object.keys(srsData).forEach(srsKey => {
+      let comboKey = cKey + "||" + srsKey;
       if (globalActiveChannels.length > 0 && !globalActiveChannels.includes(comboKey) && !globalActiveChannels.includes(cKey)) return;
 
-      let cardSrs = getVirtualSRS(p, section); 
+      let cardSrs = getVirtualSRS(p, srsKey); 
       if (!cardSrs) return;
       
-      let sectionConfig = TCM_SECTIONS.find(s => s.label === section);
+      let { sectionLabel, mode } = parseSrsKey(srsKey);
+      let sectionConfig = TCM_SECTIONS.find(s => s.label === sectionLabel);
       if (!sectionConfig) return;
+      if (mode === 'image' && !hasValidStudyImage(p)) return;
       let val = p[sectionConfig.key] || p[sectionConfig.altKey] || "";
       
       if (val && String(val).trim() !== "") {
         let cardObj = { 
           point: p, 
-          sectionLabel: section, 
+          sectionLabel: sectionLabel, 
+          srsKey: srsKey,
+          mode: mode,
           content: val, 
-          cardId: p["Short Name"] + "::" + section,
+          cardId: p["Short Name"] + "::" + srsKey,
           streak: cardSrs && cardSrs.length > 2 ? Number(cardSrs[2]) || 0 : 0
         };
         
@@ -11528,19 +11591,24 @@ function openStudyModal(forceCram = false, forceRestart = false) {
   const now = Date.now();
   const order = document.getElementById("studyOrderSelect").value;
   const isBrowseMode = (order === "browse");
+  const activeMode = getStudyCardMode();
 
   sourcePoints.forEach(p => {
+    if (activeMode === 'image' && !hasValidStudyImage(p)) return;
     sectionsToUse.forEach(sec => {
       let val = p[sec.key] || p[sec.altKey] || "";
       if (val && String(val).trim() !== "") {
         
-let cardSrs = getVirtualSRS(p, sec.label);
+let srsKey = getSrsKey(sec.label, activeMode);
+let cardSrs = getVirtualSRS(p, srsKey);
 
 let cardObj = {
   point: p,
   sectionLabel: sec.label,
+  srsKey: srsKey,
+  mode: activeMode,
   content: val,
-  cardId: p["Short Name"] + "::" + sec.label,
+  cardId: p["Short Name"] + "::" + srsKey,
   streak: cardSrs && cardSrs.length > 2
     ? Number(cardSrs[2]) || 0
     : 0
@@ -11558,7 +11626,10 @@ if (isDue) dueDeck.push(cardObj);
     });
   });
 
-  if (allDeck.length === 0) { showToast("No cards available for the current section filters."); return; }
+  if (allDeck.length === 0) {
+    showToast(activeMode === 'image' ? "No cards with images available for these filters." : "No cards available for the current section filters.");
+    return false;
+  }
 
   if (dueDeck.length === 0 && !forceCram && !isBrowseMode) {
     activeChunk = [];
@@ -11934,22 +12005,23 @@ function resumeSessionLocal(scopeToMatch) {
    // Rebuild the card objects from the saved IDs
     const rebuildCard = (savedCard) => {
       let cardId = typeof savedCard === 'string' ? savedCard : savedCard.id;
-      let [pointId, sectionLabel] = cardId.split("::");
+      let [pointId, srsKey] = cardId.split("::");
       let p = points.find(x => x["Short Name"] === pointId);
       if (!p) return null;
+      let { sectionLabel, mode } = parseSrsKey(srsKey);
       let sectionConfig = TCM_SECTIONS.find(s => s.label === sectionLabel);
       if (!sectionConfig) return null;
       let val = p[sectionConfig.key] || p[sectionConfig.altKey] || "";
       if (!val || String(val).trim() === "") return null;
       
-      let obj = { point: p, sectionLabel: sectionLabel, content: val, cardId: cardId };
+      let obj = { point: p, sectionLabel: sectionLabel, srsKey: srsKey, mode: mode, content: val, cardId: cardId };
       
       if (typeof savedCard === 'object' && 'streak' in savedCard) {
         // Restore live, mid-session progress for cards currently in your active hand
         obj.streak = savedCard.streak;
       } else {
         // Look up the true database state for cards waiting in the pending deck
-        let cardSrs = getVirtualSRS(p, sectionLabel);
+        let cardSrs = getVirtualSRS(p, srsKey);
         obj.streak = cardSrs && cardSrs.length > 2 ? Number(cardSrs[2]) || 0 : 0;
       }
       
@@ -12017,7 +12089,7 @@ function keepStudying() {
      );
      if (lastAction && lastAction.rating === 'swipe-strong') return;
 
-     let currentState = getVirtualSRS(cardData.point, cardData.sectionLabel);
+     let currentState = getVirtualSRS(cardData.point, cardData.srsKey || cardData.sectionLabel);
 
      let isDue = true;
      if (currentState) {
@@ -12096,7 +12168,7 @@ function renderCurrentStudyCard() {
   progress.style.width = ((completedCards / studyDeck.length) * 100) + "%";
   
   let activeCard = isBrowseMode ? studyDeck[currentStudyIndex] : activeChunk[currentStudyIndex];
-  let activeSrs = activeCard ? getVirtualSRS(activeCard.point, activeCard.sectionLabel) : null;
+  let activeSrs = activeCard ? getVirtualSRS(activeCard.point, activeCard.srsKey || activeCard.sectionLabel) : null;
   let activeLapses = activeSrs && activeSrs.length > 3 ? Number(activeSrs[3]) || 0 : 0;
   let leechBadge = activeLapses >= 4 ? `<span style="color:#ff3b30; margin-left:8px;">🩸 Leech (${activeLapses})</span>` : "";
   let streakHtml = !isBrowseMode && activeCard ? `<span style="color:#34c759; margin-left: 10px;">Streak: ${activeCard.streak}/3</span>${leechBadge}` : "";
@@ -12148,6 +12220,9 @@ function renderCurrentStudyCard() {
 
   // 3. RENDER NORMAL CARD
   const cardData = isBrowseMode ? studyDeck[currentStudyIndex] : activeChunk[currentStudyIndex];
+  const cardMode = cardData.mode || getStudyCardMode();
+  const cardIsBackToFront = (cardMode === 'back');
+  const cardIsImageFirst = (cardMode === 'image');
   renderStudyOccBar(cardData.point);
   renderStudyHintBar(isBrowseMode, false);
   
@@ -12160,7 +12235,7 @@ function renderCurrentStudyCard() {
   let fullName = cardData.point["Full Name"] || cardData.point[" Full Name"] || "";
 
   // Mask self-spoilers on the front face in Back-to-Front mode
-  if (isBackToFrontMode) {
+  if (cardIsBackToFront) {
     let spoilerTerms = expandTCMPoint(cardData.point["Short Name"].toLowerCase());
     if (fullName) {
       fullName.split(/[()]/).map(s => s.trim().toLowerCase()).forEach(part => {
@@ -12214,7 +12289,7 @@ function renderCurrentStudyCard() {
   let frontInnerHtml = "";
   let backInnerHtml = "";
 
-  if (isBackToFrontMode) {
+  if (cardIsBackToFront) {
     // BACK-TO-FRONT: Scrollable section text on Front, Point Name + Image on Back
     frontFaceStyle = "padding: 0; justify-content: flex-start; align-items: stretch; text-align: left;";
     backFaceStyle = "justify-content: center; align-items: center; padding: 30px; text-align: center; overflow-y: auto;";
@@ -12238,7 +12313,7 @@ function renderCurrentStudyCard() {
     `;
   } else {
     // STANDARD OR IMAGE-FIRST: Prompt on Front, Scrollable section text on Back
-    if (isImageFirstMode && hasValidImage) {
+    if (cardIsImageFirst && hasValidImage) {
       let imgSrc = getImagePath(cardData.point);
       frontInnerHtml = `
         <img src="${imgSrc}" style="max-width: 100%; max-height: 220px; border-radius: 8px; border: 1px solid #d1d1d6; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); object-fit: contain; pointer-events: none;">
@@ -12600,8 +12675,10 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
   let deltaX = e.changedTouches[0].screenX - studyTouchStartX;
   let deltaY = e.changedTouches[0].screenY - studyTouchStartY;
   
+  const activeCardObj = getActiveStudyCardObject();
+  const cardIsBackToFront = activeCardObj ? (activeCardObj.mode === 'back') : isBackToFrontMode;
   const isBack = e.target.closest('.study-face-back');
-  const scrollWrapper = e.target.closest('.study-back-content-wrapper') || (isBackToFrontMode ? isBack : null);
+  const scrollWrapper = e.target.closest('.study-back-content-wrapper') || (cardIsBackToFront ? isBack : null);
   const isBrowseMode = document.getElementById("studyOrderSelect").value === "browse";
 
   if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
@@ -12623,7 +12700,7 @@ document.getElementById("studyCardContainer").addEventListener('touchend', (e) =
       if (isBrowseMode) prevBrowseCard(); else undoLastStudyCard();
     }
   } else if (!isBrowseMode) {
-    const isNotesSide = isBackToFrontMode ? !isBack : isBack;
+    const isNotesSide = cardIsBackToFront ? !isBack : isBack;
     const threshold = isNotesSide ? 180 : 60; 
     if (deltaY < -threshold) rateCard('swipe-strong');  
     else if (deltaY > threshold) rateCard('swipe-wrong'); 
