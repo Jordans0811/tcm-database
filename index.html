@@ -2772,7 +2772,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.21.26.v1";
+const APP_VERSION = "11.21.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3046,6 +3046,7 @@ async function loadTCMData(hasLocalData) {
     
     if (serverVersion && serverVersion === localVersion) {
       console.log("Data is identical. No update needed.");
+      if (typeof syncStudySessionFromMetaData === "function") syncStudySessionFromMetaData();
       if (typeof flushSearchHistoryCloudSync === "function") flushSearchHistoryCloudSync();
       if (typeof flushStudySessionCloudSync === "function") flushStudySessionCloudSync();
       return; 
@@ -3226,6 +3227,7 @@ async function bootApp() {
   if (rawPoints.length > 0) {
     // We have data! Render instantly without flashing a loading message.
     points = processPoints(rawPoints);
+    if (typeof syncStudySessionFromMetaData === "function") syncStudySessionFromMetaData();
     initDropdown();
     handleSearch(); 
   } else {
@@ -11097,6 +11099,7 @@ function openStudySettingsModal() {
 
   // 3. Reset to active view on open, then render Paused Banner + Source & Section Pills
   studySelectedPinnedQuery = null;
+  if (typeof syncStudySessionFromMetaData === "function") syncStudySessionFromMetaData();
   renderStudyResumeBanner();
   renderStudySourceAndSections();
 
