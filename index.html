@@ -2772,7 +2772,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.21.26.v2";
+const APP_VERSION = "11.21.26.v3";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -11104,6 +11104,12 @@ function openStudySettingsModal() {
   renderStudySourceAndSections();
 
   document.getElementById('studySettingsModal').style.display = 'flex';
+
+  // Silently check for newer cloud updates (e.g., if Cloudflare finished propagating right after switching devices)
+  if (navigator.onLine && isAppBooted && (!window._lastStudySettingsSyncCheck || Date.now() - window._lastStudySettingsSyncCheck > 3000)) {
+    window._lastStudySettingsSyncCheck = Date.now();
+    loadTCMData(points.length > 0);
+  }
 }
 
 window.toggleStudyBuilderBox = function(bodyId, headerEl) {
@@ -12184,6 +12190,10 @@ function clearSavedSessionAndSync() {
   const now = Date.now();
   localStorage.removeItem('tcm_saved_session');
   try { localStorage.setItem('tcm_saved_session_cleared_at', String(now)); } catch (e) {}
+  if (lastSyncedStudySessionSig === "CLEARED") {
+    const rawCloud = window.tcmMetaDataRow ? window.tcmMetaDataRow[SAVED_SESSION_FIELD] : "";
+    if (rawCloud && !rawCloud.includes('"cleared":true')) setStudySessionCloudSig("");
+  }
   setStudySessionDirty(true);
   flushStudySessionCloudSync();
 }
@@ -12868,6 +12878,24 @@ async function syncSRSData() {
     return { id: id, field: "SRS Data", value: pointsToSave[id] };
   });
 
+  let bundledSessionSig = null;
+  let bundledSessionStr = null;
+  if (hasUnsyncedStudySessionChanges && window.tcmMetaDataRow) {
+    const sessPayload = getCurrentLocalCloudSessionPayload();
+    if (sessPayload) {
+      const sig = getStudySessionSyncSig(sessPayload);
+      if (sig !== lastSyncedStudySessionSig) {
+        bundledSessionSig = sig;
+        bundledSessionStr = JSON.stringify(sessPayload);
+        cloudPayload.push({
+          id: window.tcmMetaDataRow["Short Name"],
+          field: SAVED_SESSION_FIELD,
+          value: bundledSessionStr
+        });
+      }
+    }
+  }
+
   try {
     const resp = await fetch(writeUrl, {
       method: "POST",
@@ -12885,6 +12913,13 @@ async function syncSRSData() {
         p["SRS Data"] = pointsToSave[pointId];
         await saveSinglePointToVault(p);
       }
+    }
+
+    if (bundledSessionStr !== null && window.tcmMetaDataRow) {
+      window.tcmMetaDataRow[SAVED_SESSION_FIELD] = bundledSessionStr;
+      await saveSinglePointToVault(window.tcmMetaDataRow);
+      setStudySessionCloudSig(bundledSessionSig);
+      setStudySessionDirty(false);
     }
 
     // 2. SAFELY FILTER out only the updates we just saved
