@@ -54,6 +54,14 @@
         background: #ffffff; border: 1px solid #d1d1d6; border-radius: 8px;
         padding: 7px 8px; display: flex; flex-direction: column; gap: 4px;
       }
+      .hub-prog-track {
+        width: 100%; height: 5px; background: #e5e5ea; border-radius: 4px; overflow: hidden;
+      }
+      .hub-prog-fill {
+        height: 100%; background: #34c759; border-radius: 4px; transition: width 0.25s ease;
+      }
+      .hub-prog-fill.hy { background: #cc5500; }
+      .hub-btn-row { display: flex; gap: 4px; margin-top: auto; flex-wrap: wrap; }
       .hub-mini-btn {
         border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px;
         font-weight: 800; cursor: pointer; background: #e3e3e8; color: #007aff;
@@ -61,6 +69,10 @@
       }
       .hub-mini-btn:active { transform: scale(0.95); }
       .hub-mini-btn.primary { background: #cc5500; color: #ffffff; }
+      .quiz-assisted-pill {
+        background: rgba(255, 149, 0, 0.14); color: #cc5500; border: 1px solid rgba(204, 85, 0, 0.35);
+        border-radius: 8px; padding: 5px 9px; font-size: 12px; font-weight: 700;
+      }
       .hub-weak-list {
         display: flex; flex-direction: column; gap: 5px;
         max-height: 150px; overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -272,8 +284,11 @@
         .hub-card-title { color: #ff9f0a; }
         .hub-card-sub { color: #aeaeb2; }
         .hub-track-box, .hub-weak-row { background: #2c2c2e; border-color: #38383a; color: #f2f2f7; }
+        .hub-prog-track { background: #3a3a3c; }
+        .hub-prog-fill.hy { background: #ff9f0a; }
         .hub-mini-btn { background: #3a3a3c; color: #0a84ff; }
         .hub-mini-btn.primary { background: #ff9f0a; color: #000000; }
+        .quiz-assisted-pill { background: rgba(255, 159, 10, 0.2); color: #ff9f0a; border-color: rgba(255, 159, 10, 0.4); }
         .hub-weak-name { color: #64b5f6; }
         .quiz-top-bar, .quiz-settings-panel, .quiz-bottom-bar { background: #1c1c1e; border-color: #38383a; }
         .quiz-subtoolbar { background: #121214; border-color: #38383a; }
@@ -403,8 +418,11 @@
               <option value="15">15 Cards per Batch</option>
               <option value="20">20 Cards per Batch</option>
               <option value="25">25 Cards per Batch</option>
-              <option value="weakest_15">🔥 Weakest 15 (Most Missed)</option>
-              <option value="weakest_all">🔥 All Previously Missed</option>
+              <option value="50">50 Cards (Exam Stamina)</option>
+              <option value="weakest_15">🔥 Active Weakest 15</option>
+              <option value="weakest_all">🔥 All Active Weak</option>
+              <option value="stale_15">⏳ Stale / Due for Retest (15)</option>
+              <option value="hy_unseen">⭐ High-Yield Unmastered (!! / !!!)</option>
             </select>
             <button class="quiz-pill-btn" style="flex:1; padding:9px;" onclick="openQuizDistractorModal()">🛡️ Answer Pool</button>
           </div>
@@ -420,6 +438,10 @@
             <label style="font-size:13px; font-weight:700; color:#666; display:flex; align-items:center; gap:8px; cursor:pointer;">
               <input type="checkbox" id="qzMasteryRequeueToggle" checked onchange="window.onQuizSettingToggle('requeue', this.checked)">
               🔁 Re-queue missed cards in batch
+            </label>
+            <label style="font-size:13px; font-weight:700; color:#cc5500; display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input type="checkbox" id="qzBoardSimToggle" onchange="window.onQuizSettingToggle('boardSim', this.checked)">
+              🎯 Board Sim (4 opts, Hard, No Clues, Timed)
             </label>
             <button class="quiz-pill-btn" style="background:#cc5500; color:#fff; margin-left:auto;" onclick="toggleQuizSettings()">Done</button>
           </div>
@@ -438,7 +460,7 @@
             <div class="quiz-q-body" id="qzQuestionBody"></div>
           </div>
 
-          <button class="quiz-main-action-btn secondary" id="qzRevealBtn" onclick="revealQuizOptions()" style="display:none;">Reveal Options 👁️ <span style="font-size:12px; font-weight:600; opacity:0.8;">(Space)</span></button>
+          <button class="quiz-main-action-btn secondary" id="qzRevealBtn" onclick="revealQuizOptions()" style="display:none;">Recall Answer &amp; Why ➔ Reveal Options 👁️ <span style="font-size:12px; font-weight:600; opacity:0.8;">(Space)</span></button>
 
           <div class="quiz-options-grid" id="qzOptionsGrid"></div>
 
@@ -561,6 +583,8 @@
   let qzRequireReveal = true;
   let qzShowDigest = true;
   let qzMasteryRequeue = true;
+  let qzBoardSim = false;
+  let qzDifficultyBeforeSim = "medium";
 
   try {
     const savedPrefs = JSON.parse(localStorage.getItem("tcmQuizPrefs") || "{}");
@@ -585,46 +609,174 @@
   let currentQuestionSubMode = "";
   let currentPathologySubLabel = "";
   let lastAnswerWasCorrect = false;
+  let usedClueThisQuestion = false;
   let currentPickedWrongPointId = null;
   let currentContrastPointId = null;
   let currentDecoySourceNote = null;
   let currentClueQueue = [];
   let qzScore = 0;
   let qzTotalAnswered = 0;
+  let qzSimStartTime = 0;
+  let qzSimTimerInterval = null;
   let pendingCaseChainTarget = null;
+
+  const QUIZ_DAY_MS = 86400000;
+  const QUIZ_SKILL_LABELS = {
+    vignette: "🩺 Vignettes",
+    case_chain: "🩺➡️🌿 2-Step Case",
+    cardinal_triad: "🎯 Cardinal Triads",
+    differential: "⚖️ Sibling Diff",
+    tongue_pulse: "👅 Tongue & Pulse",
+    tx_prescription: "🌿 Tx & Formula",
+    rx_rationale: "📍 Rx Rationales",
+    pathology_chain: "🔗 Pathology/Evol",
+    fitb_pattern: "📝 Pattern FITB",
+    both_mcq: "⚡ Clinical Mix",
+    actions_mcq: "🎯 Point Actions",
+    indications_mcq: "🩺 Indications",
+    point_categories_mcq: "🏷️ Point Categories",
+    combinations_mcq: "🔗 Combinations",
+    needling_cautions_mcq: "⚠️ Needling/Safety",
+    anatomy_biomed_mcq: "🦴 Biomed Anatomy",
+    except_mcq: "🚫 Odd-Out (EXCEPT)",
+    fitb_clinical: "📝 Clinical FITB",
+    standard: "📍 Location MCQ",
+    fitb: "📝 Location FITB"
+  };
+
+  function normalizeSkillKey(subMode) {
+    if (!subMode) return "";
+    if (subMode === "case_chain_step1") return "case_chain";
+    if (subMode === "standard_location") return "standard";
+    if (subMode === "fitb_location") return "fitb";
+    return subMode;
+  }
 
   function getQuizMasteryKey(track = currentTrack) {
     return `tcmQuizMastery_${track}`;
   }
+  function getQuizSkillsKey(track = currentTrack) {
+    return `tcmQuizSkills_${track}`;
+  }
   function loadQuizMastery(track = currentTrack) {
     try { return JSON.parse(localStorage.getItem(getQuizMasteryKey(track)) || "{}"); } catch (e) { return {}; }
   }
-  function recordQuizMasteryResult(pointId, wasCorrect) {
+  function loadQuizSkills(track = currentTrack) {
+    try { return JSON.parse(localStorage.getItem(getQuizSkillsKey(track)) || "{}"); } catch (e) { return {}; }
+  }
+
+  // Rolling mastery helpers (2+ consecutive cold hits = mastered; >14d = stale; m>0 && s<2 = active weak)
+  function isCardCurrentlyWeak(st) {
+    if (!st) return false;
+    const m = Number(st.m || 0);
+    const s = Number(st.s || 0);
+    return m > 0 && s < 2;
+  }
+  function isCardMastered(st, now = Date.now()) {
+    if (!st) return false;
+    const s = Number(st.s || 0);
+    const lt = Number(st.lt || 0);
+    if (s >= 2) return lt === 0 || (now - lt) <= 21 * QUIZ_DAY_MS;
+    // Backward compatibility for legacy records with no streak field yet
+    const a = Number(st.a || 0), m = Number(st.m || 0);
+    return st.s === undefined && a >= 2 && m === 0;
+  }
+  function isCardStale(st, now = Date.now()) {
+    if (!st) return false;
+    const s = Number(st.s || 0);
+    const lt = Number(st.lt || 0);
+    if (lt === 0) return false;
+    const ageDays = (now - lt) / QUIZ_DAY_MS;
+    return (s >= 2 && ageDays >= 14) || (s === 1 && ageDays >= 7);
+  }
+
+  function recordQuizMasteryResult(pointId, wasCorrect, usedClue = false, subModeKey = "") {
     if (!pointId) return;
+    const now = Date.now();
     const map = loadQuizMastery(currentTrack);
-    const rec = map[pointId] || { a: 0, m: 0, lm: 0 };
-    rec.a += 1;
-    if (!wasCorrect) {
-      rec.m += 1;
-      rec.lm = Date.now();
+    const rec = map[pointId] || { a: 0, m: 0, lm: 0, s: 0, lt: 0, c: 0 };
+    rec.lt = now;
+
+    if (wasCorrect && usedClue) {
+      // Assisted hit: log separately so cold accuracy & mastery streaks aren't inflated
+      rec.c = Number(rec.c || 0) + 1;
+      rec.s = Math.min(Number(rec.s || 0), 1);
+    } else {
+      rec.a = Number(rec.a || 0) + 1;
+      if (wasCorrect) {
+        rec.s = Number(rec.s || 0) + 1;
+      } else {
+        rec.m = Number(rec.m || 0) + 1;
+        rec.lm = now;
+        rec.s = 0;
+      }
+
+      const normSkill = normalizeSkillKey(subModeKey || currentQuestionSubMode || qzSubMode);
+      if (normSkill) {
+        const sMap = loadQuizSkills(currentTrack);
+        const sRec = sMap[normSkill] || { a: 0, m: 0 };
+        sRec.a += 1;
+        if (!wasCorrect) sRec.m += 1;
+        sMap[normSkill] = sRec;
+        try { localStorage.setItem(getQuizSkillsKey(currentTrack), JSON.stringify(sMap)); } catch (e) {}
+      }
     }
+
     map[pointId] = rec;
     try { localStorage.setItem(getQuizMasteryKey(currentTrack), JSON.stringify(map)); } catch (e) {}
+  }
+
+  function stopBoardSimTimer() {
+    if (qzSimTimerInterval) {
+      clearInterval(qzSimTimerInterval);
+      qzSimTimerInterval = null;
+    }
+  }
+
+  function formatSimElapsed(ms) {
+    const secs = Math.max(0, Math.floor(ms / 1000));
+    const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+    const ss = String(secs % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
   }
 
   function syncQuizSettingCheckboxes() {
     const revEl = document.getElementById("qzRequireRevealToggle");
     const digEl = document.getElementById("qzShowDigestToggle");
     const reqEl = document.getElementById("qzMasteryRequeueToggle");
+    const simEl = document.getElementById("qzBoardSimToggle");
     if (revEl) revEl.checked = qzRequireReveal;
     if (digEl) digEl.checked = qzShowDigest;
     if (reqEl) reqEl.checked = qzMasteryRequeue;
+    if (simEl) simEl.checked = qzBoardSim;
   }
 
   window.onQuizSettingToggle = function (settingKey, isChecked) {
     if (settingKey === "reveal") qzRequireReveal = Boolean(isChecked);
     else if (settingKey === "digest") qzShowDigest = Boolean(isChecked);
     else if (settingKey === "requeue") qzMasteryRequeue = Boolean(isChecked);
+    else if (settingKey === "boardSim") {
+      qzBoardSim = Boolean(isChecked);
+      const diffEl = document.getElementById("qzDifficultySelect");
+      if (qzBoardSim) {
+        if (!qzSubMode.startsWith("fitb")) {
+          qzDifficultyBeforeSim = qzDifficulty;
+          qzDifficulty = "hard";
+          if (diffEl) diffEl.value = "hard";
+        }
+        const limEl = document.getElementById("qzLimitSelect");
+        if (limEl && (limEl.value === "10" || limEl.value === "15")) limEl.value = "25";
+        if (typeof showToast === "function") showToast("🎯 Board Sim ON: 4 options, Hard, No Clues, Timed");
+      } else {
+        stopBoardSimTimer();
+        if (!qzSubMode.startsWith("fitb") && qzDifficultyBeforeSim) {
+          qzDifficulty = qzDifficultyBeforeSim;
+          if (diffEl) diffEl.value = qzDifficulty;
+        }
+      }
+      retakeQuizWholePool();
+      return;
+    }
 
     try {
       localStorage.setItem("tcmQuizPrefs", JSON.stringify({
@@ -1353,87 +1505,180 @@
       const now = Date.now();
       let srsDue = 0, srsTotal = 0, leechCount = 0;
       const leechItems = [];
+      const pointsById = new Map();
 
+      const trackMeta = [
+        { key: "patterns", icon: "☯️", label: "Patterns", data: loadQuizMastery("patterns"), skills: loadQuizSkills("patterns"), ids: new Set(), hyIds: new Set() },
+        { key: "clinical_points", icon: "⚡", label: "Act/Ind", data: loadQuizMastery("clinical_points"), skills: loadQuizSkills("clinical_points"), ids: new Set(), hyIds: new Set() },
+        { key: "location", icon: "📍", label: "Location", data: loadQuizMastery("location"), skills: loadQuizSkills("location"), ids: new Set(), hyIds: new Set() }
+      ];
+      const srsModes = ["standard", "back", "image"];
+
+      // Single O(N) pass: index points, count all SRS modes ([Back]/[Img] included), and tally track/high-yield totals
       points.forEach(p => {
+        const sn = String(p["Short Name"] || "").trim();
+        if (!sn) return;
+        if (!pointsById.has(sn)) pointsById.set(sn, p);
+
+        const isNoQuiz = /#noquiz\b/i.test(String(p["Notes"] || ""));
+        if (!isNoQuiz) {
+          const imp = String(p.Important || "").trim();
+          const isHY = (imp === "!!" || imp === "!!!");
+          const cm = String(p["Clinical Manifestations"] || "").trim();
+          const loc = String(p["Location "] || p["Location"] || "").trim();
+
+          if (cm !== "" && !/\bNormal\s+Menses\s*:/i.test(cm)) {
+            trackMeta[0].ids.add(sn);
+            if (isHY) trackMeta[0].hyIds.add(sn);
+          } else if (loc && loc.toLowerCase() !== sn.toLowerCase()) {
+            trackMeta[2].ids.add(sn);
+            if (isHY) trackMeta[2].hyIds.add(sn);
+            if ((p["Actions"] && String(p["Actions"]).trim()) ||
+                (p["Indications"] && String(p["Indications"]).trim()) ||
+                (p["Combinations"] && String(p["Combinations"]).trim())) {
+              trackMeta[1].ids.add(sn);
+              if (isHY) trackMeta[1].hyIds.add(sn);
+            }
+          }
+        }
+
         if (!p["SRS Data"]) return;
         try {
           const srs = JSON.parse(p["SRS Data"]);
           TCM_SECTIONS.forEach(sec => {
-            const st = typeof getVirtualSRS === "function" ? getVirtualSRS(p, sec.label) : srs[sec.label];
-            if (st && Array.isArray(st)) {
-              srsTotal++;
-              if (st[0] === 0 || st[1] <= now) srsDue++;
-              const lapses = st.length > 3 ? (Number(st[3]) || 0) : 0;
-              if (lapses >= 4) {
-                leechCount++;
-                leechItems.push({ id: p["Short Name"], section: sec.label, lapses, interval: Number(st[0]) || 0 });
+            srsModes.forEach(mode => {
+              const sKey = typeof getSrsKey === "function"
+                ? getSrsKey(sec.label, mode)
+                : (mode === "standard" ? sec.label : (mode === "back" ? `${sec.label} [Back]` : `${sec.label} [Img]`));
+              if (!srs.hasOwnProperty(sKey)) return;
+              const st = typeof getVirtualSRS === "function" ? getVirtualSRS(p, sKey) : srs[sKey];
+              if (st && Array.isArray(st)) {
+                srsTotal++;
+                if (st[0] === 0 || st[1] <= now) srsDue++;
+                const lapses = st.length > 3 ? (Number(st[3]) || 0) : 0;
+                if (lapses >= 4) {
+                  leechCount++;
+                  leechItems.push({ id: sn, section: sKey, lapses, interval: Number(st[0]) || 0 });
+                }
               }
-            }
+            });
           });
         } catch (e) {}
       });
       leechItems.sort((a, b) => b.lapses - a.lapses);
 
-      const trackMeta = [
-        { key: "patterns", icon: "☯️", label: "Patterns", data: loadQuizMastery("patterns") },
-        { key: "clinical_points", icon: "⚡", label: "Act/Ind", data: loadQuizMastery("clinical_points") },
-        { key: "location", icon: "📍", label: "Location", data: loadQuizMastery("location") }
-      ];
-
-      const channelMissMap = {};
-      const missedItemList = [];
+      const channelWeakMap = {};
+      const activeWeakList = [];
+      const skillWeakList = [];
 
       trackMeta.forEach(tm => {
-        let attempts = 0, misses = 0;
-        const entries = Object.entries(tm.data);
-        entries.forEach(([id, st]) => {
+        let attempts = 0, misses = 0, mastered = 0, hyMastered = 0, weakCount = 0, staleCount = 0;
+
+        tm.ids.forEach(id => {
+          const st = tm.data[id];
+          if (!st) return;
           const a = Number(st.a || 0);
           const m = Number(st.m || 0);
           attempts += a;
           misses += m;
-          if (m > 0) {
-            const pt = points.find(x => x["Short Name"] === id);
+
+          if (isCardMastered(st, now)) {
+            mastered++;
+            if (tm.hyIds.has(id)) hyMastered++;
+          }
+          if (isCardStale(st, now)) staleCount++;
+
+          if (isCardCurrentlyWeak(st)) {
+            weakCount++;
+            const pt = pointsById.get(id);
             const chShort = (pt && (pt["Channel Short Name"] || pt[" Channel Short Name"] || pt["Channel Full Name"])) || "Other";
             const chFull = (pt && (pt["Channel Full Name"] || pt[" Channel Full Name"])) || "Other";
             const cKey = tm.key + "||" + chFull;
-            if (!channelMissMap[cKey]) {
-              channelMissMap[cKey] = { track: tm.key, icon: tm.icon, chShort, chFull, misses: 0 };
+            if (!channelWeakMap[cKey]) {
+              channelWeakMap[cKey] = { track: tm.key, icon: tm.icon, chShort, chFull, count: 0 };
             }
-            channelMissMap[cKey].misses += m;
+            channelWeakMap[cKey].count += 1;
 
-            missedItemList.push({
+            activeWeakList.push({
               id,
               track: tm.key,
               icon: tm.icon,
               misses: m,
               attempts: a,
+              streak: Number(st.s || 0),
+              isHY: tm.hyIds.has(id),
               rate: m / Math.max(1, a),
               lastMissed: Number(st.lm || 0)
             });
           }
         });
-        tm.quizzed = entries.length;
-        tm.attempts = attempts;
-        tm.misses = misses;
+
+        Object.entries(tm.skills || {}).forEach(([sk, sRec]) => {
+          const sa = Number(sRec.a || 0), sm = Number(sRec.m || 0);
+          if (sa >= 3) {
+            const acc = Math.round(((sa - sm) / sa) * 100);
+            skillWeakList.push({
+              track: tm.key,
+              icon: tm.icon,
+              subMode: sk,
+              label: QUIZ_SKILL_LABELS[sk] || sk,
+              acc,
+              attempts: sa,
+              misses: sm
+            });
+          }
+        });
+
+        tm.total = tm.ids.size;
+        tm.hyTotal = tm.hyIds.size;
+        tm.mastered = mastered;
+        tm.masteredPct = tm.total > 0 ? Math.round((mastered / tm.total) * 100) : 0;
+        tm.hyMastered = hyMastered;
+        tm.hyPct = tm.hyTotal > 0 ? Math.round((hyMastered / tm.hyTotal) * 100) : 0;
+        tm.weakCount = weakCount;
+        tm.staleCount = staleCount;
         tm.acc = attempts > 0 ? Math.round(((attempts - misses) / attempts) * 100) : null;
       });
 
-      const weakChannels = Object.values(channelMissMap).sort((a, b) => b.misses - a.misses);
-      missedItemList.sort((a, b) => b.misses - a.misses || b.rate - a.rate || b.lastMissed - a.lastMissed);
-      const topWeakChannelsStr = weakChannels.slice(0, 3)
-        .map(w => `${w.icon} ${escapeHTML(w.chShort)} (${w.misses})`)
-        .join(", ");
+      const weakChannels = Object.values(channelWeakMap).sort((a, b) => b.count - a.count);
+      activeWeakList.sort((a, b) => (b.isHY - a.isHY) || (a.streak - b.streak) || (b.rate - a.rate) || (b.lastMissed - a.lastMissed));
+      skillWeakList.sort((a, b) => a.acc - b.acc || b.misses - a.misses);
+
+      const topWeakStr = skillWeakList.length > 0
+        ? `${skillWeakList[0].label} (${skillWeakList[0].acc}%)`
+        : (weakChannels.length > 0 ? `${weakChannels[0].icon} ${escapeHTML(weakChannels[0].chShort)} (${weakChannels[0].count} weak)` : "No active weak spots -- run a batch!");
 
       const trackCardsHtml = trackMeta.map(tm => `
         <div class="hub-track-box">
-          <div style="font-weight:800; font-size:12px;">${tm.icon} ${tm.label}</div>
-          <div style="font-size:11px; color:#8e8e93;">
-            <b>${tm.quizzed}</b> quizzed${tm.acc !== null ? ` • <b>${tm.acc}%</b>` : ""}<br>
-            Misses: <b>${tm.misses}</b>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:12px;">
+            <span>${tm.icon} ${tm.label}</span>
+            <span style="color:#34c759;">${tm.masteredPct}%</span>
           </div>
-          <button type="button" class="hub-mini-btn primary" style="margin-top:auto;" onclick="event.stopPropagation(); drillWeakestInTrack('${tm.key}')">🔥 Drill Weakest</button>
+          <div class="hub-prog-track"><div class="hub-prog-fill" style="width:${tm.masteredPct}%;"></div></div>
+          <div style="font-size:10.5px; color:#8e8e93; line-height:1.35;">
+            Mastered: <b>${tm.mastered}/${tm.total}</b>${tm.acc !== null ? ` • ${tm.acc}%` : ""}<br>
+            ${tm.hyTotal > 0 ? `⭐ HY: <b>${tm.hyMastered}/${tm.hyTotal}</b> (${tm.hyPct}%)<br>` : ""}
+            Weak: <b style="color:${tm.weakCount ? '#ff3b30' : '#34c759'};">${tm.weakCount}</b>${tm.staleCount ? ` • ⏳ <b>${tm.staleCount}</b>` : ""}
+          </div>
+          <div class="hub-btn-row">
+            <button type="button" class="hub-mini-btn primary" style="flex:1;" onclick="event.stopPropagation(); drillWeakestInTrack('${tm.key}')">🔥 Weak</button>
+            ${tm.staleCount > 0
+              ? `<button type="button" class="hub-mini-btn" style="flex:1;" onclick="event.stopPropagation(); drillStaleInTrack('${tm.key}')">⏳ Stale</button>`
+              : (tm.hyTotal > 0 ? `<button type="button" class="hub-mini-btn" style="flex:1;" onclick="event.stopPropagation(); drillHighYieldInTrack('${tm.key}')">⭐ HY</button>` : "")}
+          </div>
         </div>
       `).join("");
+
+      const weakSkillsHtml = skillWeakList.length > 0
+        ? skillWeakList.slice(0, 6).map(sk => `
+            <div class="hub-weak-row">
+              <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700;">
+                ${escapeHTML(sk.label)} <span style="color:${sk.acc < 75 ? '#ff3b30' : '#34c759'};">(${sk.acc}% • ${sk.attempts - sk.misses}/${sk.attempts})</span>
+              </span>
+              <button type="button" class="hub-mini-btn primary" onclick="event.stopPropagation(); drillSkillInQuiz('${sk.track}', '${sk.subMode}')">🎯 Drill</button>
+            </div>
+          `).join("")
+        : `<div style="font-size:12px; color:#8e8e93;">Answer 3+ cold questions in a mode to unlock skill diagnostics.</div>`;
 
       const weakChannelsHtml = weakChannels.length > 0
         ? weakChannels.slice(0, 8).map(w => {
@@ -1441,30 +1686,30 @@
             return `
               <div class="hub-weak-row">
                 <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700;">
-                  ${w.icon} ${escapeHTML(w.chShort)} <span style="color:#ff3b30;">(${w.misses})</span>
+                  ${w.icon} ${escapeHTML(w.chShort)} <span style="color:#ff3b30;">(${w.count} active)</span>
                 </span>
-                <button type="button" class="hub-mini-btn" onclick="event.stopPropagation(); focusChannelOnMainScreen('${safeChan}')" title="Filter main screen to this channel">🔍 View</button>
-                <button type="button" class="hub-mini-btn primary" onclick="event.stopPropagation(); drillChannelInQuiz('${w.track}', '${safeChan}')" title="Quiz this channel">🎯 Drill</button>
+                <button type="button" class="hub-mini-btn" onclick="event.stopPropagation(); focusChannelOnMainScreen('${w.track}', '${safeChan}')" title="Show only active weak cards from this channel on main screen">🔍 View</button>
+                <button type="button" class="hub-mini-btn primary" onclick="event.stopPropagation(); drillChannelInQuiz('${w.track}', '${safeChan}')" title="Quiz only active weak cards from this channel against close siblings">🎯 Drill</button>
               </div>
             `;
           }).join("")
-        : `<div style="font-size:12px; color:#8e8e93;">No missed channels yet -- run a batch!</div>`;
+        : `<div style="font-size:12px; color:#34c759; font-weight:700;">All clear -- no active weak channels!</div>`;
 
-      const missedItemsHtml = missedItemList.length > 0
-        ? missedItemList.slice(0, 12).map(item => {
+      const missedItemsHtml = activeWeakList.length > 0
+        ? activeWeakList.slice(0, 12).map(item => {
             const safeId = item.id.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
             const inCmp = typeof compareList !== "undefined" && compareList.includes(item.id);
             return `
               <div class="hub-weak-row">
                 <span class="hub-weak-name" onclick="event.stopPropagation(); openQuickPeekById('${safeId}')" title="Tap for Quick Peek">
-                  ${item.icon} ${escapeHTML(item.id)}
+                  ${item.icon}${item.isHY ? "⭐" : ""} ${escapeHTML(item.id)}
                 </span>
-                <span style="font-size:11px; color:#ff3b30; font-weight:800; white-space:nowrap;">${item.misses}/${item.attempts}</span>
+                <span style="font-size:11px; color:#ff3b30; font-weight:800; white-space:nowrap;" title="Streak to graduate: ${item.streak}/2">${item.streak}/2 • ${item.misses}m</span>
                 <button type="button" class="hub-mini-btn" style="${inCmp ? 'background:#cc5500;color:#fff;' : ''}" onclick="event.stopPropagation(); toggleHubCompareItem(this, '${safeId}')" title="Add to Compare">${inCmp ? '✓' : '+ cf.'}</button>
               </div>
             `;
           }).join("")
-        : `<div style="font-size:12px; color:#8e8e93;">No missed items logged yet.</div>`;
+        : `<div style="font-size:12px; color:#34c759; font-weight:700;">No active weak items (2 cold hits clear an item).</div>`;
 
       const leechesHtml = leechItems.length > 0
         ? leechItems.slice(0, 8).map(l => {
@@ -1480,7 +1725,7 @@
           }).join("")
         : `<div style="font-size:12px; color:#8e8e93;">No SRS leeches (4+ lapses).</div>`;
 
-      const topMissedIdsForCompare = missedItemList.slice(0, 10).map(i => i.id);
+      const topMissedIdsForCompare = activeWeakList.slice(0, 10).map(i => i.id);
       const safeTopCompareArg = JSON.stringify(topMissedIdsForCompare).replace(/"/g, "&quot;");
       const wasOpen = window._hubReadinessExpanded === true;
 
@@ -1491,29 +1736,33 @@
             <span style="font-size:11.5px;">SRS Due: ${srsDue}/${srsTotal}${leechCount ? ` • 🩸 ${leechCount}` : ""}</span>
           </div>
           <div style="color:#666; font-size:12px;">
-            <b>Quizzed:</b> ${trackMeta[0].quizzed} Patterns • ${trackMeta[1].quizzed} Act/Ind • ${trackMeta[2].quizzed} Loc<br>
-            <b>Weak Spots:</b> ${topWeakChannelsStr || "None logged yet -- tap to inspect"}
+            <b>Mastered:</b> ☯️ ${trackMeta[0].masteredPct}% • ⚡ ${trackMeta[1].masteredPct}% • 📍 ${trackMeta[2].masteredPct}%<br>
+            <b>Next Focus:</b> ${topWeakStr}
           </div>
         </div>
         <div id="hubReadinessDetails" class="hub-readiness-details${wasOpen ? " open" : ""}">
           <div>
-            <div class="hub-section-subhdr"><span>Quiz Mastery by Track</span><span>Uses Weakest 15</span></div>
+            <div class="hub-section-subhdr"><span>Syllabus &amp; High-Yield Mastery</span><span>2 Cold Hits = Mastered</span></div>
             <div class="hub-track-grid">${trackCardsHtml}</div>
           </div>
           <div>
-            <div class="hub-section-subhdr"><span>Weak Channels / Categories</span><span>Tap 🔍 View or 🎯 Drill</span></div>
+            <div class="hub-section-subhdr"><span>Clinical Skill Diagnostics</span><span>Lowest Cold Accuracy</span></div>
+            <div class="hub-weak-list">${weakSkillsHtml}</div>
+          </div>
+          <div>
+            <div class="hub-section-subhdr"><span>Active Weak Channels</span><span>Clears After 2 Cold Hits</span></div>
             <div class="hub-weak-list">${weakChannelsHtml}</div>
           </div>
           <div>
             <div class="hub-section-subhdr">
-              <span>Most Missed (Tap to Peek)</span>
+              <span>Active Weak Items (Tap to Peek)</span>
               ${topMissedIdsForCompare.length > 0 ? `<button type="button" class="hub-mini-btn" onclick="event.stopPropagation(); compareQuizItems(${safeTopCompareArg})">⚖️ Compare Top ${topMissedIdsForCompare.length}</button>` : ""}
             </div>
             <div class="hub-weak-list">${missedItemsHtml}</div>
           </div>
           <div>
             <div class="hub-section-subhdr">
-              <span>SRS Due &amp; Leeches</span>
+              <span>SRS Due &amp; Leeches (All Modes)</span>
               <button type="button" class="hub-mini-btn primary" onclick="event.stopPropagation(); closeToolsHubModal(); openStudySettingsModal();">🧠 Study Due (${srsDue})</button>
             </div>
             <div class="hub-weak-list">${leechesHtml}</div>
@@ -1555,6 +1804,46 @@
     retakeQuizWholePool();
   };
 
+  window.drillHighYieldInTrack = function (track) {
+    closeToolsHubModal();
+    injectQuizHubDOM();
+    if (typeof closeBottomSheet === "function") closeBottomSheet();
+    document.getElementById("quizModal").style.display = "flex";
+    switchQuizTrack(track, true);
+    document.getElementById("quizResumeModal").style.display = "none";
+    const limitEl = document.getElementById("qzLimitSelect");
+    if (limitEl) limitEl.value = "hy_unseen";
+    retakeQuizWholePool();
+  };
+
+  window.drillStaleInTrack = function (track) {
+    closeToolsHubModal();
+    injectQuizHubDOM();
+    if (typeof closeBottomSheet === "function") closeBottomSheet();
+    document.getElementById("quizModal").style.display = "flex";
+    switchQuizTrack(track, true);
+    document.getElementById("quizResumeModal").style.display = "none";
+    const limitEl = document.getElementById("qzLimitSelect");
+    if (limitEl) limitEl.value = "stale_15";
+    retakeQuizWholePool();
+  };
+
+  window.drillSkillInQuiz = function (track, subMode) {
+    closeToolsHubModal();
+    injectQuizHubDOM();
+    if (typeof closeBottomSheet === "function") closeBottomSheet();
+    document.getElementById("quizModal").style.display = "flex";
+    switchQuizTrack(track, true);
+    document.getElementById("quizResumeModal").style.display = "none";
+    const subSel = document.getElementById("qzSubModeSelect");
+    if (subSel && Array.from(subSel.options).some(o => o.value === subMode)) {
+      subSel.value = subMode;
+      onQuizModeOrDiffChange();
+    } else {
+      retakeQuizWholePool();
+    }
+  };
+
   window.drillChannelInQuiz = function (track, channelFullName) {
     closeToolsHubModal();
     injectQuizHubDOM();
@@ -1572,20 +1861,67 @@
       matched = trackEligiblePoints.filter(p => rawIds.has(p["Short Name"]));
     }
     if (matched.length > 0) {
-      trackFilteredPoints = matched;
+      const mastery = loadQuizMastery(track);
+      const weakInChannel = matched.filter(p => isCardCurrentlyWeak(mastery[p["Short Name"]]));
+      const targetPool = weakInChannel.length > 0 ? weakInChannel : matched;
+
+      // Hybrid: quiz only the exact active weak cards, keep full channel (if 6+) or full track as close distractors
+      trackFilteredPoints = targetPool;
+      trackDistractorPoints = matched.length >= 6 ? matched : [...trackEligiblePoints];
+
+      const targetIdSet = new Set(targetPool.map(p => p["Short Name"]));
       document.querySelectorAll("#qzChannelTree .qz-pt-cb").forEach(cb => {
-        cb.checked = matched.some(m => m["Short Name"] === cb.value);
+        cb.checked = targetIdSet.has(cb.value);
       });
       document.querySelectorAll("#qzChannelTree .qf-group").forEach(g => {
         if (!g.querySelector("#qzSelectAllGlobal")) syncSingleQuizGroup(g);
       });
+      const limitEl = document.getElementById("qzLimitSelect");
+      if (limitEl) limitEl.value = "all";
       retakeQuizWholePool();
-      if (typeof showToast === "function") showToast(`🎯 Drilling ${channelFullName} (${matched.length})`);
+      if (typeof showToast === "function") {
+        showToast(weakInChannel.length > 0
+          ? `🎯 Drilling ${weakInChannel.length} weak card${weakInChannel.length === 1 ? "" : "s"} in ${channelFullName}`
+          : `🎯 Drilling ${channelFullName} (${matched.length})`);
+      }
     }
   };
 
-  window.focusChannelOnMainScreen = function (channelFullName) {
+  window.focusChannelOnMainScreen = function (trackOrChannel, maybeChannelFullName) {
     closeToolsHubModal();
+    const hasTrackArg = maybeChannelFullName !== undefined;
+    const track = hasTrackArg ? trackOrChannel : null;
+    const channelFullName = hasTrackArg ? maybeChannelFullName : trackOrChannel;
+
+    let weakIds = [];
+    if (track && typeof points !== "undefined") {
+      const mastery = loadQuizMastery(track);
+      const seen = new Set();
+      points.forEach(p => {
+        const sn = String(p["Short Name"] || "").trim();
+        if (!sn || seen.has(sn)) return;
+        const ch = (p["Channel Full Name"] || p[" Channel Full Name"] || "Other");
+        if (ch === channelFullName && isCardCurrentlyWeak(mastery[sn])) {
+          seen.add(sn);
+          weakIds.push(sn);
+        }
+      });
+    }
+
+    const searchEl = document.getElementById("searchInput");
+    if (weakIds.length > 0 && searchEl) {
+      if (typeof activeChannels !== "undefined") {
+        activeChannels = ["All"];
+        if (typeof initDropdown === "function") initDropdown();
+      }
+      searchEl.value = "@" + weakIds.map(id => `"${id.replace(/"/g, "")}"`).join(", ");
+      if (typeof handleSearch === "function") handleSearch();
+      if (typeof showToast === "function") {
+        showToast(`🔍 Showing ${weakIds.length} weak card${weakIds.length === 1 ? "" : "s"} in ${channelFullName}`);
+      }
+      return;
+    }
+
     if (typeof activeChannels !== "undefined") {
       const hasChannel = typeof points !== "undefined" && points.some(p => (p["Channel Full Name"] || p[" Channel Full Name"] || "") === channelFullName);
       activeChannels = hasChannel ? [channelFullName] : ["All"];
@@ -1609,6 +1945,7 @@
   };
 
   window.closeQuizModal = function () {
+    stopBoardSimTimer();
     saveQuizSessionState();
     if (qzSyncDirty) {
       syncQuizWithCloud(false);
@@ -2110,7 +2447,7 @@
 
   // --- 10. INTERACTIVE CLUE LADDER (Progressive Reveal for Vignettes) ---
   function setupClueLadder(cluesArray) {
-    currentClueQueue = Array.isArray(cluesArray) ? [...cluesArray] : [];
+    currentClueQueue = (!qzBoardSim && Array.isArray(cluesArray)) ? [...cluesArray] : [];
     const clueBtn = document.getElementById("qzClueBtn");
     if (!clueBtn) return;
     if (currentClueQueue.length > 0) {
@@ -2123,6 +2460,7 @@
 
   window.revealNextQuizClue = function () {
     if (currentClueQueue.length === 0) return;
+    usedClueThisQuestion = true;
     const nextClueHtml = currentClueQueue.shift();
     const bodyEl = document.getElementById("qzQuestionBody");
     if (bodyEl) {
@@ -2280,6 +2618,7 @@
     currentValidAnswersSet = new Set();
     currentQuestionSubMode = qzSubMode;
     currentPathologySubLabel = "";
+    usedClueThisQuestion = false;
     setupClueLadder([]);
     if (requeueBadge) requeueBadge.style.display = "none";
 
@@ -3603,7 +3942,22 @@
     const grid = document.getElementById("qzOptionsGrid");
     grid.innerHTML = "";
 
-    optionsData.forEach((opt, idx) => {
+    let finalOptions = optionsData;
+    if (qzBoardSim && optionsData.length > 4) {
+      const targetLower = String(currentCorrectAnswer || "").trim().toLowerCase();
+      const isRightOpt = (opt) => {
+        const val = (opt.rawCompare !== undefined ? opt.rawCompare : stripBBCode(opt.text).trim()).toLowerCase();
+        return (currentValidAnswersSet && currentValidAnswersSet.size > 0)
+          ? currentValidAnswersSet.has(val)
+          : (val === targetLower);
+      };
+      const correctOpts = optionsData.filter(isRightOpt);
+      const wrongOpts = optionsData.filter(opt => !isRightOpt(opt));
+      const keptCorrect = correctOpts.length > 0 ? [correctOpts[0]] : [];
+      finalOptions = shuffleArr([...keptCorrect, ...wrongOpts.slice(0, Math.max(0, 4 - keptCorrect.length))]);
+    }
+
+    finalOptions.forEach((opt, idx) => {
       const btn = document.createElement("button");
       btn.className = "quiz-opt-btn";
       const rawCompareVal = opt.rawCompare !== undefined ? opt.rawCompare : stripBBCode(opt.text).trim();
@@ -3630,13 +3984,13 @@
       : (pickedVal === targetVal);
     lastAnswerWasCorrect = isCorrect;
     const cardId = currentTargetPoint ? currentTargetPoint["Short Name"] : "";
-    if (!currentIsRequeuedTry) recordQuizMasteryResult(cardId, isCorrect);
+    if (!currentIsRequeuedTry) recordQuizMasteryResult(cardId, isCorrect, usedClueThisQuestion, currentQuestionSubMode);
 
     if (isCorrect) {
       selectedBtn.classList.add("correct");
       qzScore++;
-      // Only graduate a card to "Seen" when answered correctly on the FIRST cold attempt of a batch
-      if (currentTargetPoint && !currentIsRequeuedTry && document.getElementById("qzLimitSelect")?.value !== "all") {
+      // Only graduate a card to "Seen" on a cold first-try hit without clues
+      if (currentTargetPoint && !currentIsRequeuedTry && !usedClueThisQuestion && document.getElementById("qzLimitSelect")?.value !== "all") {
         try {
           const sKey = getSeenKey();
           const seenSet = new Set(JSON.parse(localStorage.getItem(sKey) || "[]"));
@@ -3646,6 +4000,15 @@
             localStorage.setItem(sKey + "_resetAt", String(Date.now()));
           }
         } catch (e) {}
+      }
+      // If a clue was used, re-queue once so the user proves cold recall later in the batch
+      if (usedClueThisQuestion && qzMasteryRequeue && !qzBoardSim && currentTargetPoint && (requeuedCardCounts[cardId] || 0) < 1) {
+        requeuedCardCounts[cardId] = 1;
+        const insertIndex = Math.max(0, remainingQuizQueue.length - 3);
+        remainingQuizQueue.splice(insertIndex, 0, {
+          _isRequeuedWrapper: true,
+          point: currentTargetPoint
+        });
       }
     } else {
       selectedBtn.classList.add("incorrect");
@@ -3667,9 +4030,9 @@
         });
       }
 
-      // Intra-Batch Mastery Loop: Re-insert missed card 3 questions back until answered right (up to 5 retries)
+      // Intra-Batch Mastery Loop: Re-insert missed card 3 questions back until answered right (skipped in Board Sim)
       const prevRetries = requeuedCardCounts[cardId] || 0;
-      if (qzMasteryRequeue && currentTargetPoint && prevRetries < 5) {
+      if (qzMasteryRequeue && !qzBoardSim && currentTargetPoint && prevRetries < 5) {
         requeuedCardCounts[cardId] = prevRetries + 1;
         const insertIndex = Math.max(0, remainingQuizQueue.length - 3);
         remainingQuizQueue.splice(insertIndex, 0, {
@@ -3682,8 +4045,10 @@
     markQuizLedgerDirty();
     saveQuizSessionState();
     updateQuizScoreUI();
-    renderPostAnswerDigest(isCorrect);
-    renderPostAnswerInspectionBar();
+    if (!qzBoardSim) {
+      renderPostAnswerDigest(isCorrect);
+      renderPostAnswerInspectionBar();
+    }
 
     if (currentQuestionSubMode === "case_chain_step1" && currentTargetPoint) {
       pendingCaseChainTarget = currentTargetPoint;
@@ -3716,6 +4081,9 @@
     card.className = "quiz-digest-card" + (isCorrect ? "" : " missed");
     let html = "";
 
+    if (isCorrect && usedClueThisQuestion) {
+      html += `<div class="quiz-assisted-pill">💡 Clue-Assisted Hit -- streak held &amp; queued once more for cold recall.</div>`;
+    }
     if (currentDecoySourceNote) {
       html += `<div style="color:#cc5500; font-weight:700;">💡 ${currentDecoySourceNote}</div>`;
     }
@@ -4038,7 +4406,8 @@
 
   function updateQuizScoreUI() {
     const pct = qzTotalAnswered === 0 ? 0 : Math.round((qzScore / qzTotalAnswered) * 100);
-    document.getElementById("quizTopScore").textContent = `${qzScore}/${qzTotalAnswered} • ${pct}% (${remainingQuizQueue.length} left)`;
+    const simTimerStr = (qzBoardSim && qzSimStartTime > 0) ? `⏱ ${formatSimElapsed(Date.now() - qzSimStartTime)} • ` : "";
+    document.getElementById("quizTopScore").textContent = `${simTimerStr}${qzScore}/${qzTotalAnswered} • ${pct}% (${remainingQuizQueue.length} left)`;
   }
 
   // --- 13. POOL MANAGEMENT, CLOUD SYNC, RETAKE MISSED & SUMMARY ---
@@ -4153,7 +4522,15 @@
     const masteryEncoded = {};
     Object.entries(masteryRaw).forEach(([id, st]) => {
       const a = Number(st.a || 0), m = Number(st.m || 0), lm = Number(st.lm || 0);
-      masteryEncoded[encodeId(id)] = lm > 0 ? [a, m, lm] : [a, m];
+      const s = Number(st.s || 0), lt = Number(st.lt || 0), c = Number(st.c || 0);
+      masteryEncoded[encodeId(id)] = c > 0 ? [a, m, lm, s, lt, c] : [a, m, lm, s, lt];
+    });
+
+    const skillsRaw = loadQuizSkills(trackName);
+    const skillsEncoded = {};
+    Object.entries(skillsRaw).forEach(([sk, rec]) => {
+      const sa = Number(rec.a || 0), sm = Number(rec.m || 0);
+      if (sa > 0) skillsEncoded[sk] = [sa, sm];
     });
 
     return {
@@ -4168,6 +4545,7 @@
       d: dict,
       seen: seenMap,
       mastery: masteryEncoded,
+      skills: skillsEncoded,
       session: sessionObj
     };
   }
@@ -4260,17 +4638,44 @@
         const id = (dict && /^\d+$/.test(k)) ? dict[Number(k)] : k;
         if (!id) return;
         const cA = Number(arr[0] || 0), cM = Number(arr[1] || 0), cLm = Number(arr[2] || 0);
-        const prev = localMap[id] || { a: 0, m: 0, lm: 0 };
+        const cS = arr.length > 3 ? Number(arr[3] || 0) : 0;
+        const cLt = arr.length > 4 ? Number(arr[4] || 0) : 0;
+        const cC = arr.length > 5 ? Number(arr[5] || 0) : 0;
+        const prev = localMap[id] || { a: 0, m: 0, lm: 0, s: 0, lt: 0, c: 0 };
         const nA = Math.max(prev.a || 0, cA);
         const nM = Math.max(prev.m || 0, cM);
         const nLm = Math.max(prev.lm || 0, cLm);
-        if (nA !== prev.a || nM !== prev.m || nLm !== prev.lm) {
-          localMap[id] = { a: nA, m: nM, lm: nLm };
+        const nC = Math.max(prev.c || 0, cC);
+        const cloudIsNewer = cLt > Number(prev.lt || 0);
+        const nLt = Math.max(Number(prev.lt || 0), cLt);
+        const nS = cloudIsNewer ? cS : (cLt === Number(prev.lt || 0) ? Math.max(Number(prev.s || 0), cS) : Number(prev.s || 0));
+        if (nA !== prev.a || nM !== prev.m || nLm !== prev.lm || nS !== prev.s || nLt !== prev.lt || nC !== prev.c) {
+          localMap[id] = { a: nA, m: nM, lm: nLm, s: nS, lt: nLt, c: nC };
           masteryChanged = true;
         }
       });
       if (masteryChanged) {
         try { localStorage.setItem(getQuizMasteryKey(trk), JSON.stringify(localMap)); } catch (e) {}
+        changed = true;
+      }
+    }
+
+    if (cloud.skills && typeof cloud.skills === "object") {
+      const localSkills = loadQuizSkills(trk);
+      let skillsChanged = false;
+      Object.entries(cloud.skills).forEach(([sk, arr]) => {
+        if (!Array.isArray(arr)) return;
+        const cA = Number(arr[0] || 0), cM = Number(arr[1] || 0);
+        const prev = localSkills[sk] || { a: 0, m: 0 };
+        const nA = Math.max(prev.a || 0, cA);
+        const nM = Math.max(prev.m || 0, cM);
+        if (nA !== prev.a || nM !== prev.m) {
+          localSkills[sk] = { a: nA, m: nM };
+          skillsChanged = true;
+        }
+      });
+      if (skillsChanged) {
+        try { localStorage.setItem(getQuizSkillsKey(trk), JSON.stringify(localSkills)); } catch (e) {}
         changed = true;
       }
     }
@@ -4516,18 +4921,55 @@
 
     if (limitVal === "weakest_15" || limitVal === "weakest_all") {
       const mastery = loadQuizMastery(currentTrack);
-      const missedOnly = eligibleFiltered
-        .filter(p => (mastery[p["Short Name"]]?.m || 0) > 0)
-        .sort((a, b) => {
-          const mA = mastery[a["Short Name"]];
-          const mB = mastery[b["Short Name"]];
-          return (mB.m / Math.max(1, mB.a)) - (mA.m / Math.max(1, mA.a)) || (mB.m - mA.m);
-        });
-      if (missedOnly.length === 0) {
-        if (typeof showToast === "function") showToast("No missed items logged in this track yet!");
+      let targetWeak = eligibleFiltered.filter(p => isCardCurrentlyWeak(mastery[p["Short Name"]]));
+      if (targetWeak.length === 0) {
+        targetWeak = eligibleFiltered.filter(p => (mastery[p["Short Name"]]?.m || 0) > 0);
+      }
+      targetWeak.sort((a, b) => {
+        const mA = mastery[a["Short Name"]];
+        const mB = mastery[b["Short Name"]];
+        return (Number(mA.s || 0) - Number(mB.s || 0)) ||
+               ((mB.m / Math.max(1, mB.a)) - (mA.m / Math.max(1, mA.a))) ||
+               (Number(mB.lm || 0) - Number(mA.lm || 0));
+      });
+      if (targetWeak.length === 0) {
+        if (typeof showToast === "function") showToast("No active weak items in this track!");
         activeQuizPool = shuffleArr(eligibleFiltered).slice(0, 15);
       } else {
-        activeQuizPool = limitVal === "weakest_15" ? missedOnly.slice(0, 15) : missedOnly;
+        activeQuizPool = limitVal === "weakest_15" ? targetWeak.slice(0, 15) : targetWeak;
+      }
+      startQuizRound();
+      return;
+    }
+
+    if (limitVal === "stale_15") {
+      const now = Date.now();
+      const mastery = loadQuizMastery(currentTrack);
+      const staleCards = eligibleFiltered
+        .filter(p => isCardStale(mastery[p["Short Name"]], now))
+        .sort((a, b) => Number(mastery[a["Short Name"]]?.lt || 0) - Number(mastery[b["Short Name"]]?.lt || 0));
+      if (staleCards.length === 0) {
+        if (typeof showToast === "function") showToast("No stale cards due for retest right now!");
+        activeQuizPool = shuffleArr(eligibleFiltered).slice(0, 15);
+      } else {
+        activeQuizPool = staleCards.slice(0, 15);
+      }
+      startQuizRound();
+      return;
+    }
+
+    if (limitVal === "hy_unseen") {
+      const now = Date.now();
+      const mastery = loadQuizMastery(currentTrack);
+      const hyCards = eligibleFiltered.filter(p => {
+        const imp = String(p.Important || "").trim();
+        return (imp === "!!" || imp === "!!!") && !isCardMastered(mastery[p["Short Name"]], now);
+      });
+      if (hyCards.length === 0) {
+        if (typeof showToast === "function") showToast("🎉 All High-Yield (!! / !!!) cards mastered!");
+        activeQuizPool = shuffleArr(eligibleFiltered).slice(0, 15);
+      } else {
+        activeQuizPool = shuffleArr(hyCards).slice(0, 15);
       }
       startQuizRound();
       return;
@@ -4575,12 +5017,20 @@
   };
 
   function startQuizRound() {
+    stopBoardSimTimer();
     qzScore = 0;
     qzTotalAnswered = 0;
     pendingCaseChainTarget = null;
     sessionMisses = [];
     requeuedCardCounts = {};
     remainingQuizQueue = shuffleArr([...activeQuizPool]);
+
+    if (qzBoardSim) {
+      qzSimStartTime = Date.now();
+      qzSimTimerInterval = setInterval(updateQuizScoreUI, 1000);
+    } else {
+      qzSimStartTime = 0;
+    }
 
     document.getElementById("qzSummaryView").style.display = "none";
     document.getElementById("qzActiveView").style.display = "flex";
@@ -4590,6 +5040,8 @@
   }
 
   function showQuizSummaryScreen() {
+    const simElapsedMs = (qzBoardSim && qzSimStartTime > 0) ? (Date.now() - qzSimStartTime) : 0;
+    stopBoardSimTimer();
     const sKey = getStateKey();
     localStorage.removeItem(sKey);
     localStorage.setItem(sKey + "_clearedAt", String(Date.now()));
@@ -4612,7 +5064,10 @@
     const unseenLeft = eligibleFiltered.filter(p => !seenIds.includes(p["Short Name"])).length;
     const poolNote = document.getElementById("qzSummaryPoolNote");
     if (poolNote) {
-      poolNote.textContent = `Filtered Pool: ${eligibleFiltered.length} cards (${unseenLeft} unseen remaining in cycle)`;
+      const simPace = simElapsedMs > 0 && qzTotalAnswered > 0
+        ? `🎯 Board Sim: ${formatSimElapsed(simElapsedMs)} (${Math.round(simElapsedMs / 1000 / qzTotalAnswered)}s/Q) • `
+        : "";
+      poolNote.textContent = `${simPace}Filtered Pool: ${eligibleFiltered.length} cards (${unseenLeft} unseen remaining in cycle)`;
     }
 
     const missedBtn = document.getElementById("qzRetakeMissedBtn");
