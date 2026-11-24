@@ -2363,6 +2363,98 @@ mark.diff-term-mark {
       .study-summary-footer { color: #8e8e93; border-top-color: #38383a; }
       .study-summary-close-btn { background: #2c2c2e; color: #ffffff; }
     }
+
+    /* --- TEXT OCCLUSION SPOTLIGHT, STEPPER & COMPARE BAR --- */
+    @keyframes occNeonDashPulse {
+      0%, 100% {
+        border-bottom-color: #00b8ff;
+        filter: drop-shadow(0 0 4px rgba(0, 184, 255, 0.75));
+      }
+      50% {
+        border-bottom-color: rgba(0, 184, 255, 0.35);
+        filter: drop-shadow(0 0 1px rgba(0, 184, 255, 0.25));
+      }
+    }
+    @keyframes occNeonDashPulseDark {
+      0%, 100% {
+        border-bottom-color: #00e5ff;
+        filter: drop-shadow(0 0 5px rgba(0, 229, 255, 0.85));
+      }
+      50% {
+        border-bottom-color: rgba(0, 229, 255, 0.38);
+        filter: drop-shadow(0 0 1.5px rgba(0, 229, 255, 0.3));
+      }
+    }
+    .line-occluded.occ-step-target {
+      background: transparent;
+      border-bottom: 1px dashed #00b8ff;
+      animation: occNeonDashPulse 1.8s ease-in-out infinite;
+    }
+    .compare-occ-toggle-btn {
+      font-size: 13px; font-weight: 800; padding: 6px 10px; border-radius: 6px;
+      background: #e3e3e8; color: #007aff; border: none; cursor: pointer;
+    }
+    .compare-occ-toggle-btn.active { background: #cc5500; color: #ffffff; }
+    .compare-occ-bar {
+      display: none; align-items: center; gap: 6px; padding: 6px 12px;
+      background: #f2f2f7; border-bottom: 1px solid #d1d1d6;
+      overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+      flex-shrink: 0; white-space: nowrap;
+    }
+    .compare-occ-bar::-webkit-scrollbar { display: none; }
+    .compare-occ-bar.open { display: flex; }
+    .occ-bar-sep { color: #c7c7cc; font-weight: 300; margin: 0 2px; flex-shrink: 0; }
+    .text-occ-stepper {
+      position: absolute; bottom: calc(14px + env(safe-area-inset-bottom)); right: 14px;
+      background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid #d1d1d6; border-radius: 24px; padding: 5px 8px;
+      display: none; align-items: center; gap: 6px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16); z-index: 120;
+    }
+    .text-occ-stepper.visible { display: flex; }
+    .text-occ-btn {
+      border: none; border-radius: 16px; padding: 7px 13px;
+      font-size: 12.5px; font-weight: 800; cursor: pointer; white-space: nowrap;
+      transition: opacity 0.12s, transform 0.1s;
+    }
+    .text-occ-btn:active { opacity: 0.78; transform: scale(0.96); }
+    .text-occ-btn.primary { background: #007aff; color: #ffffff; }
+    .text-occ-btn.secondary { background: #e3e3e8; color: #333333; padding: 7px 10px; }
+    .text-occ-split {
+      display: none; align-items: stretch; border-radius: 16px; overflow: hidden;
+      border: 1px solid #007aff;
+    }
+    .text-occ-split-half {
+      border: none; padding: 7px 12px; font-size: 12.5px; font-weight: 800;
+      cursor: pointer; white-space: nowrap; transition: opacity 0.12s, transform 0.1s;
+    }
+    .text-occ-split-half:active { opacity: 0.78; transform: scale(0.97); }
+    .text-occ-split-half.reset-half { background: #f2f2f7; color: #333333; border-right: 1px solid #d1d1d6; }
+    .text-occ-split-half.next-half { background: #007aff; color: #ffffff; }
+    .text-occ-split-half.next-half:disabled { opacity: 0.45; cursor: default; }
+    @media (max-width: 540px) {
+      .text-occ-stepper { right: 50%; transform: translateX(50%); max-width: calc(100% - 20px); }
+    }
+    @media (prefers-color-scheme: dark) {
+      .line-occluded.occ-step-target {
+        background: transparent;
+        border-bottom: 1px dashed #00e5ff;
+        animation: occNeonDashPulseDark 1.8s ease-in-out infinite;
+      }
+      .compare-occ-toggle-btn { background: #2c2c2e; color: #0a84ff; }
+      .compare-occ-toggle-btn.active { background: #ff9f0a; color: #000000; }
+      .compare-occ-bar { background: #1c1c1e; border-bottom-color: #38383a; }
+      .occ-bar-sep { color: #48484a; }
+      .text-occ-stepper {
+        background: rgba(28, 28, 30, 0.94); border-color: #38383a;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+      }
+      .text-occ-btn.primary { background: #0a84ff; color: #ffffff; }
+      .text-occ-btn.secondary { background: #2c2c2e; color: #f2f2f7; }
+      .text-occ-split { border-color: #0a84ff; }
+      .text-occ-split-half.reset-half { background: #2c2c2e; color: #f2f2f7; border-right-color: #38383a; }
+      .text-occ-split-half.next-half { background: #0a84ff; color: #ffffff; }
+    }
   </style>
   
 <script src="./tcm-stopwords.js"></script>
@@ -2657,12 +2749,13 @@ display: flex; flex-direction: column;">
           <button id="compareToggleNamesBtn" onclick="toggleCompareNames()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide Names</button>
           <button onclick="shuffleCompare()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">🔀 Shuffle</button>
           <button id="compareHideAllBtn" onclick="toggleAllCompareColumns()" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #e3e3e8; color: #007aff; border: none; cursor: pointer;">Hide All</button>
+          <button id="compareOccToggleBtn" type="button" class="compare-occ-toggle-btn" onclick="toggleCompareOccBar()" title="Toggle Occlusion Controls">🌫️ Occlude</button>
           <button onclick="if(typeof window.drillCompareList==='function') window.drillCompareList();" style="font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 6px; background: #cc5500; color: #fff; border: none; cursor: pointer;">🎯 Drill</button>
           <button onclick="closeCompareModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
         </div>
       </div>
 
-
+      <div id="compareOccBar" class="compare-occ-bar"></div>
       
     <div class="compare-table-container" id="compareContainer" tabindex="-1"></div>
     <button type="button" id="comparePaddleLeft" class="compare-paddle left" onclick="scrollCompareHorizontal(-1, false)" aria-label="Scroll compare table left">
@@ -2671,6 +2764,15 @@ display: flex; flex-direction: column;">
     <button type="button" id="comparePaddleRight" class="compare-paddle right" onclick="scrollCompareHorizontal(1, false)" aria-label="Scroll compare table right">
       <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
     </button>
+
+    <div id="compareOccStepper" class="text-occ-stepper">
+      <button type="button" class="text-occ-btn secondary" onclick="undoTextOccReveal('compare')" title="Undo Last Reveal">↩️</button>
+      <button type="button" id="compareOccStepperMain" class="text-occ-btn primary" onclick="handleTextOccStep('compare')">▶️ Focus Next</button>
+      <div id="compareOccStepperSplit" class="text-occ-split">
+        <button type="button" class="text-occ-split-half reset-half" onclick="resetActiveTextOccSection('compare')" title="Reset this section">🔄 Reset</button>
+        <button type="button" id="compareOccStepperNext" class="text-occ-split-half next-half" onclick="advanceTextOccSection('compare')">Next Section ›</button>
+      </div>
+    </div>
 
     </div>
   </div>
@@ -2907,6 +3009,14 @@ display: flex; flex-direction: column;">
   </div>
   <div id="sheetContent" class="sheet-content">
     </div>
+  <div id="sheetOccStepper" class="text-occ-stepper">
+    <button type="button" class="text-occ-btn secondary" onclick="undoTextOccReveal('sheet')" title="Undo Last Reveal">↩️</button>
+    <button type="button" id="sheetOccStepperMain" class="text-occ-btn primary" onclick="handleTextOccStep('sheet')">▶️ Focus Next</button>
+    <div id="sheetOccStepperSplit" class="text-occ-split">
+      <button type="button" class="text-occ-split-half reset-half" onclick="resetActiveTextOccSection('sheet')" title="Reset this section">🔄 Reset</button>
+      <button type="button" id="sheetOccStepperNext" class="text-occ-split-half next-half" onclick="advanceTextOccSection('sheet')">Next Section ›</button>
+    </div>
+  </div>
 </div>
 
   
@@ -2917,7 +3027,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.24.26.v1";
+const APP_VERSION = "11.24.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -7863,7 +7973,10 @@ let comparePinFirst = false;
       container.scrollTop = 0;
       container.scrollLeft = 0;
       container.focus({ preventScroll: true });
+      if (typeof isAnyOccHideActive === "function") compareOccBarOpen = isAnyOccHideActive();
     }
+    if (typeof renderCompareOccBar === "function") renderCompareOccBar();
+    if (typeof initTextOccStepper === "function") initTextOccStepper("compare");
     requestAnimationFrame(updateComparePaddles);
   }
 
@@ -7934,6 +8047,7 @@ let comparePinFirst = false;
   // Lock the viewport back down to protect the main app UI
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
   document.getElementById("compareModal").style.display = "none";
+  if (typeof clearTextOccState === "function") clearTextOccState("compare");
   
   // RESTORE ORIGINAL ORDER IF SHUFFLED
   if (backupCompareList.length > 0) {
@@ -8715,6 +8829,8 @@ if (document.getElementById('occStudioModal')?.style.display === 'flex') { stop(
       const cContainer = document.getElementById('compareContainer');
       if (cContainer) cContainer.scrollBy({ top: e.key === 'ArrowDown' ? 80 : -80, behavior: 'auto' });
       return;
+    } else if (!e.metaKey && !e.ctrlKey && !e.altKey && handleTextOccKeydown('compare', e)) {
+      return;
     }
   }
 
@@ -8774,6 +8890,9 @@ if (document.getElementById('occStudioModal')?.style.display === 'flex') { stop(
       case 'ArrowUp':
         e.preventDefault(); 
         if (sheetContent) sheetContent.scrollBy({ top: -60, behavior: 'auto' });
+        break;
+      default:
+        if (!e.metaKey && !e.ctrlKey && !e.altKey) handleTextOccKeydown('sheet', e);
         break;
     }
     return; 
@@ -8938,6 +9057,7 @@ document.addEventListener('keyup', (e) => {
 
   // NEW: Wipe the staging pool when closing the sheet so the basket doesn't float on the home screen!
   if (typeof clearOcclusionPool === 'function') clearOcclusionPool(false);
+  if (typeof clearTextOccState === 'function') clearTextOccState('sheet');
 
   // 1. Start the curtain-drop animation
   sheet.classList.remove('open');
@@ -9228,6 +9348,7 @@ document.addEventListener('keyup', (e) => {
         e.stopPropagation();
         if (typeof onBeforeJump === "function") onBeforeJump();
         scrollToSectionEl(sectionEl, pillBtn);
+        if (typeof setActiveTextOccSection === "function") setActiveTextOccSection("sheet", sectionEl);
       };
 
       jumpScroller.appendChild(pillBtn);
@@ -9536,6 +9657,8 @@ document.addEventListener('keyup', (e) => {
     addFieldBtn.onclick = () => { window.triggerEdit(point["Short Name"], "Notes"); };
     container.appendChild(addFieldBtn);
 
+    if (typeof initTextOccStepper === "function") initTextOccStepper("sheet");
+
     // --- 4. RESTORE THE TOGGLE BUTTON ---
     if (hasFilteredContent) {
       const stickyBtnContainer = document.createElement("div"); 
@@ -9757,9 +9880,527 @@ function buildInlineGroupBarHTML(point, anyMark, anyHide) {
       const isSelected = !occludeAllGroups && activeHideGroups.has(g);
       html += `<button type="button" class="occ-group-pill${isSelected ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleHideGroup(${g})">G${g}</button>`;
     }
+    html += `<span class="occ-bar-sep">|</span>
+      <button type="button" class="occ-group-pill${textOccShuffle ? ' active-mark' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleTextOccShuffle()" title="Toggle Shuffle Order">🔀</button>
+      <button type="button" class="occ-group-pill" style="padding:4px 9px; font-size:11px;" onclick="revealActiveTextOccSection('sheet')" title="Reveal Current Section">👁️</button>
+      <button type="button" class="occ-group-pill" style="padding:4px 9px; font-size:11px;" onclick="resetActiveTextOccSection('sheet')" title="Reset Current Section">🔄</button>`;
     html += `</div>`;
   }
   return html;
+}
+
+// --- BOTTOM SHEET & COMPARE OCCLUSION STEPPER + WASD ENGINE ---
+let textOccShuffle = false;
+let compareOccBarOpen = false;
+const textOccState = {
+  sheet: { sectionEl: null, targetEl: null, history: [] },
+  compare: { sectionEl: null, targetEl: null, history: [] }
+};
+
+function isAnyOccHideActive() {
+  return lineOccState === 'hide' || wordOccState === 'hide' || phraseOccState === 'hide';
+}
+
+function getTextOccContainer(scope) {
+  return document.getElementById(scope === 'compare' ? 'compareContainer' : 'sheetContent');
+}
+
+function getTextOccUnits(scope) {
+  const container = getTextOccContainer(scope);
+  if (!container) return [];
+  const units = [];
+  if (scope === 'sheet') {
+    container.querySelectorAll('.point-notes').forEach(sec => {
+      if (sec.offsetParent === null) return;
+      const blanks = Array.from(sec.querySelectorAll('.line-occluded, .line-revealed')).filter(el => el.offsetParent !== null);
+      if (blanks.length > 0) units.push({ el: sec, col: 0 });
+    });
+  } else {
+    // Compare: column-first (left to right), then top to bottom within each column
+    const byCol = new Map();
+    container.querySelectorAll('.compare-card-body').forEach(cell => {
+      if (cell.offsetParent === null) return;
+      if (cell.classList.contains('study-blur') && !cell.classList.contains('study-peek')) return;
+      const blanks = Array.from(cell.querySelectorAll('.line-occluded, .line-revealed')).filter(el => el.offsetParent !== null);
+      if (blanks.length === 0) return;
+      const col = parseInt(cell.getAttribute('data-col') || '0', 10);
+      if (!byCol.has(col)) byCol.set(col, []);
+      byCol.get(col).push({ el: cell, col });
+    });
+    Array.from(byCol.keys()).sort((a, b) => a - b).forEach(col => {
+      units.push(...byCol.get(col));
+    });
+  }
+  return units;
+}
+
+function getHiddenBlanksInUnit(unitEl) {
+  if (!unitEl) return [];
+  return Array.from(unitEl.querySelectorAll('.line-occluded')).filter(el => el.offsetParent !== null);
+}
+
+function clearTextOccTarget(scope) {
+  const st = textOccState[scope];
+  if (st && st.targetEl) {
+    st.targetEl.classList.remove('occ-step-target');
+    st.targetEl = null;
+  }
+}
+
+window.clearTextOccState = function(scope) {
+  const st = textOccState[scope];
+  if (!st) return;
+  clearTextOccTarget(scope);
+  st.sectionEl = null;
+  st.history = [];
+  const stepper = document.getElementById(scope === 'compare' ? 'compareOccStepper' : 'sheetOccStepper');
+  if (stepper) stepper.classList.remove('visible');
+};
+
+function ensureTextOccActiveUnit(scope) {
+  const st = textOccState[scope];
+  const units = getTextOccUnits(scope);
+  if (units.length === 0) {
+    clearTextOccTarget(scope);
+    st.sectionEl = null;
+    return null;
+  }
+  if (st.sectionEl && units.some(u => u.el === st.sectionEl)) {
+    return st.sectionEl;
+  }
+  const firstWithHidden = units.find(u => getHiddenBlanksInUnit(u.el).length > 0) || units[0];
+  st.sectionEl = firstWithHidden.el;
+  return st.sectionEl;
+}
+
+function scrollOnlyIfClipped(scope, el) {
+  const container = getTextOccContainer(scope);
+  if (!container || !el) return;
+  const cRect = container.getBoundingClientRect();
+  const eRect = el.getBoundingClientRect();
+  let topGuard = 10;
+  if (scope === 'sheet') {
+    const jb = container.querySelector('.section-jump-bar');
+    if (jb && jb.style.display !== 'none') topGuard = jb.offsetHeight + 36;
+  } else {
+    topGuard = 70;
+  }
+  const bottomGuard = 64;
+  if (eRect.top < cRect.top + topGuard) {
+    container.scrollTop -= (cRect.top + topGuard - eRect.top);
+  } else if (eRect.bottom > cRect.bottom - bottomGuard) {
+    container.scrollTop += (eRect.bottom - (cRect.bottom - bottomGuard));
+  }
+  if (scope === 'compare') {
+    if (eRect.left < cRect.left + 12) {
+      container.scrollLeft -= (cRect.left + 12 - eRect.left);
+    } else if (eRect.right > cRect.right - 12) {
+      container.scrollLeft += (eRect.right - (cRect.right - 12));
+    }
+  }
+}
+
+function focusTextOccTarget(scope, blankEl) {
+  const st = textOccState[scope];
+  clearTextOccTarget(scope);
+  if (!blankEl) {
+    updateTextOccStepperUI(scope);
+    return;
+  }
+  st.targetEl = blankEl;
+  blankEl.classList.add('occ-step-target');
+  scrollOnlyIfClipped(scope, blankEl);
+  updateTextOccStepperUI(scope);
+}
+
+window.setActiveTextOccSection = function(scope, sectionEl) {
+  if (!isAnyOccHideActive()) return;
+  const units = getTextOccUnits(scope);
+  if (!units.some(u => u.el === sectionEl)) return;
+  const st = textOccState[scope];
+  if (st.sectionEl !== sectionEl) {
+    clearTextOccTarget(scope);
+    st.sectionEl = sectionEl;
+    updateTextOccStepperUI(scope);
+  }
+};
+
+window.initTextOccStepper = function(scope) {
+  const st = textOccState[scope];
+  if (!st) return;
+  clearTextOccTarget(scope);
+  st.sectionEl = null;
+  st.history = [];
+  if (isAnyOccHideActive()) ensureTextOccActiveUnit(scope);
+  updateTextOccStepperUI(scope);
+};
+
+function updateTextOccStepperUI(scope) {
+  const stepper = document.getElementById(scope === 'compare' ? 'compareOccStepper' : 'sheetOccStepper');
+  const mainBtn = document.getElementById(scope === 'compare' ? 'compareOccStepperMain' : 'sheetOccStepperMain');
+  const splitEl = document.getElementById(scope === 'compare' ? 'compareOccStepperSplit' : 'sheetOccStepperSplit');
+  const nextBtn = document.getElementById(scope === 'compare' ? 'compareOccStepperNext' : 'sheetOccStepperNext');
+  if (!stepper || !mainBtn || !splitEl || !nextBtn) return;
+
+  if (!isAnyOccHideActive()) {
+    stepper.classList.remove('visible');
+    return;
+  }
+  const units = getTextOccUnits(scope);
+  if (units.length === 0) {
+    stepper.classList.remove('visible');
+    return;
+  }
+
+  stepper.classList.add('visible');
+  const activeEl = ensureTextOccActiveUnit(scope);
+  const hidden = getHiddenBlanksInUnit(activeEl);
+  const st = textOccState[scope];
+
+  if (st.targetEl && (!st.targetEl.isConnected || !st.targetEl.classList.contains('line-occluded'))) {
+    clearTextOccTarget(scope);
+  }
+
+  if (hidden.length === 0) {
+    mainBtn.style.display = 'none';
+    splitEl.style.display = 'inline-flex';
+    const curIdx = units.findIndex(u => u.el === activeEl);
+    const nextUnit = (curIdx >= 0 && curIdx + 1 < units.length) ? units[curIdx + 1] : null;
+    if (scope === 'compare') {
+      if (nextUnit) {
+        const curCol = units[curIdx].col;
+        nextBtn.disabled = false;
+        nextBtn.textContent = nextUnit.col !== curCol ? 'Next Point ›' : 'Next Section ›';
+      } else {
+        nextBtn.disabled = true;
+        nextBtn.textContent = '🏁 Done';
+      }
+    } else {
+      if (nextUnit) {
+        nextBtn.disabled = false;
+        nextBtn.textContent = 'Next Section ›';
+      } else if (sheetContextPoints && currentSheetIndex < sheetContextPoints.length - 1) {
+        nextBtn.disabled = false;
+        nextBtn.textContent = 'Next Point ›';
+      } else {
+        nextBtn.disabled = true;
+        nextBtn.textContent = '🏁 Done';
+      }
+    }
+  } else {
+    mainBtn.style.display = 'inline-block';
+    splitEl.style.display = 'none';
+    mainBtn.textContent = st.targetEl ? '👁️ Reveal (Space)' : `▶️ Focus Next (${hidden.length})`;
+  }
+}
+
+window.handleTextOccStep = function(scope) {
+  if (!isAnyOccHideActive()) return;
+  const activeEl = ensureTextOccActiveUnit(scope);
+  if (!activeEl) return;
+  const st = textOccState[scope];
+
+  if (st.targetEl && st.targetEl.isConnected && st.targetEl.classList.contains('line-occluded')) {
+    const el = st.targetEl;
+    el.classList.remove('line-occluded', 'occ-step-target');
+    el.classList.add('line-revealed');
+    st.history.push({ el, sectionEl: activeEl });
+    st.targetEl = null;
+    updateTextOccStepperUI(scope);
+    return;
+  }
+
+  const hidden = getHiddenBlanksInUnit(activeEl);
+  if (hidden.length === 0) {
+    advanceTextOccSection(scope);
+    return;
+  }
+
+  const nextBlank = textOccShuffle
+    ? hidden[Math.floor(Math.random() * hidden.length)]
+    : hidden[0];
+  focusTextOccTarget(scope, nextBlank);
+};
+
+window.advanceTextOccSection = function(scope) {
+  const units = getTextOccUnits(scope);
+  const st = textOccState[scope];
+  const curIdx = units.findIndex(u => u.el === st.sectionEl);
+  const nextUnit = (curIdx >= 0 && curIdx + 1 < units.length) ? units[curIdx + 1] : null;
+
+  if (nextUnit) {
+    clearTextOccTarget(scope);
+    st.sectionEl = nextUnit.el;
+    const container = getTextOccContainer(scope);
+    if (scope === 'sheet' && container) {
+      const jb = container.querySelector('.section-jump-bar');
+      const offset = (jb && jb.style.display !== 'none') ? jb.offsetHeight + 6 : 10;
+      const targetTop = container.scrollTop + (nextUnit.el.getBoundingClientRect().top - container.getBoundingClientRect().top) - offset;
+      container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    } else if (scope === 'compare' && container) {
+      const curCol = curIdx >= 0 ? units[curIdx].col : -1;
+      const cRect = container.getBoundingClientRect();
+      const uRect = nextUnit.el.getBoundingClientRect();
+      const targetTop = Math.max(0, container.scrollTop + (uRect.top - cRect.top) - 66);
+      if (nextUnit.col !== curCol) {
+        const targetLeft = Math.max(0, container.scrollLeft + (uRect.left - cRect.left) - 12);
+        container.scrollTo({ top: targetTop, left: targetLeft, behavior: 'smooth' });
+      } else {
+        container.scrollTo({ top: targetTop, behavior: 'smooth' });
+      }
+    }
+    updateTextOccStepperUI(scope);
+  } else if (scope === 'sheet' && sheetContextPoints && currentSheetIndex < sheetContextPoints.length - 1) {
+    currentSheetIndex++;
+    updateSheetUI();
+  }
+};
+
+window.undoTextOccReveal = function(scope) {
+  const st = textOccState[scope];
+  if (!st || st.history.length === 0) return;
+  const last = st.history.pop();
+  if (!last || !last.el || !last.el.isConnected) {
+    updateTextOccStepperUI(scope);
+    return;
+  }
+  last.el.classList.remove('line-revealed');
+  last.el.classList.add('line-occluded');
+  if (last.sectionEl && last.sectionEl.isConnected) st.sectionEl = last.sectionEl;
+  focusTextOccTarget(scope, last.el);
+};
+
+window.revealActiveTextOccSection = function(scope) {
+  const activeEl = ensureTextOccActiveUnit(scope);
+  if (!activeEl) return;
+  const st = textOccState[scope];
+  clearTextOccTarget(scope);
+  getHiddenBlanksInUnit(activeEl).forEach(el => {
+    el.classList.remove('line-occluded', 'occ-step-target');
+    el.classList.add('line-revealed');
+    st.history.push({ el, sectionEl: activeEl });
+  });
+  updateTextOccStepperUI(scope);
+};
+
+window.resetActiveTextOccSection = function(scope) {
+  const activeEl = ensureTextOccActiveUnit(scope);
+  if (!activeEl) return;
+  const st = textOccState[scope];
+  clearTextOccTarget(scope);
+  activeEl.querySelectorAll('.line-revealed').forEach(el => {
+    el.classList.remove('line-revealed');
+    el.classList.add('line-occluded');
+  });
+  st.history = st.history.filter(h => h.sectionEl !== activeEl);
+  updateTextOccStepperUI(scope);
+};
+
+window.toggleTextOccShuffle = function() {
+  textOccShuffle = !textOccShuffle;
+  const sheet = document.getElementById('bottomSheet');
+  if (sheet && sheet.classList.contains('open')) updateSheetUI(false, true);
+  if (document.getElementById('compareModal')?.style.display === 'flex') renderCompareOccBar();
+  showToast(textOccShuffle ? '🔀 Occlusion Shuffle: ON' : '🔀 Occlusion Shuffle: OFF');
+};
+
+function moveTextOccTarget(scope, direction) {
+  if (!isAnyOccHideActive()) return false;
+  const activeEl = ensureTextOccActiveUnit(scope);
+  if (!activeEl) return false;
+  const hidden = getHiddenBlanksInUnit(activeEl);
+  if (hidden.length === 0) return false;
+
+  const st = textOccState[scope];
+  if (!st.targetEl || !st.targetEl.isConnected || !st.targetEl.classList.contains('line-occluded')) {
+    focusTextOccTarget(scope, hidden[0]);
+    return true;
+  }
+
+  const cRect = st.targetEl.getBoundingClientRect();
+  const cX = cRect.left + cRect.width / 2;
+  const cY = cRect.top + cRect.height / 2;
+
+  let bestEl = null;
+  let minScore = Infinity;
+
+  hidden.forEach(el => {
+    if (el === st.targetEl) return;
+    const r = el.getBoundingClientRect();
+    const bX = r.left + r.width / 2;
+    const bY = r.top + r.height / 2;
+    const dx = bX - cX;
+    const dy = bY - cY;
+    let valid = false, score = 0;
+
+    if (direction === 'up' && dy < -4) { valid = true; score = Math.hypot(dx * 3, dy); }
+    else if (direction === 'down' && dy > 4) { valid = true; score = Math.hypot(dx * 3, dy); }
+    else if (direction === 'left' && dx < -4) { valid = true; score = Math.hypot(dx, dy * 3); }
+    else if (direction === 'right' && dx > 4) { valid = true; score = Math.hypot(dx, dy * 3); }
+
+    if (valid && score < minScore) {
+      minScore = score;
+      bestEl = el;
+    }
+  });
+
+  if (bestEl) focusTextOccTarget(scope, bestEl);
+  return true;
+}
+
+function handleTextOccKeydown(scope, e) {
+  if (!isAnyOccHideActive()) return false;
+  if (getTextOccUnits(scope).length === 0) return false;
+
+  const k = e.key.toLowerCase();
+  if (e.key === ' ' || e.code === 'Space') {
+    e.preventDefault();
+    handleTextOccStep(scope);
+    return true;
+  }
+  if (k === 'w') { e.preventDefault(); moveTextOccTarget(scope, 'up'); return true; }
+  if (k === 's') { e.preventDefault(); moveTextOccTarget(scope, 'down'); return true; }
+  if (k === 'a') { e.preventDefault(); moveTextOccTarget(scope, 'left'); return true; }
+  if (k === 'd') { e.preventDefault(); moveTextOccTarget(scope, 'right'); return true; }
+  if (k === 'r') { e.preventDefault(); resetActiveTextOccSection(scope); return true; }
+  return false;
+}
+
+// Keep stepper synced when user taps any occluded blank or Compare column blur manually
+['sheetContent', 'compareContainer'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', (e) => {
+    const scope = id === 'compareContainer' ? 'compare' : 'sheet';
+    if (!isAnyOccHideActive()) return;
+    const blank = e.target.closest('.line-occluded, .line-revealed');
+    if (!blank) {
+      if (scope === 'compare') setTimeout(() => updateTextOccStepperUI('compare'), 0);
+      return;
+    }
+    const unitEl = blank.closest(scope === 'compare' ? '.compare-card-body' : '.point-notes');
+    const st = textOccState[scope];
+    if (unitEl) st.sectionEl = unitEl;
+    if (st.targetEl === blank) {
+      blank.classList.remove('occ-step-target');
+      st.targetEl = null;
+    }
+    if (blank.classList.contains('line-revealed') && unitEl) {
+      st.history.push({ el: blank, sectionEl: unitEl });
+    }
+    updateTextOccStepperUI(scope);
+  });
+});
+
+// --- COMPARE STICKY OCCLUSION BAR CONTROLS ---
+window.toggleCompareOccBar = function() {
+  if (!compareOccBarOpen) {
+    compareOccBarOpen = true;
+    if (!isAnyOccHideActive()) {
+      if (typeof restorePreferredOccTypes === 'function') restorePreferredOccTypes();
+      else phraseOccState = 'hide';
+      updateOccToggleUI();
+      openCompareModal(true);
+      return;
+    }
+    renderCompareOccBar();
+  } else {
+    compareOccBarOpen = false;
+    if (isAnyOccHideActive()) {
+      if (typeof rememberActiveOccTypes === 'function') rememberActiveOccTypes();
+      lineOccState = 'off';
+      wordOccState = 'off';
+      phraseOccState = 'off';
+      updateOccToggleUI();
+      openCompareModal(true);
+      const sheet = document.getElementById('bottomSheet');
+      if (sheet && sheet.classList.contains('open')) updateSheetUI(false, true);
+      return;
+    }
+    renderCompareOccBar();
+  }
+};
+
+window.toggleCompareOccType = function(type) {
+  if (type === 'line') lineOccState = (lineOccState === 'hide') ? 'off' : 'hide';
+  else if (type === 'word') wordOccState = (wordOccState === 'hide') ? 'off' : 'hide';
+  else if (type === 'phrase') phraseOccState = (phraseOccState === 'hide') ? 'off' : 'hide';
+  if (typeof rememberActiveOccTypes === 'function') rememberActiveOccTypes();
+  updateOccToggleUI();
+  openCompareModal(true);
+  const sheet = document.getElementById('bottomSheet');
+  if (sheet && sheet.classList.contains('open')) updateSheetUI(false, true);
+};
+
+window.setCompareOccMode = function(mode) {
+  if (mode === 'off') {
+    if (typeof rememberActiveOccTypes === 'function') rememberActiveOccTypes();
+    lineOccState = 'off';
+    wordOccState = 'off';
+    phraseOccState = 'off';
+  } else {
+    const anyHide = isAnyOccHideActive();
+    if (!anyHide) {
+      if (typeof restorePreferredOccTypes === 'function') restorePreferredOccTypes();
+      else phraseOccState = 'hide';
+    }
+    if (mode === 'all') {
+      occludeAllGroups = true;
+      activeHideGroups.clear();
+    } else {
+      const g = parseInt(mode, 10);
+      if (!anyHide || occludeAllGroups) {
+        occludeAllGroups = false;
+        activeHideGroups = new Set([g]);
+      } else {
+        if (activeHideGroups.has(g)) activeHideGroups.delete(g);
+        else activeHideGroups.add(g);
+      }
+    }
+  }
+  updateOccToggleUI();
+  openCompareModal(true);
+  const sheet = document.getElementById('bottomSheet');
+  if (sheet && sheet.classList.contains('open')) updateSheetUI(false, true);
+};
+
+function renderCompareOccBar() {
+  const bar = document.getElementById('compareOccBar');
+  const toggleBtn = document.getElementById('compareOccToggleBtn');
+  const anyHide = isAnyOccHideActive();
+
+  if (toggleBtn) toggleBtn.classList.toggle('active', anyHide || compareOccBarOpen);
+  if (!bar) return;
+
+  bar.classList.toggle('open', compareOccBarOpen);
+  if (!compareOccBarOpen) return;
+
+  let maxG = maxOcclusionGroup;
+  compareList.forEach(id => {
+    const pt = points.find(p => p["Short Name"] === id);
+    if (pt) maxG = Math.max(maxG, getDetectedMaxGroup(pt));
+  });
+
+  let html = `<button type="button" class="occ-group-pill${!anyHide ? ' active-mark' : ''}" style="padding:4px 9px; font-size:11px;" onclick="setCompareOccMode('off')">Off</button>`;
+  html += `<button type="button" class="occ-group-pill${lineOccState === 'hide' ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleCompareOccType('line')">Line</button>`;
+  html += `<button type="button" class="occ-group-pill${wordOccState === 'hide' ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleCompareOccType('word')">Word</button>`;
+  html += `<button type="button" class="occ-group-pill${phraseOccState === 'hide' ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleCompareOccType('phrase')">Phrase</button>`;
+  html += `<span class="occ-bar-sep">|</span>`;
+  html += `<button type="button" class="occ-group-pill${(anyHide && occludeAllGroups) ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="setCompareOccMode('all')">All</button>`;
+
+  for (let g = 1; g <= maxG; g++) {
+    const isSel = anyHide && !occludeAllGroups && activeHideGroups.has(g);
+    html += `<button type="button" class="occ-group-pill${isSel ? ' active-hide' : ''}" style="padding:4px 9px; font-size:11px;" onclick="setCompareOccMode(${g})">G${g}</button>`;
+  }
+
+  if (anyHide) {
+    html += `<span class="occ-bar-sep">|</span>`;
+    html += `<button type="button" class="occ-group-pill${textOccShuffle ? ' active-mark' : ''}" style="padding:4px 9px; font-size:11px;" onclick="toggleTextOccShuffle()" title="Toggle Shuffle Order">🔀</button>`;
+    html += `<button type="button" class="occ-group-pill" style="padding:4px 9px; font-size:11px;" onclick="revealActiveTextOccSection('compare')" title="Reveal Current Section">👁️</button>`;
+    html += `<button type="button" class="occ-group-pill" style="padding:4px 9px; font-size:11px;" onclick="resetActiveTextOccSection('compare')" title="Reset Current Section">🔄</button>`;
+  }
+
+  bar.innerHTML = html;
 }
 
 function updateOccToggleUI() {
@@ -13917,7 +14558,7 @@ document.getElementById("studyOrderSelect").addEventListener("change", function(
 
 document.addEventListener('wheel', (e) => {
   // Intercept horizontal pill/action toolbars (main-page .scroller is handled separately above)
-  const scroller = e.target.closest('.pill-nav, .jump-pills-scroller, .point-action-row, .study-occ-bar, .quiz-track-tabs, .quiz-subtoolbar, .compare-actions');
+  const scroller = e.target.closest('.pill-nav, .jump-pills-scroller, .point-action-row, .study-occ-bar, .sheet-occ-bar, .compare-occ-bar, .quiz-track-tabs, .quiz-subtoolbar, .compare-actions');
   
   // Only hijack if the toolbar actually overflows horizontally and user is scrolling vertically
   if (scroller && scroller.scrollWidth > scroller.clientWidth + 2 && e.deltaY !== 0 && Math.abs(e.deltaX) < 10) {
