@@ -1230,9 +1230,17 @@ mark.diff-term-mark {
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid #d1d1d6;
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.section-jump-row {
+  display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  width: 100%;
 }
 
 .jump-bar-point-badge {
@@ -1570,8 +1578,8 @@ mark.diff-term-mark {
     .occ-group-pill.active-hide { background: #007aff; color: #fff; }
     .sheet-occ-bar {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      background: rgba(227, 227, 232, 0.6); padding: 8px 12px; border-radius: 10px;
-      margin: 0 0 12px 0; overflow-x: auto; scrollbar-width: none;
+      background: rgba(227, 227, 232, 0.6); padding: 5px 8px; border-radius: 8px;
+      margin: 0; overflow-x: auto; scrollbar-width: none;
     }
     .sheet-occ-bar::-webkit-scrollbar { display: none; }
     @media (prefers-color-scheme: dark) {
@@ -1899,7 +1907,7 @@ mark.diff-term-mark {
       .study-section-title { color: #aaa; }
       .study-back-header { background: #2c2c2e; border-color: #38383a; color: white; }
       .study-back-content { color: #eee; }
-      #studyOrderSelect, #studyCardModeSelect { background: #2c2c2e; color: white; }
+      #studyOrderSelect, #studyCardModeSelect { background: #2c2c2e !important; color: #ffffff !important; }
       .study-hdr-icon-btn { background: #2c2c2e; color: #0a84ff; }
       .study-hdr-icon-btn.active { background: #ff9f0a; color: #000000; }
       .grade-btn-wrong { background: rgba(255, 69, 58, 0.2); color: #ff453a; }
@@ -2552,7 +2560,7 @@ display: flex; flex-direction: column;">
 
 
 <!-- FLASHCARD SETTINGS MODAL -->
-<div id="studySettingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10015; justify-content: center; align-items: center;">
+<div id="studySettingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10020; justify-content: center; align-items: center;">
   <div class="modal-content" style="max-height: 85vh; overflow-y: auto;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
       <h3 class="modal-title" style="margin-bottom: 0;">Study Settings</h3>
@@ -2669,6 +2677,7 @@ display: flex; flex-direction: column;">
       <button id="studyAutoImgBtn" class="study-hdr-icon-btn" onclick="toggleStudyAutoRevealImage()" title="Toggle Auto-Reveal Images">🖼️</button>
       <button class="study-hdr-icon-btn" onclick="studyEditCurrentCard()" title="Edit current card">✏️</button>
       <button class="study-hdr-icon-btn" onclick="studyPeekCurrentCard()" title="Quick Peek Search">⚡</button>
+      <button class="study-hdr-icon-btn" onclick="openStudySettingsFromStudy()" title="Study Settings">⚙️</button>
       <select id="studyCardModeSelect" onchange="changeStudyCardMode(this.value)" title="Switch card face mode" style="font-size: 13px; font-weight: 800; padding: 6px 8px; border-radius: 6px; background: #e3e3e8; color: #333; border: none; cursor: pointer;">
         <option value="standard">🪪 Front</option>
         <option value="back">🔄 Text 1st</option>
@@ -2772,7 +2781,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.21.26.v4";
+const APP_VERSION = "11.23.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -8329,8 +8338,8 @@ window.ModalStack = {
   order: [
     'lightbox', 'srsCardModal', 'editModal', 'quickPeekModal',
     'compareModal', 'quizFilterModal', 'quizDistractorModal', 'quizResumeModal',
-    'studyModal', 'resumeSessionModal', 'occSearchModal', 'occLibraryModal',
-    'occStudioModal', 'quizModal', 'toolsHubModal', 'studySettingsModal',
+    'studySettingsModal', 'studyModal', 'resumeSessionModal', 'occSearchModal', 'occLibraryModal',
+    'occStudioModal', 'quizModal', 'toolsHubModal',
     'intakeModal', 'sectionModal', 'occlusionModal', 'printModal',
     'devModal', 'channelModal'
   ],
@@ -8477,6 +8486,7 @@ const isTyping = !!(curEl && (curEl.tagName === 'INPUT' || curEl.tagName === 'TE
     if (document.getElementById('quizFilterModal')?.style.display === 'flex') { stop(); closeQuizFilterModal(); return; }
     if (document.getElementById('quizDistractorModal')?.style.display === 'flex') { stop(); closeQuizDistractorModal(); return; }
     if (document.getElementById('quizResumeModal')?.style.display === 'flex') { stop(); abandonSavedQuizSession(); return; }
+    if (document.getElementById('studySettingsModal')?.style.display === 'flex') { stop(); closeStudySettingsModal(); return; }
     if (document.getElementById('studyModal')?.style.display === 'flex') { stop(); closeStudyModal(); return; }
     if (document.getElementById('resumeSessionModal')?.style.display === 'flex') { stop(); document.getElementById('resumeSessionModal').style.display = 'none'; return; }
     if (document.getElementById('occSearchModal')?.style.display === 'flex') { stop(); closeOccSearchModal(); return; }
@@ -8484,7 +8494,6 @@ if (document.getElementById('occLibraryModal')?.style.display === 'flex') { stop
 if (document.getElementById('occStudioModal')?.style.display === 'flex') { stop(); closeOcclusionStudioModal(); return; }
     if (document.getElementById('quizModal')?.style.display === 'flex') { stop(); closeQuizModal(); return; }
     if (document.getElementById('toolsHubModal')?.style.display === 'flex') { stop(); clearToolsHubKeyFocus(); closeToolsHubModal(); return; }
-    if (document.getElementById('studySettingsModal')?.style.display === 'flex') { stop(); closeStudySettingsModal(); return; }
     if (document.getElementById('intakeModal')?.style.display === 'flex') { stop(); closeIntakeModal(); return; }
     if (document.getElementById('sectionModal')?.style.display === 'flex') { stop(); closeSectionFilterModal(); return; }
     if (document.getElementById('occlusionModal')?.style.display === 'flex') { stop(); closeOcclusionModal(); return; }
@@ -8995,17 +9004,10 @@ document.addEventListener('keyup', (e) => {
 
     container.appendChild(actionRow);
 
-   // Inline Group Bar when Mark or Hide mode is active
+   // --- STICKY MINI-HEADER, SECTION JUMP-PILLS & OCCLUSION GROUP BAR ---
     const anyMark = (lineOccState === 'mark' || wordOccState === 'mark' || phraseOccState === 'mark');
     const anyHide = (lineOccState === 'hide' || wordOccState === 'hide' || phraseOccState === 'hide');
-    if (anyMark || anyHide) {
-      const groupBar = document.createElement("div");
-      groupBar.className = "sheet-occ-bar";
-      groupBar.innerHTML = buildInlineGroupBarHTML(point, anyMark, anyHide);
-      container.appendChild(groupBar);
-    }
 
-    // --- STICKY MINI-HEADER & SECTION JUMP-PILLS BAR ---
     const jumpBar = document.createElement("div");
     jumpBar.className = "section-jump-bar";
 
@@ -9034,10 +9036,22 @@ document.addEventListener('keyup', (e) => {
       container.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+    const jumpRow = document.createElement("div");
+    jumpRow.className = "section-jump-row";
+
     const jumpScroller = document.createElement("div");
     jumpScroller.className = "jump-pills-scroller";
-    jumpBar.appendChild(pointBadge);
-    jumpBar.appendChild(jumpScroller);
+    jumpRow.appendChild(pointBadge);
+    jumpRow.appendChild(jumpScroller);
+    jumpBar.appendChild(jumpRow);
+
+    if (anyMark || anyHide) {
+      const groupBar = document.createElement("div");
+      groupBar.className = "sheet-occ-bar";
+      groupBar.innerHTML = buildInlineGroupBarHTML(point, anyMark, anyHide);
+      jumpBar.appendChild(groupBar);
+    }
+
     container.appendChild(jumpBar);
 
     const jumpTargets = [];
@@ -9303,8 +9317,11 @@ document.addEventListener('keyup', (e) => {
       });
     }
 
-    // Hide the jump bar if no sections exist; otherwise set the sticky offset for section headers
+    // Hide the jump bar if no sections exist (unless occlusion bar is active); otherwise set sticky offset
     if (jumpTargets.length === 0) {
+      jumpRow.style.display = "none";
+    }
+    if (jumpTargets.length === 0 && !anyMark && !anyHide) {
       jumpBar.style.display = "none";
       container.style.setProperty("--jump-bar-offset", "0px");
     } else {
@@ -11587,6 +11604,7 @@ function openGlobalReview(forceCram = false, forceRestart = false) {
         <p style="margin-top: 0; font-size: 16px;">0 cards due in the selected channels.</p>
         <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           <button onclick="openGlobalReview(true, true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
+          <button onclick="openStudySettingsFromStudy()" style="background: #5856d6; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(88,86,214,0.3);">⚙️ Study Settings</button>
           <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
         </div>
       </div>
@@ -11673,6 +11691,7 @@ if (isDue) dueDeck.push(cardObj);
         <p style="margin-top: 0; font-size: 16px;">0 cards due out of ${allDeck.length} selected.</p>
         <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           <button onclick="openStudyModal(true, true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
+          <button onclick="openStudySettingsFromStudy()" style="background: #5856d6; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(88,86,214,0.3);">⚙️ Study Settings</button>
           <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
         </div>
       </div>
@@ -11981,6 +12000,11 @@ function closeStudyModal() {
   saveSessionLocal(true); // Saves locally and syncs paused position to MetaData["Flashcard View"]
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
   document.getElementById("studyModal").style.display = "none";
+}
+
+function openStudySettingsFromStudy() {
+  saveSessionLocal(true);
+  openStudySettingsModal();
 }
 
 // --- LOCAL PERSISTENCE HELPERS ---
@@ -12408,6 +12432,7 @@ function keepStudying() {
         <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           ${pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
           <button onclick="${studyDeckScope === 'global' ? 'openGlobalReview(true)' : 'openStudyModal(true)'}" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
+          <button onclick="openStudySettingsFromStudy()" style="background: #5856d6; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(88,86,214,0.3);">⚙️ Study Settings</button>
           <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
         </div>
       </div>`;
@@ -12487,6 +12512,7 @@ function renderCurrentStudyCard() {
           ${isBrowseMode ? `<button onclick="currentStudyIndex = 0; renderCurrentStudyCard();" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Browse Again</button>` : ''}
           ${!isBrowseMode ? `<button onclick="keepStudying()" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Keep Studying</button>` : ''}
           ${!isBrowseMode && pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
+          <button onclick="openStudySettingsFromStudy()" style="background: #5856d6; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(88,86,214,0.3);">⚙️ Study Settings</button>
           <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
         </div>
       </div>`;
@@ -12506,6 +12532,7 @@ function renderCurrentStudyCard() {
         <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           <button onclick="continueChunk()" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Continue Deck</button>
           ${pendingSRSUpdates.length > 0 ? `<button id="intermissionSyncBtn" onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
+          <button onclick="openStudySettingsFromStudy()" style="background: #5856d6; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(88,86,214,0.3);">⚙️ Study Settings</button>
         </div>
       </div>`;
     return;
