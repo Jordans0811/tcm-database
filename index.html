@@ -2246,6 +2246,123 @@ mark.diff-term-mark {
       .flat-list-thumb { background: #1c1c1e; }
       .flat-list-snippet { color: #aeaeb2; }
     }
+
+    /* --- SRS STATS BUTTON & MODAL --- */
+    .study-stats-launch-btn {
+      background: rgba(204, 85, 0, 0.12); color: #cc5500; border: 1px solid rgba(204, 85, 0, 0.3);
+      border-radius: 14px; padding: 5px 11px; font-size: 12px; font-weight: 800;
+      cursor: pointer; white-space: nowrap; transition: transform 0.1s, opacity 0.15s;
+    }
+    .study-stats-launch-btn:active { transform: scale(0.95); opacity: 0.8; }
+    .srs-stats-tabs {
+      display: flex; background: #e3e3e8; border-radius: 9px; padding: 3px; gap: 3px; margin-bottom: 12px; flex-shrink: 0;
+    }
+    .srs-stats-tab {
+      flex: 1; border: none; background: transparent; padding: 7px 6px; border-radius: 7px;
+      font-size: 12.5px; font-weight: 800; color: #555; cursor: pointer;
+    }
+    .srs-stats-tab.active { background: #ffffff; color: #cc5500; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+    .srs-stats-range-row {
+      display: flex; gap: 6px; margin-bottom: 12px; align-items: center;
+    }
+    .srs-range-pill {
+      border: 1px solid #c7c7cc; background: #ffffff; color: #555; border-radius: 14px;
+      padding: 4px 10px; font-size: 11.5px; font-weight: 800; cursor: pointer;
+    }
+    .srs-range-pill.active { background: #007aff; color: #ffffff; border-color: #007aff; }
+    .srs-kpi-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;
+    }
+    .srs-kpi-card {
+      background: #f8f8fa; border: 1px solid #e5e5ea; border-radius: 10px; padding: 10px; text-align: center;
+    }
+    .srs-kpi-val { font-size: 22px; font-weight: 900; color: #cc5500; line-height: 1.15; }
+    .srs-kpi-lbl { font-size: 11px; font-weight: 700; color: #8e8e93; text-transform: uppercase; margin-top: 3px; }
+    .srs-stats-card {
+      background: #f8f8fa; border: 1px solid #e5e5ea; border-radius: 10px; padding: 11px; margin-bottom: 10px;
+    }
+    .srs-stats-subhdr {
+      font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px;
+      color: #8e8e93; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .srs-bar-chart {
+      display: flex; align-items: flex-end; gap: 4px; height: 96px; padding-top: 14px;
+    }
+    .srs-bar-col {
+      flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end;
+    }
+    .srs-bar-num { font-size: 9.5px; font-weight: 800; color: #8e8e93; margin-bottom: 2px; line-height: 1; }
+    .srs-bar-fill {
+      width: 100%; max-width: 24px; min-height: 2px; border-radius: 4px 4px 0 0; background: #cc5500; transition: height 0.2s;
+    }
+    .srs-bar-fill.empty { background: #d1d1d6; opacity: 0.45; }
+    .srs-bar-lbl { font-size: 9.5px; font-weight: 700; color: #8e8e93; margin-top: 4px; white-space: nowrap; }
+    .srs-list-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 7px 0; border-bottom: 1px solid #e5e5ea; font-size: 13px;
+    }
+    .srs-list-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .srs-stacked-bar {
+      display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #e5e5ea; margin: 6px 0 8px 0;
+    }
+    .srs-legend-row {
+      display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; font-weight: 700; color: #555;
+    }
+    .srs-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+    @media (prefers-color-scheme: dark) {
+      .study-stats-launch-btn { background: rgba(255, 159, 10, 0.18); color: #ff9f0a; border-color: rgba(255, 159, 10, 0.4); }
+      .srs-stats-tabs { background: #2c2c2e; }
+      .srs-stats-tab { color: #aeaeb2; }
+      .srs-stats-tab.active { background: #3a3a3c; color: #ff9f0a; }
+      .srs-range-pill { background: #2c2c2e; color: #aeaeb2; border-color: #38383a; }
+      .srs-range-pill.active { background: #0a84ff; color: #ffffff; border-color: #0a84ff; }
+      .srs-kpi-card, .srs-stats-card { background: #2c2c2e; border-color: #38383a; color: #f2f2f7; }
+      .srs-kpi-val { color: #ff9f0a; }
+      .srs-bar-fill { background: #ff9f0a; }
+      .srs-bar-fill.empty { background: #48484a; }
+      .srs-list-row { border-bottom-color: #38383a; color: #f2f2f7; }
+      .srs-stacked-bar { background: #3a3a3c; }
+      .srs-legend-row { color: #aeaeb2; }
+    }
+
+    #studyStatsModal .modal-content {
+      height: 75vh;
+      max-height: 75vh !important;
+      box-sizing: border-box;
+    }
+    .srs-drill-btn {
+      width: 100%; padding: 12px; border: none; border-radius: 8px;
+      background: #cc5500; color: #ffffff; font-size: 14.5px; font-weight: 800;
+      cursor: pointer; margin-bottom: 12px;
+    }
+    .srs-drill-btn:active { opacity: 0.85; transform: scale(0.99); }
+
+    /* End-of-Session Summary Card (Light + Dark Mode) */
+    .study-summary-card {
+      background: #ffffff; border: 1px solid #d1d1d6; border-radius: 12px;
+      padding: 15px; margin: 20px auto; width: 90%; max-width: 320px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05); box-sizing: border-box;
+    }
+    .study-summary-row {
+      display: flex; justify-content: space-between; font-size: 12px;
+      color: #555; font-weight: bold; margin-top: 15px;
+    }
+    .study-summary-mid { border-left: 1px solid #eee; border-right: 1px solid #eee; }
+    .study-summary-footer {
+      margin-top: 15px; font-size: 11px; color: #8e8e93; border-top: 1px solid #eee;
+      padding-top: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .study-summary-close-btn {
+      background: #e3e3e8; color: #333; border: none; padding: 14px 24px;
+      border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;
+    }
+    @media (prefers-color-scheme: dark) {
+      .study-summary-card { background: #1c1c1e; border-color: #38383a; box-shadow: 0 4px 16px rgba(0,0,0,0.45); }
+      .study-summary-row { color: #aeaeb2; }
+      .study-summary-mid { border-left-color: #38383a; border-right-color: #38383a; }
+      .study-summary-footer { color: #8e8e93; border-top-color: #38383a; }
+      .study-summary-close-btn { background: #2c2c2e; color: #ffffff; }
+    }
   </style>
   
 <script src="./tcm-stopwords.js"></script>
@@ -2562,9 +2679,12 @@ display: flex; flex-direction: column;">
 <!-- FLASHCARD SETTINGS MODAL -->
 <div id="studySettingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10020; justify-content: center; align-items: center;">
   <div class="modal-content" style="max-height: 85vh; overflow-y: auto;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 15px;">
       <h3 class="modal-title" style="margin-bottom: 0;">Study Settings</h3>
-      <button onclick="closeStudySettingsModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button type="button" id="studySettingsStatsBtn" class="study-stats-launch-btn" onclick="openStudyStatsModal()">📊 Stats</button>
+        <button onclick="closeStudySettingsModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+      </div>
     </div>
 
     <div id="studyResumeBanner" style="display: none;"></div>
@@ -2633,6 +2753,22 @@ display: flex; flex-direction: column;">
       <button id="btnStudyCurrent" class="save-btn" style="width: 100%; background: #007aff; box-shadow: 0 4px 10px rgba(0,122,255,0.3);" onclick="startStudyFromSettings('current')">Study Current Set (0 Due)</button>
       <button id="btnStudyGlobal" class="save-btn" style="width: 100%; background: #34c759; box-shadow: 0 4px 10px rgba(52,199,89,0.3);" onclick="startStudyFromSettings('global')">Study Global Deck (0 Due)</button>
     </div>
+  </div>
+</div>
+
+<!-- FLASHCARD STATS MODAL -->
+<div id="studyStatsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10020; justify-content: center; align-items: center;" onclick="if(event.target===this) closeStudyStatsModal()">
+  <div class="modal-content" style="max-height: 85vh; display: flex; flex-direction: column;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0;">
+      <h3 class="modal-title" style="margin-bottom: 0;">Flashcard Stats</h3>
+      <button onclick="closeStudyStatsModal()" style="background: transparent; border: none; font-size: 26px; cursor: pointer; color: #555; padding: 0; line-height: 1;">&times;</button>
+    </div>
+    <div class="srs-stats-tabs">
+      <button type="button" id="srsTabActivity" class="srs-stats-tab active" onclick="switchStudyStatsTab('activity')">📊 Activity</button>
+      <button type="button" id="srsTabMastery" class="srs-stats-tab" onclick="switchStudyStatsTab('mastery')">📈 Mastery</button>
+      <button type="button" id="srsTabLeeches" class="srs-stats-tab" onclick="switchStudyStatsTab('leeches')">🩸 Leeches</button>
+    </div>
+    <div id="studyStatsBody" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0;"></div>
   </div>
 </div>
 
@@ -2781,7 +2917,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.23.26.v1";
+const APP_VERSION = "11.24.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3056,8 +3192,10 @@ async function loadTCMData(hasLocalData) {
     if (serverVersion && serverVersion === localVersion) {
       console.log("Data is identical. No update needed.");
       if (typeof syncStudySessionFromMetaData === "function") syncStudySessionFromMetaData();
+      if (typeof syncSRSStatsFromMetaData === "function") syncSRSStatsFromMetaData();
       if (typeof flushSearchHistoryCloudSync === "function") flushSearchHistoryCloudSync();
       if (typeof flushStudySessionCloudSync === "function") flushStudySessionCloudSync();
+      if (typeof flushSRSStatsCloudSync === "function") flushSRSStatsCloudSync();
       return; 
     }
 
@@ -3145,6 +3283,7 @@ document.addEventListener("visibilitychange", () => {
     }
     if (typeof flushSearchHistoryCloudSync === 'function') flushSearchHistoryCloudSync();
     if (typeof flushStudySessionCloudSync === 'function') flushStudySessionCloudSync();
+    if (typeof flushSRSStatsCloudSync === 'function') flushSRSStatsCloudSync();
   }
 });
 
@@ -3237,6 +3376,7 @@ async function bootApp() {
     // We have data! Render instantly without flashing a loading message.
     points = processPoints(rawPoints);
     if (typeof syncStudySessionFromMetaData === "function") syncStudySessionFromMetaData();
+    if (typeof syncSRSStatsFromMetaData === "function") syncSRSStatsFromMetaData();
     initDropdown();
     handleSearch(); 
   } else {
@@ -3942,6 +4082,9 @@ function applySectionFilter() {
       }
       if (typeof syncStudySessionFromMetaData === "function") {
         syncStudySessionFromMetaData();
+      }
+      if (typeof syncSRSStatsFromMetaData === "function") {
+        syncSRSStatsFromMetaData();
       }
       if (typeof window.pullQuizLedgerFromCloud === "function") {
         window.pullQuizLedgerFromCloud(true);
@@ -8338,7 +8481,7 @@ window.ModalStack = {
   order: [
     'lightbox', 'srsCardModal', 'editModal', 'quickPeekModal',
     'compareModal', 'quizFilterModal', 'quizDistractorModal', 'quizResumeModal',
-    'studySettingsModal', 'studyModal', 'resumeSessionModal', 'occSearchModal', 'occLibraryModal',
+    'studyStatsModal', 'studySettingsModal', 'studyModal', 'resumeSessionModal', 'occSearchModal', 'occLibraryModal',
     'occStudioModal', 'quizModal', 'toolsHubModal',
     'intakeModal', 'sectionModal', 'occlusionModal', 'printModal',
     'devModal', 'channelModal'
@@ -8486,6 +8629,7 @@ const isTyping = !!(curEl && (curEl.tagName === 'INPUT' || curEl.tagName === 'TE
     if (document.getElementById('quizFilterModal')?.style.display === 'flex') { stop(); closeQuizFilterModal(); return; }
     if (document.getElementById('quizDistractorModal')?.style.display === 'flex') { stop(); closeQuizDistractorModal(); return; }
     if (document.getElementById('quizResumeModal')?.style.display === 'flex') { stop(); abandonSavedQuizSession(); return; }
+    if (document.getElementById('studyStatsModal')?.style.display === 'flex') { stop(); closeStudyStatsModal(); return; }
     if (document.getElementById('studySettingsModal')?.style.display === 'flex') { stop(); closeStudySettingsModal(); return; }
     if (document.getElementById('studyModal')?.style.display === 'flex') { stop(); closeStudyModal(); return; }
     if (document.getElementById('resumeSessionModal')?.style.display === 'flex') { stop(); document.getElementById('resumeSessionModal').style.display = 'none'; return; }
@@ -11117,6 +11261,8 @@ function openStudySettingsModal() {
   // 3. Reset to active view on open, then render Paused Banner + Source & Section Pills
   studySelectedPinnedQuery = null;
   if (typeof syncStudySessionFromMetaData === "function") syncStudySessionFromMetaData();
+  if (typeof syncSRSStatsFromMetaData === "function") syncSRSStatsFromMetaData();
+  if (typeof updateStudySettingsStatsBadge === "function") updateStudySettingsStatsBadge();
   renderStudyResumeBanner();
   renderStudySourceAndSections();
 
@@ -11605,7 +11751,7 @@ function openGlobalReview(forceCram = false, forceRestart = false) {
         <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           <button onclick="openGlobalReview(true, true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
           <button onclick="openStudySettingsFromStudy()" style="background: #5856d6; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(88,86,214,0.3);">⚙️ Study Settings</button>
-          <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
+          <button onclick="closeStudyModal()" class="study-summary-close-btn">Close</button>
         </div>
       </div>
     `;
@@ -11692,7 +11838,7 @@ if (isDue) dueDeck.push(cardObj);
         <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
           <button onclick="openStudyModal(true, true)" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
           <button onclick="openStudySettingsFromStudy()" style="background: #5856d6; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(88,86,214,0.3);">⚙️ Study Settings</button>
-          <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
+          <button onclick="closeStudyModal()" class="study-summary-close-btn">Close</button>
         </div>
       </div>
     `;
@@ -11998,6 +12144,7 @@ function finalizeDeckLaunch(order, isBrowseMode, isResuming = false) {
 
 function closeStudyModal() {
   saveSessionLocal(true); // Saves locally and syncs paused position to MetaData["Flashcard View"]
+  if (typeof flushSRSStatsCloudSync === "function") flushSRSStatsCloudSync();
   viewportMeta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
   document.getElementById("studyModal").style.display = "none";
 }
@@ -12433,7 +12580,7 @@ function keepStudying() {
           ${pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
           <button onclick="${studyDeckScope === 'global' ? 'openGlobalReview(true)' : 'openStudyModal(true)'}" style="background: #ff9f0a; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(255,159,10,0.3);">Study Anyway (Cram)</button>
           <button onclick="openStudySettingsFromStudy()" style="background: #5856d6; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(88,86,214,0.3);">⚙️ Study Settings</button>
-          <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
+          <button onclick="closeStudyModal()" class="study-summary-close-btn">Close</button>
         </div>
       </div>`;
     return;
@@ -12464,14 +12611,14 @@ function generateStudyStatsHTML() {
   let accColor = accuracy >= 80 ? '#34c759' : (accuracy >= 60 ? '#ff9f0a' : '#ff3b30');
 
   return `
-    <div style="background: white; border: 1px solid #d1d1d6; border-radius: 12px; padding: 15px; margin: 20px auto; width: 90%; max-width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-      <div style="font-size: 28px; font-weight: 900; color: ${accColor}; margin-bottom: 5px;">${accuracy}% <span style="font-size: 14px; font-weight: bold; color: #888; text-transform: uppercase;">Accuracy</span></div>
-      <div style="display: flex; justify-content: space-between; font-size: 12px; color: #555; font-weight: bold; margin-top: 15px;">
+    <div class="study-summary-card">
+      <div style="font-size: 28px; font-weight: 900; color: ${accColor}; margin-bottom: 5px;">${accuracy}% <span style="font-size: 14px; font-weight: bold; color: #8e8e93; text-transform: uppercase;">Accuracy</span></div>
+      <div class="study-summary-row">
         <div style="text-align: center; flex: 1;"><span style="display: block; font-size: 20px; color: #007aff;">${studySessionStats.strong}</span> Strong</div>
-        <div style="text-align: center; flex: 1; border-left: 1px solid #eee; border-right: 1px solid #eee;"><span style="display: block; font-size: 20px; color: #34c759;">${studySessionStats.correct}</span> Correct</div>
+        <div class="study-summary-mid" style="text-align: center; flex: 1;"><span style="display: block; font-size: 20px; color: #34c759;">${studySessionStats.correct}</span> Correct</div>
         <div style="text-align: center; flex: 1;"><span style="display: block; font-size: 20px; color: #ff3b30;">${studySessionStats.wrong}</span> Wrong</div>
       </div>
-      <div style="margin-top: 15px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Total Session Reviews: ${total}</div>
+      <div class="study-summary-footer">Total Session Reviews: ${total}</div>
     </div>
   `;
 }
@@ -12513,7 +12660,7 @@ function renderCurrentStudyCard() {
           ${!isBrowseMode ? `<button onclick="keepStudying()" style="background: #007aff; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(0,122,255,0.3);">Keep Studying</button>` : ''}
           ${!isBrowseMode && pendingSRSUpdates.length > 0 ? `<button onclick="syncSRSData()" style="background: #34c759; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(52,199,89,0.3);">Save & Sync Stats</button>` : ''}
           <button onclick="openStudySettingsFromStudy()" style="background: #5856d6; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px; box-shadow: 0 4px 10px rgba(88,86,214,0.3);">⚙️ Study Settings</button>
-          <button onclick="closeStudyModal()" style="background: #e3e3e8; color: #333; border: none; padding: 14px 24px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; width: 220px;">Close</button>
+          <button onclick="closeStudyModal()" class="study-summary-close-btn">Close</button>
         </div>
       </div>`;
     return;
@@ -12744,7 +12891,8 @@ function rateCard(ratingClass) {
     // --- UPDATE STATS ON EVERY SWIPE ---
     if (ratingClass === 'swipe-strong') studySessionStats.strong++;
     else if (ratingClass === 'swipe-correct') studySessionStats.correct++;
-    else if (ratingClass === 'swipe-wrong') studySessionStats.wrong++; 
+    else if (ratingClass === 'swipe-wrong') studySessionStats.wrong++;
+    const repMeta = recordSRSRep(currentCard.point, ratingClass);
 
     
    // --- UPDATE STREAK ---
@@ -12794,7 +12942,9 @@ function rateCard(ratingClass) {
       previousIndex: snapshotIndex,
       graduated: graduated,
       pulledNewCard: pulledNewCard,
-      rating: ratingClass
+      rating: ratingClass,
+      statDate: repMeta.date,
+      statChannel: repMeta.channel
     });
 
     updateStudySyncBadge();
@@ -12824,6 +12974,7 @@ function undoLastStudyCard() {
   if (lastAction.rating === 'swipe-strong') studySessionStats.strong--;
   else if (lastAction.rating === 'swipe-correct') studySessionStats.correct--;
   else if (lastAction.rating === 'swipe-wrong') studySessionStats.wrong--;
+  undoSRSRep(lastAction.statDate, lastAction.statChannel, lastAction.rating);
   
   if (!isCramMode) {
     // Safely find and remove the most recent entry for this card from the sync pool
@@ -12923,6 +13074,22 @@ async function syncSRSData() {
     }
   }
 
+  let bundledStatsSig = null;
+  let bundledStatsStr = null;
+  if (hasUnsyncedSRSStats && window.tcmMetaDataRow) {
+    const statsPayload = loadSRSStatsLocal();
+    const sig = getSRSStatsSyncSig(statsPayload);
+    if (sig !== lastSyncedSRSStatsSig) {
+      bundledStatsSig = sig;
+      bundledStatsStr = serializeSRSStatsSafe(statsPayload);
+      cloudPayload.push({
+        id: window.tcmMetaDataRow["Short Name"],
+        field: SRS_STATS_FIELD,
+        value: bundledStatsStr
+      });
+    }
+  }
+
   try {
     const resp = await fetch(writeUrl, {
       method: "POST",
@@ -12947,6 +13114,13 @@ async function syncSRSData() {
       await saveSinglePointToVault(window.tcmMetaDataRow);
       setStudySessionCloudSig(bundledSessionSig);
       setStudySessionDirty(false);
+    }
+
+    if (bundledStatsStr !== null && window.tcmMetaDataRow) {
+      window.tcmMetaDataRow[SRS_STATS_FIELD] = bundledStatsStr;
+      await saveSinglePointToVault(window.tcmMetaDataRow);
+      setSRSStatsCloudSig(bundledStatsSig);
+      setSRSStatsDirty(false);
     }
 
     // 2. SAFELY FILTER out only the updates we just saved
@@ -12977,6 +13151,682 @@ async function syncSRSData() {
     isSyncing = false; 
   }
 }
+
+// --- SRS DAILY REP TRACKER & STATS MODAL (STORED IN METADATA["Remarks"]) ---
+const SRS_STATS_FIELD = "Remarks";
+const SRS_STATS_LOCAL_KEY = "tcm_srs_daily_stats";
+let lastSyncedSRSStatsSig = localStorage.getItem("tcm_srs_stats_cloud_sig") || "";
+let hasUnsyncedSRSStats = localStorage.getItem("tcm_srs_stats_dirty") === "true";
+let activeStudyStatsTab = "activity";
+let activeStudyStatsRange = "7d"; // 'today' | '7d' | '30d' | 'all'
+
+function setSRSStatsCloudSig(sig) {
+  lastSyncedSRSStatsSig = sig;
+  try { localStorage.setItem("tcm_srs_stats_cloud_sig", sig); } catch (e) {}
+}
+
+function setSRSStatsDirty(isDirty) {
+  hasUnsyncedSRSStats = isDirty;
+  try { localStorage.setItem("tcm_srs_stats_dirty", isDirty ? "true" : "false"); } catch (e) {}
+}
+
+function getSRSStatsDeviceId() {
+  let id = localStorage.getItem("tcm_srs_device_id");
+  if (!id) {
+    id = Math.random().toString(36).slice(2, 6);
+    try { localStorage.setItem("tcm_srs_device_id", id); } catch (e) {}
+  }
+  return id;
+}
+
+function getLocalDateKey(dateObj = new Date()) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const d = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function loadSRSStatsLocal() {
+  try {
+    const raw = localStorage.getItem(SRS_STATS_LOCAL_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return {
+          v: 1,
+          u: Number(parsed.u) || 0,
+          c: Array.isArray(parsed.c) ? parsed.c : [],
+          d: parsed.d && typeof parsed.d === "object" ? parsed.d : {},
+          a: parsed.a && typeof parsed.a === "object" ? parsed.a : null
+        };
+      }
+    }
+  } catch (e) {}
+  return { v: 1, u: 0, c: [], d: {}, a: null };
+}
+
+function saveSRSStatsLocal(store) {
+  try { localStorage.setItem(SRS_STATS_LOCAL_KEY, JSON.stringify(store)); } catch (e) {}
+}
+
+function getSRSStatsSyncSig(store) {
+  return JSON.stringify({ c: store.c || [], d: store.d || {}, a: store.a || null });
+}
+
+function serializeSRSStatsSafe(store) {
+  const copy = JSON.parse(JSON.stringify(store));
+  let str = JSON.stringify(copy);
+  if (str.length <= 46000) return str;
+
+  // Compact oldest days into archive bucket if ever approaching Sheets' 50k cell cap
+  if (!copy.a) copy.a = { t: [0, 0, 0], b: {} };
+  const sortedDates = Object.keys(copy.d || {}).sort();
+  while (str.length > 44000 && sortedDates.length > 60) {
+    const oldest = sortedDates.shift();
+    const dayObj = copy.d[oldest];
+    if (dayObj) {
+      Object.values(dayObj).forEach(dev => {
+        if (Array.isArray(dev.t)) {
+          copy.a.t[0] += Number(dev.t[0]) || 0;
+          copy.a.t[1] += Number(dev.t[1]) || 0;
+          copy.a.t[2] += Number(dev.t[2]) || 0;
+        }
+        if (dev.b && typeof dev.b === "object") {
+          Object.entries(dev.b).forEach(([cIdx, arr]) => {
+            if (!copy.a.b[cIdx]) copy.a.b[cIdx] = [0, 0, 0];
+            copy.a.b[cIdx][0] += Number(arr[0]) || 0;
+            copy.a.b[cIdx][1] += Number(arr[1]) || 0;
+            copy.a.b[cIdx][2] += Number(arr[2]) || 0;
+          });
+        }
+      });
+    }
+    delete copy.d[oldest];
+    str = JSON.stringify(copy);
+  }
+  return str;
+}
+
+function getRatingTupleIndex(ratingClass) {
+  if (ratingClass === "swipe-strong") return 0;
+  if (ratingClass === "swipe-correct") return 1;
+  return 2;
+}
+
+function recordSRSRep(pointObj, ratingClass) {
+  const dateKey = getLocalDateKey();
+  const chanName = (pointObj && (pointObj["Channel Full Name"] || pointObj[" Channel Full Name"] || pointObj["Channel Short Name"] || pointObj[" Channel Short Name"])) || "Other";
+  const devId = getSRSStatsDeviceId();
+  const rIdx = getRatingTupleIndex(ratingClass);
+
+  const store = loadSRSStatsLocal();
+  let cIdx = store.c.indexOf(chanName);
+  if (cIdx === -1) {
+    cIdx = store.c.length;
+    store.c.push(chanName);
+  }
+  if (!store.d[dateKey]) store.d[dateKey] = {};
+  if (!store.d[dateKey][devId]) store.d[dateKey][devId] = { t: [0, 0, 0], b: {} };
+  const devBucket = store.d[dateKey][devId];
+  devBucket.t[rIdx] = (Number(devBucket.t[rIdx]) || 0) + 1;
+  if (!devBucket.b[cIdx]) devBucket.b[cIdx] = [0, 0, 0];
+  devBucket.b[cIdx][rIdx] = (Number(devBucket.b[cIdx][rIdx]) || 0) + 1;
+
+  store.u = Date.now();
+  saveSRSStatsLocal(store);
+  setSRSStatsDirty(true);
+  return { date: dateKey, channel: chanName };
+}
+
+function undoSRSRep(dateKey, chanName, ratingClass) {
+  if (!dateKey || !chanName) return;
+  const devId = getSRSStatsDeviceId();
+  const rIdx = getRatingTupleIndex(ratingClass);
+  const store = loadSRSStatsLocal();
+  const devBucket = store.d[dateKey] && store.d[dateKey][devId];
+  if (!devBucket) return;
+
+  devBucket.t[rIdx] = Math.max(0, (Number(devBucket.t[rIdx]) || 0) - 1);
+  const cIdx = store.c.indexOf(chanName);
+  if (cIdx !== -1 && devBucket.b && devBucket.b[cIdx]) {
+    devBucket.b[cIdx][rIdx] = Math.max(0, (Number(devBucket.b[cIdx][rIdx]) || 0) - 1);
+  }
+  store.u = Date.now();
+  saveSRSStatsLocal(store);
+  setSRSStatsDirty(true);
+}
+
+function syncSRSStatsFromMetaData() {
+  if (!window.tcmMetaDataRow) return;
+  const rawCloud = window.tcmMetaDataRow[SRS_STATS_FIELD];
+  const local = loadSRSStatsLocal();
+  const myDev = getSRSStatsDeviceId();
+
+  if (!rawCloud || String(rawCloud).trim() === "") {
+    if (Object.keys(local.d).length > 0) {
+      setSRSStatsDirty(true);
+      flushSRSStatsCloudSync();
+    }
+    return;
+  }
+
+  try {
+    const cloud = JSON.parse(rawCloud);
+    if (!cloud || typeof cloud !== "object" || !cloud.d) return;
+
+    const cloudChannels = Array.isArray(cloud.c) ? cloud.c : [];
+    const ensureChanIdx = (name) => {
+      let idx = local.c.indexOf(name);
+      if (idx === -1) {
+        idx = local.c.length;
+        local.c.push(name);
+      }
+      return idx;
+    };
+
+    const remapDevBucket = (devObj) => {
+      const out = {
+        t: [Number(devObj.t?.[0]) || 0, Number(devObj.t?.[1]) || 0, Number(devObj.t?.[2]) || 0],
+        b: {}
+      };
+      if (devObj.b && typeof devObj.b === "object") {
+        Object.entries(devObj.b).forEach(([oldIdx, arr]) => {
+          const chName = cloudChannels[Number(oldIdx)] || "Other";
+          const newIdx = ensureChanIdx(chName);
+          out.b[newIdx] = [Number(arr?.[0]) || 0, Number(arr?.[1]) || 0, Number(arr?.[2]) || 0];
+        });
+      }
+      return out;
+    };
+
+    const sumTuple = (arr) => (Number(arr?.[0]) || 0) + (Number(arr?.[1]) || 0) + (Number(arr?.[2]) || 0);
+
+    Object.entries(cloud.d).forEach(([dateKey, cloudDay]) => {
+      if (!cloudDay || typeof cloudDay !== "object") return;
+      if (!local.d[dateKey]) local.d[dateKey] = {};
+      Object.entries(cloudDay).forEach(([devId, cloudDev]) => {
+        if (!cloudDev) return;
+        if (devId !== myDev) {
+          local.d[dateKey][devId] = remapDevBucket(cloudDev);
+        } else {
+          const localDev = local.d[dateKey][devId];
+          if (!localDev || (!hasUnsyncedSRSStats && sumTuple(cloudDev.t) > sumTuple(localDev.t))) {
+            local.d[dateKey][devId] = remapDevBucket(cloudDev);
+          }
+        }
+      });
+    });
+
+    if (cloud.a && (!local.a || sumTuple(cloud.a.t) > sumTuple(local.a.t))) {
+      local.a = remapDevBucket(cloud.a);
+    }
+
+    local.u = Math.max(Number(local.u) || 0, Number(cloud.u) || 0);
+    saveSRSStatsLocal(local);
+
+    const cloudSig = getSRSStatsSyncSig(cloud);
+    const mergedSig = getSRSStatsSyncSig(local);
+    setSRSStatsCloudSig(cloudSig);
+
+    if (mergedSig !== cloudSig) {
+      setSRSStatsDirty(true);
+      flushSRSStatsCloudSync();
+    } else {
+      setSRSStatsDirty(false);
+    }
+
+    updateStudySettingsStatsBadge();
+    if (document.getElementById("studyStatsModal")?.style.display === "flex") {
+      renderStudyStatsModal();
+    }
+  } catch (e) {
+    console.warn("SRS stats cloud merge skipped:", e);
+  }
+}
+
+function flushSRSStatsCloudSync() {
+  if (!hasUnsyncedSRSStats || !navigator.onLine || !window.tcmMetaDataRow) return;
+  const store = loadSRSStatsLocal();
+  const sig = getSRSStatsSyncSig(store);
+  if (sig === lastSyncedSRSStatsSig) {
+    setSRSStatsDirty(false);
+    return;
+  }
+
+  const serialized = serializeSRSStatsSafe(store);
+  window.tcmMetaDataRow[SRS_STATS_FIELD] = serialized;
+  if (typeof saveSinglePointToVault === "function") {
+    saveSinglePointToVault(window.tcmMetaDataRow);
+  }
+
+  setSRSStatsCloudSig(sig);
+  setSRSStatsDirty(false);
+
+  fetch(writeUrl, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      id: window.tcmMetaDataRow["Short Name"],
+      field: SRS_STATS_FIELD,
+      value: serialized
+    }),
+    keepalive: true
+  }).catch(err => {
+    setSRSStatsCloudSig("");
+    setSRSStatsDirty(true);
+    console.log("SRS stats cloud sync deferred:", err);
+  });
+}
+
+window.addEventListener("pagehide", flushSRSStatsCloudSync);
+window.addEventListener("online", flushSRSStatsCloudSync);
+
+function getTodaySRSRepCount() {
+  const store = loadSRSStatsLocal();
+  const dayObj = store.d[getLocalDateKey()];
+  if (!dayObj) return 0;
+  let total = 0;
+  Object.values(dayObj).forEach(dev => {
+    if (dev && Array.isArray(dev.t)) {
+      total += (Number(dev.t[0]) || 0) + (Number(dev.t[1]) || 0) + (Number(dev.t[2]) || 0);
+    }
+  });
+  return total;
+}
+
+function updateStudySettingsStatsBadge() {
+  const btn = document.getElementById("studySettingsStatsBtn");
+  if (!btn) return;
+  const todayReps = getTodaySRSRepCount();
+  btn.textContent = todayReps > 0 ? `📊 Stats (${todayReps})` : "📊 Stats";
+}
+
+window.openStudyStatsModal = function() {
+  syncSRSStatsFromMetaData();
+  renderStudyStatsModal();
+  document.getElementById("studyStatsModal").style.display = "flex";
+};
+
+window.closeStudyStatsModal = function() {
+  document.getElementById("studyStatsModal").style.display = "none";
+};
+
+window.switchStudyStatsTab = function(tab) {
+  activeStudyStatsTab = tab;
+  document.getElementById("srsTabActivity").classList.toggle("active", tab === "activity");
+  document.getElementById("srsTabMastery").classList.toggle("active", tab === "mastery");
+  document.getElementById("srsTabLeeches").classList.toggle("active", tab === "leeches");
+  renderStudyStatsModal();
+};
+
+window.setStudyStatsRange = function(range) {
+  activeStudyStatsRange = range;
+  renderStudyStatsModal();
+};
+
+function renderStudyStatsModal() {
+  const body = document.getElementById("studyStatsBody");
+  if (!body) return;
+  if (activeStudyStatsTab === "activity") renderSRSActivityTab(body);
+  else if (activeStudyStatsTab === "mastery") renderSRSMasteryTab(body);
+  else renderSRSLeechesTab(body);
+}
+
+function renderSRSActivityTab(body) {
+  const store = loadSRSStatsLocal();
+  const todayKey = getLocalDateKey();
+  const now = new Date();
+
+  const getDateOffsetKey = (daysAgo) => {
+    const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo);
+    return getLocalDateKey(dt);
+  };
+
+  const sumDay = (dateKey) => {
+    const dayObj = store.d[dateKey];
+    let s = 0, c = 0, w = 0;
+    const byChan = {};
+    if (dayObj) {
+      Object.values(dayObj).forEach(dev => {
+        if (!dev) return;
+        s += Number(dev.t?.[0]) || 0;
+        c += Number(dev.t?.[1]) || 0;
+        w += Number(dev.t?.[2]) || 0;
+        if (dev.b && typeof dev.b === "object") {
+          Object.entries(dev.b).forEach(([cIdx, arr]) => {
+            const name = store.c[Number(cIdx)] || "Other";
+            if (!byChan[name]) byChan[name] = [0, 0, 0];
+            byChan[name][0] += Number(arr?.[0]) || 0;
+            byChan[name][1] += Number(arr?.[1]) || 0;
+            byChan[name][2] += Number(arr?.[2]) || 0;
+          });
+        }
+      });
+    }
+    return { s, c, w, total: s + c + w, byChan };
+  };
+
+  const todayStats = sumDay(todayKey);
+  let weekTotal = 0;
+  for (let i = 0; i < 7; i++) weekTotal += sumDay(getDateOffsetKey(i)).total;
+
+  let allTotal = 0;
+  if (store.a && Array.isArray(store.a.t)) {
+    allTotal += (Number(store.a.t[0]) || 0) + (Number(store.a.t[1]) || 0) + (Number(store.a.t[2]) || 0);
+  }
+  Object.keys(store.d).forEach(dk => { allTotal += sumDay(dk).total; });
+
+  // Build selected timeframe totals + channel breakdown
+  let rangeS = 0, rangeC = 0, rangeW = 0;
+  const chanTotals = {};
+  const addChanMap = (map) => {
+    Object.entries(map).forEach(([name, arr]) => {
+      if (!chanTotals[name]) chanTotals[name] = [0, 0, 0];
+      chanTotals[name][0] += arr[0];
+      chanTotals[name][1] += arr[1];
+      chanTotals[name][2] += arr[2];
+    });
+  };
+
+  let targetDates = [];
+  if (activeStudyStatsRange === "today") {
+    targetDates = [todayKey];
+  } else if (activeStudyStatsRange === "7d") {
+    for (let i = 6; i >= 0; i--) targetDates.push(getDateOffsetKey(i));
+  } else if (activeStudyStatsRange === "30d") {
+    for (let i = 29; i >= 0; i--) targetDates.push(getDateOffsetKey(i));
+  } else {
+    targetDates = Object.keys(store.d).sort();
+    if (store.a && Array.isArray(store.a.t)) {
+      rangeS += Number(store.a.t[0]) || 0;
+      rangeC += Number(store.a.t[1]) || 0;
+      rangeW += Number(store.a.t[2]) || 0;
+      if (store.a.b) {
+        const archMap = {};
+        Object.entries(store.a.b).forEach(([cIdx, arr]) => {
+          archMap[store.c[Number(cIdx)] || "Other"] = [Number(arr[0]) || 0, Number(arr[1]) || 0, Number(arr[2]) || 0];
+        });
+        addChanMap(archMap);
+      }
+    }
+  }
+
+  targetDates.forEach(dk => {
+    const dStat = sumDay(dk);
+    rangeS += dStat.s;
+    rangeC += dStat.c;
+    rangeW += dStat.w;
+    addChanMap(dStat.byChan);
+  });
+
+  const rangeTotal = rangeS + rangeC + rangeW;
+  const rangeAcc = rangeTotal > 0 ? Math.round(((rangeS + rangeC) / rangeTotal) * 100) : 0;
+
+  // Bar chart shows last 7 or 14 days cleanly
+  const chartDays = activeStudyStatsRange === "30d" ? 14 : 7;
+  const chartCols = [];
+  let maxBar = 1;
+  for (let i = chartDays - 1; i >= 0; i--) {
+    const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const dk = getLocalDateKey(dt);
+    const tot = sumDay(dk).total;
+    if (tot > maxBar) maxBar = tot;
+    const lbl = chartDays === 7
+      ? dt.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2)
+      : String(dt.getDate());
+    chartCols.push({ dk, tot, lbl });
+  }
+
+  const barsHtml = chartCols.map(col => {
+    const hPct = col.tot > 0 ? Math.max(8, Math.round((col.tot / maxBar) * 100)) : 3;
+    return `
+      <div class="srs-bar-col" title="${col.dk}: ${col.tot} reps">
+        <div class="srs-bar-num">${col.tot > 0 ? col.tot : ""}</div>
+        <div class="srs-bar-fill${col.tot === 0 ? " empty" : ""}" style="height:${hPct}%;"></div>
+        <div class="srs-bar-lbl">${col.lbl}</div>
+      </div>
+    `;
+  }).join("");
+
+  const sortedChans = Object.entries(chanTotals)
+    .map(([name, arr]) => {
+      const tot = arr[0] + arr[1] + arr[2];
+      const acc = tot > 0 ? Math.round(((arr[0] + arr[1]) / tot) * 100) : 0;
+      return { name, tot, acc };
+    })
+    .filter(x => x.tot > 0)
+    .sort((a, b) => b.tot - a.tot);
+
+  const chanListHtml = sortedChans.length > 0
+    ? sortedChans.map(ch => `
+        <div class="srs-list-row">
+          <span style="font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(ch.name)}</span>
+          <span style="font-weight:800; color:#cc5500; white-space:nowrap;">${ch.tot} reps</span>
+          <span style="font-size:11.5px; color:${ch.acc >= 80 ? '#34c759' : (ch.acc >= 60 ? '#ff9f0a' : '#ff3b30')}; font-weight:800; min-width:34px; text-align:right;">${ch.acc}%</span>
+        </div>
+      `).join("")
+    : `<div style="font-size:12.5px; color:#8e8e93; text-align:center; padding:8px 0;">No reps logged in this timeframe yet.</div>`;
+
+  const rangeBtn = (val, label) => `<button type="button" class="srs-range-pill${activeStudyStatsRange === val ? " active" : ""}" onclick="setStudyStatsRange('${val}')">${label}</button>`;
+
+  body.innerHTML = `
+    <div class="srs-stats-range-row">
+      ${rangeBtn("today", "Today")}
+      ${rangeBtn("7d", "7D")}
+      ${rangeBtn("30d", "30D")}
+      ${rangeBtn("all", "All-Time")}
+    </div>
+    <div class="srs-kpi-grid">
+      <div class="srs-kpi-card"><div class="srs-kpi-val">${todayStats.total}</div><div class="srs-kpi-lbl">Today's Reps</div></div>
+      <div class="srs-kpi-card"><div class="srs-kpi-val">${weekTotal}</div><div class="srs-kpi-lbl">Last 7 Days</div></div>
+      <div class="srs-kpi-card"><div class="srs-kpi-val">${allTotal}</div><div class="srs-kpi-lbl">All-Time Reps</div></div>
+      <div class="srs-kpi-card"><div class="srs-kpi-val" style="color:${rangeTotal === 0 ? '#8e8e93' : (rangeAcc >= 80 ? '#34c759' : '#ff9f0a')};">${rangeTotal > 0 ? rangeAcc + "%" : "--"}</div><div class="srs-kpi-lbl">Accuracy (${activeStudyStatsRange.toUpperCase()})</div></div>
+    </div>
+    <div class="srs-stats-card">
+      <div class="srs-stats-subhdr"><span>Daily Reps (Last ${chartDays} Days)</span><span>Includes Cram</span></div>
+      <div class="srs-bar-chart">${barsHtml}</div>
+    </div>
+    <div class="srs-stats-card">
+      <div class="srs-stats-subhdr"><span>Reps by Channel / Topic</span><span>${rangeTotal} Total</span></div>
+      ${chanListHtml}
+    </div>
+  `;
+}
+
+function collectAllEnrolledSRSCards() {
+  const now = Date.now();
+  const cards = [];
+  points.forEach(p => {
+    if (!p["SRS Data"] || p["SRS Data"] === "{}" || p["SRS Data"].trim() === "") return;
+    let srsData = {};
+    try { srsData = JSON.parse(p["SRS Data"]); } catch (e) { return; }
+    const chanName = p["Channel Full Name"] || p[" Channel Full Name"] || "Other";
+
+    TCM_SECTIONS.forEach(secObj => {
+      ["standard", "back", "image"].forEach(mode => {
+        const srsKey = getSrsKey(secObj.label, mode);
+        if (!srsData.hasOwnProperty(srsKey)) return;
+        const st = getVirtualSRS(p, srsKey);
+        if (!st || !Array.isArray(st)) return;
+        const interval = Number(st[0]) || 0;
+        const due = Number(st[1]) || 0;
+        const streak = st.length > 2 ? (Number(st[2]) || 0) : 0;
+        const lapses = st.length > 3 ? (Number(st[3]) || 0) : 0;
+        const bucket = interval === 0 ? "learning" : (interval < 7 ? "young" : "mature");
+        const isDue = interval === 0 || due <= now;
+        cards.push({ point: p, chanName, sectionLabel: secObj.label, srsKey, mode, interval, due, streak, lapses, bucket, isDue });
+      });
+    });
+  });
+  return cards;
+}
+
+function renderSRSMasteryTab(body) {
+  const cards = collectAllEnrolledSRSCards();
+  if (cards.length === 0) {
+    body.innerHTML = `<div style="text-align:center; padding:30px 10px; color:#8e8e93;">No enrolled SRS cards yet. Complete and sync a study session to see maturity and mode stats.</div>`;
+    return;
+  }
+
+  let learning = 0, young = 0, mature = 0, dueNow = 0;
+  const modeStats = {
+    standard: { label: "🪪 Front", total: 0, due: 0, mature: 0, lapses: 0 },
+    back: { label: "🔄 Text 1st", total: 0, due: 0, mature: 0, lapses: 0 },
+    image: { label: "🖼️ Img 1st", total: 0, due: 0, mature: 0, lapses: 0 }
+  };
+  const chanMap = {};
+
+  cards.forEach(c => {
+    if (c.bucket === "learning") learning++;
+    else if (c.bucket === "young") young++;
+    else mature++;
+    if (c.isDue) dueNow++;
+
+    const ms = modeStats[c.mode] || modeStats.standard;
+    ms.total++;
+    if (c.isDue) ms.due++;
+    if (c.bucket === "mature") ms.mature++;
+    ms.lapses += c.lapses;
+
+    if (!chanMap[c.chanName]) chanMap[c.chanName] = { total: 0, learning: 0, young: 0, mature: 0, due: 0, lapses: 0 };
+    const cm = chanMap[c.chanName];
+    cm.total++;
+    cm[c.bucket]++;
+    if (c.isDue) cm.due++;
+    cm.lapses += c.lapses;
+  });
+
+  const tot = cards.length;
+  const pLearn = Math.round((learning / tot) * 100);
+  const pYoung = Math.round((young / tot) * 100);
+  const pMat = Math.max(0, 100 - pLearn - pYoung);
+
+  const modeRowsHtml = Object.values(modeStats)
+    .filter(m => m.total > 0)
+    .map(m => `
+      <div class="srs-list-row">
+        <span style="font-weight:800;">${m.label}</span>
+        <span style="font-size:12px; color:#8e8e93;">${m.total} cards • ${m.mature} mature • ${m.due} due</span>
+        <span style="font-size:12px; font-weight:800; color:${m.lapses > 0 ? '#ff3b30' : '#34c759'};">${m.lapses} lapses</span>
+      </div>
+    `).join("");
+
+  const chanRowsHtml = Object.entries(chanMap)
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([name, st]) => `
+      <div class="srs-list-row">
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(name)}</div>
+          <div style="font-size:11px; color:#8e8e93;">Learn ${st.learning} • Young ${st.young} • Mature ${st.mature}</div>
+        </div>
+        <div style="text-align:right; flex-shrink:0;">
+          <div style="font-size:12px; font-weight:800; color:#cc5500;">${st.due} Due</div>
+          <div style="font-size:11px; color:#8e8e93;">${st.lapses} lapses</div>
+        </div>
+      </div>
+    `).join("");
+
+  body.innerHTML = `
+    <div class="srs-stats-card">
+      <div class="srs-stats-subhdr"><span>Maturity Buckets (${tot} Enrolled)</span><span>${dueNow} Due Now</span></div>
+      <div class="srs-stacked-bar">
+        <div style="width:${pLearn}%; background:#ff9f0a;"></div>
+        <div style="width:${pYoung}%; background:#007aff;"></div>
+        <div style="width:${pMat}%; background:#34c759;"></div>
+      </div>
+      <div class="srs-legend-row">
+        <span><span class="srs-dot" style="background:#ff9f0a;"></span>Learning: ${learning}</span>
+        <span><span class="srs-dot" style="background:#007aff;"></span>Young (1–6d): ${young}</span>
+        <span><span class="srs-dot" style="background:#34c759;"></span>Mature (7d+): ${mature}</span>
+      </div>
+    </div>
+    <div class="srs-stats-card">
+      <div class="srs-stats-subhdr"><span>Card Mode Breakdown</span><span>All Enrolled</span></div>
+      ${modeRowsHtml}
+    </div>
+    <div class="srs-stats-card">
+      <div class="srs-stats-subhdr"><span>Mastery by Channel</span><span>${Object.keys(chanMap).length} Channels</span></div>
+      ${chanRowsHtml}
+    </div>
+  `;
+}
+
+function renderSRSLeechesTab(body) {
+  const cards = collectAllEnrolledSRSCards().filter(c => c.lapses > 0).sort((a, b) => b.lapses - a.lapses || a.interval - b.interval);
+  const leeches = cards.filter(c => c.lapses >= 4);
+  const displayList = leeches.length > 0 ? leeches : cards.slice(0, 25);
+  const minLapsesToDrill = leeches.length > 0 ? 4 : 1;
+
+  if (displayList.length === 0) {
+    body.innerHTML = `<div style="text-align:center; padding:30px 10px; color:#34c759; font-weight:700;">No leeches or lapsed cards yet!</div>`;
+    return;
+  }
+
+  const rowsHtml = displayList.slice(0, 40).map(c => {
+    const safeId = c.point["Short Name"].replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const badge = c.lapses >= 4 ? "🩸" : "⚠️";
+    return `
+      <div class="srs-list-row">
+        <div style="flex:1; min-width:0; cursor:pointer;" onclick="openQuickPeekById('${safeId}')">
+          <div style="font-weight:800; color:#007aff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${badge} ${escapeHTML(c.point["Short Name"])}</div>
+          <div style="font-size:11.5px; color:#8e8e93;">${escapeHTML(c.srsKey)} • ${c.interval === 0 ? `Learning (${c.streak}/3)` : `${c.interval}d interval`}</div>
+        </div>
+        <span style="font-size:12px; font-weight:800; color:#ff3b30; white-space:nowrap;">${c.lapses} lapse${c.lapses === 1 ? "" : "s"}</span>
+      </div>
+    `;
+  }).join("");
+
+  body.innerHTML = `
+    <button type="button" class="srs-drill-btn" onclick="drillSRSLeeches(${minLapsesToDrill})">
+      🎯 Drill ${leeches.length > 0 ? `${leeches.length} Leeches (4+ Lapses)` : `${displayList.length} Trouble Cards`}
+    </button>
+    <div class="srs-stats-card">
+      <div class="srs-stats-subhdr"><span>${leeches.length > 0 ? "Leeches (4+ Lapses)" : "Most Missed Cards (Tap to Peek)"}</span><span>${displayList.length} Shown</span></div>
+      ${rowsHtml}
+    </div>
+  `;
+}
+
+window.drillSRSLeeches = function(minLapses = 4) {
+  const troubleCards = collectAllEnrolledSRSCards()
+    .filter(c => c.lapses >= minLapses)
+    .sort((a, b) => b.lapses - a.lapses);
+
+  const builtDeck = [];
+  troubleCards.forEach(c => {
+    if (c.mode === "image" && !hasValidStudyImage(c.point)) return;
+    const secCfg = TCM_SECTIONS.find(s => s.label === c.sectionLabel);
+    if (!secCfg) return;
+    const val = c.point[secCfg.key] || c.point[secCfg.altKey] || "";
+    if (!val || String(val).trim() === "") return;
+    builtDeck.push({
+      point: c.point,
+      sectionLabel: c.sectionLabel,
+      srsKey: c.srsKey,
+      mode: c.mode,
+      content: val,
+      cardId: c.point["Short Name"] + "::" + c.srsKey,
+      streak: c.streak
+    });
+  });
+
+  if (builtDeck.length === 0) {
+    showToast("No trouble cards available to drill.");
+    return;
+  }
+
+  studyDeckScope = "global";
+  isCramMode = false;
+  activeStudyDeckLabel = minLapses >= 4 ? "SRS Leeches" : "Trouble Cards";
+  activeStudySectionSummary = `${builtDeck.length} Cards`;
+  studyDeck = builtDeck;
+
+  closeStudyStatsModal();
+  closeStudySettingsModal();
+  const orderSel = document.getElementById("studyOrderSelect");
+  if (orderSel && orderSel.value === "browse") orderSel.value = "order";
+  finalizeDeckLaunch(orderSel ? orderSel.value : "order", false, false);
+};
 
 
 // --- KEYBOARD CONTROLS ---
