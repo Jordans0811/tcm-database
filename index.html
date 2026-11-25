@@ -3027,7 +3027,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.24.26.v2";
+const APP_VERSION = "11.25.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3222,6 +3222,12 @@ function normalizeSearchSpelling(str, splitHyphens = true) {
     .replace(/\blustr(?:e|er)\b/gi, "luster")
     .replace(/\bborborygmus\b/gi, "borborygmi")
     .replace(/\bgall\s*bladder\b/gi, "gallbladder");
+}
+
+function normalizeCompactKey(str) {
+  return normalizeSearchSpelling(str || "", false)
+    .toLowerCase()
+    .replace(/[\s\-\.]+/g, "");
 }
 
 // 2. Save the entire database (Used during background syncs)
@@ -3887,14 +3893,14 @@ else setTimeout(warmPdfJsCache, 3500);
     const trimmed = (rawQuery || "").trim();
     if (trimmed.length < 4 || searchVocabFreq.size === 0) return null;
 
-    const words = trimmed.match(/(?:^|[\s"|])([a-zA-Z]{4,24})(?=$|[\s"|.,;:!?])/g);
+    const words = trimmed.match(/(?:^|[\s"|@#])([a-zA-Z]{4,24})(?=$|[\s"|.,;:!?])/g);
     let correctedQuery = trimmed;
     let changed = false;
 
     if (words) {
       const seen = new Set();
       words.forEach(chunk => {
-        const word = chunk.replace(/^[\s"|]+/, "");
+        const word = chunk.replace(/^[\s"|@#]+/, "");
         const norm = normalizeSearchSpelling(word, true).toLowerCase();
         if (!norm || seen.has(norm) || !/^[a-z]{4,24}$/.test(norm)) return;
         seen.add(norm);
@@ -3902,7 +3908,7 @@ else setTimeout(warmPdfJsCache, 3500);
         const fix = findClosestVocabWord(norm);
         if (fix) {
           correctedQuery = correctedQuery.replace(
-            new RegExp("(^|[\\s\"|])" + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "(?=$|[\\s\"|.,;:!?])", "g"),
+            new RegExp("(^|[\\s\"|@#])" + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "(?=$|[\\s\"|.,;:!?])", "g"),
             "$1" + fix
           );
           changed = true;
@@ -3954,10 +3960,12 @@ else setTimeout(warmPdfJsCache, 3500);
 
     const processed = filteredData.map(point => {
       const old = oldMap[point["Short Name"]];
-      if (old && JSON.stringify(stripDerivedFields(old)) === JSON.stringify(stripDerivedFields(point))) {
+      if (old && old._shortNameKey !== undefined && old._hashTarget !== undefined && JSON.stringify(stripDerivedFields(old)) === JSON.stringify(stripDerivedFields(point))) {
         point._searchIndex = old._searchIndex;
-        point._shortNameLower = old._shortNameLower; 
-        point._fullNameLower = old._fullNameLower;   
+        point._shortNameLower = old._shortNameLower;
+        point._shortNameKey = old._shortNameKey;
+        point._fullNameLower = old._fullNameLower;
+        point._hashTarget = old._hashTarget;
         point._canonicalKey = old._canonicalKey;
         point._outgoingMentions = old._outgoingMentions;
         point._paragraphs = old._paragraphs;
@@ -3965,7 +3973,13 @@ else setTimeout(warmPdfJsCache, 3500);
       }
       point._searchIndex = generateSearchIndex(point);
       point._shortNameLower = (point["Short Name"] || "").toString().toLowerCase();
+      point._shortNameKey = normalizeCompactKey(point["Short Name"]);
       point._fullNameLower = (point["Full Name"] || point[" Full Name"] || "").toString().toLowerCase();
+      point._hashTarget = normalizeSearchSpelling(
+        (point["Full Name"] || point[" Full Name"] || "") + " " +
+        (point["Channel Short Name"] || point[" Channel Short Name"] || ""),
+        true
+      ).toLowerCase();
       point._canonicalKey = getCanonicalPointKey(point["Short Name"]);
       point._outgoingMentions = extractOutgoingMentions(point);
       
@@ -4438,7 +4452,7 @@ function applySectionFilter() {
   }
 
     function expandTCMPoint(term, allowLetterOnlyExpansion = true) {
-    term = term.trim();
+    term = term.trim().toLowerCase();
     
     const aliases = {
       'li': ['li', 'l.i.'], 'ht': ['ht', 'he'], 'he': ['ht', 'he'],
@@ -4966,14 +4980,16 @@ function applySectionFilter() {
     if (typeof onAfterPaste === "function") onAfterPaste();
   }
 
-  function preNormalizePointListText(str) {
+  function preNormalizePointListText(str, stripPrescriptionNoise = true) {
     let s = normalizeSearchSpelling(str || "").trim();
     s = s.replace(/[\u2010-\u2015\u2212]/g, "-");
     s = s.replace(/[†‡§°®™]/g, " ");
-    s = s.replace(/^(?:points?|acupoints?|tx|rx|prescription|formula)\s*:\s*/i, "");
-    s = s.replace(/[\(\[][^\)\]]*[\)\]]/g, " ");
-    s = s.replace(/(?:^|[\s,;])\d{1,2}[.)](?=\s)/g, ", ");
-    s = s.replace(/\b(?:bilat(?:eral)?|unilat(?:eral)?|b\/l|e-?stim|moxa)\b\.?/gi, " ");
+    if (stripPrescriptionNoise) {
+      s = s.replace(/^(?:points?|acupoints?|tx|rx|prescription|formula)\s*:\s*/i, "");
+      s = s.replace(/[\(\[][^\)\]]*[\)\]]/g, " ");
+      s = s.replace(/(?:^|[\s,;])\d{1,2}[.)](?=\s)/g, ", ");
+      s = s.replace(/\b(?:bilat(?:eral)?|unilat(?:eral)?|b\/l|e-?stim|moxa)\b\.?/gi, " ");
+    }
     if (multiWordPointRegex && /\s/.test(s)) {
       s = s.replace(multiWordPointRegex, m => m.replace(/\s+/g, ""));
     }
@@ -4991,7 +5007,7 @@ function applySectionFilter() {
   }
 
   function resolvePointTokenToShortNames(token) {
-    const clean = token.toLowerCase().replace(/[\s\-\.]/g, "");
+    const clean = normalizeCompactKey(token);
     if (!clean) return [];
     const direct = knownPointLookup.get(clean);
     if (direct) return Array.from(direct);
@@ -4999,7 +5015,7 @@ function applySectionFilter() {
     const variants = expandTCMPoint(token, false);
     const out = new Set();
     variants.forEach(v => {
-      const hit = knownPointLookup.get(v.toLowerCase().replace(/[\s\-\.]/g, ""));
+      const hit = knownPointLookup.get(normalizeCompactKey(v));
       if (hit) hit.forEach(name => out.add(name));
     });
     return Array.from(out);
@@ -5072,7 +5088,7 @@ function applySectionFilter() {
   }
 
     function runSearchQuery(rawQuery, options = { respectActiveChannels: true, allowAutoPointList: true }) {
-    let query = normalizeSearchSpelling((rawQuery || "").trim(), false);
+    let query = normalizeSearchSpelling((rawQuery || "").trim(), false).toLowerCase();
     let isDocWide = false;
 
     if (/(?:^|\s)all:(?=\s|$)/i.test(query)) {
@@ -5197,7 +5213,7 @@ function applySectionFilter() {
             }
           }
 
-          const cleanPre = preNormalizePointListText(atChunk);
+          const cleanPre = preNormalizePointListText(atChunk, false);
           const atTokens = cleanPre.split(/[\s,+&;•·*\n\r\/|]+/).map(t => t.replace(/"/g, "").trim()).filter(Boolean);
           atTokens.forEach(t => {
             const rangeTerms = expandPointRange(t);
@@ -5290,7 +5306,7 @@ function applySectionFilter() {
     if (headers.length > 0) {
       const seenCleanH = new Set();
       headers.forEach(h => {
-        const cleanH = h.replace(/[\s\-\.]/g, "");
+        const cleanH = normalizeCompactKey(h);
         if (!cleanH || seenCleanH.has(cleanH)) return;
         seenCleanH.add(cleanH);
         if (/^[a-z].*\d$/i.test(cleanH)) {
@@ -5320,18 +5336,14 @@ function applySectionFilter() {
       // 4. SHORT NAMES @ or Auto Point-List
       if (exactMatchedShortNames.size > 0 || headerMatchers.length > 0) {
         const matchesExact = exactMatchedShortNames.has(point["Short Name"]);
-        const cleanPointName = point._shortNameLower.replace(/[\s\-\.]/g, "");
+        const cleanPointName = point._shortNameKey;
         const matchesHeader = headerMatchers.some(m => m.type === "regex" ? m.regex.test(cleanPointName) : cleanPointName.includes(m.text));
         if (!matchesExact && !matchesHeader) return false;
       }
 
       // 5. FULL NAMES & CHANNELS #
       if (fullNamesGroups.length > 0) {
-        const hashTarget = normalizeSearchSpelling(
-          (point["Full Name"] || point[" Full Name"] || "") + " " +
-          (point["Channel Short Name"] || point[" Channel Short Name"] || ""),
-          true
-        ).toLowerCase();
+        const hashTarget = point._hashTarget;
         const passesAllHashGroups = fullNamesGroups.every(group => group.some(f => hashTarget.includes(f)));
         if (!passesAllHashGroups) return false;
       }
@@ -6788,8 +6800,8 @@ searchInput.addEventListener("keydown", e => {
   function findBestDirectMatch(rawQuery, results) {
     if (!rawQuery || results.length === 0) return null;
     if (results.length === 1) return results[0];
-    const clean = rawQuery.replace(/^[@#]/, "").trim().toLowerCase().replace(/[\s\-\.]/g, "");
-    const direct = results.find(p => p._shortNameLower.replace(/[\s\-\.]/g, "") === clean);
+    const clean = normalizeCompactKey(rawQuery.replace(/^[@#]/, ""));
+    const direct = results.find(p => p._shortNameKey === clean);
     if (direct) return direct;
     const resolved = resolvePointTokenToShortNames(rawQuery.replace(/^[@#]/, "").trim());
     if (resolved.length === 1) {
