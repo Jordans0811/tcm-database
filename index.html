@@ -3027,7 +3027,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.25.26.v1";
+const APP_VERSION = "11.27.26.v1";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -5108,6 +5108,9 @@ function applySectionFilter() {
 
     const headers = [];
     const exactMatchedShortNames = new Set();
+    const atExactOrder = new Map();
+    const headerOrderMap = new Map();
+    let atOrderCounter = 0;
     let orderedPointList = [];
     let isAutoPointList = false;
     let unmatchedPointTokens = [];
@@ -5170,11 +5173,19 @@ function applySectionFilter() {
             while ((m = segRegex.exec(quotedChunk)) !== null) {
               const segVal = normalizeSearchSpelling((m[1] || m[2] || ""), true).toLowerCase().trim();
               if (!segVal) continue;
+              const orderIdx = atOrderCounter++;
               const resolved = resolvePointTokenToShortNames(segVal);
               if (resolved.length > 0 && (/\d/.test(segVal) || segVal.length >= 4)) {
-                resolved.forEach(name => exactMatchedShortNames.add(name));
+                resolved.forEach(name => {
+                  exactMatchedShortNames.add(name);
+                  if (!atExactOrder.has(name)) atExactOrder.set(name, orderIdx);
+                });
               }
-              headers.push(...expandTCMPoint(segVal, true));
+              expandTCMPoint(segVal, true).forEach(h => {
+                headers.push(h);
+                const cleanH = normalizeCompactKey(h);
+                if (cleanH && !headerOrderMap.has(cleanH)) headerOrderMap.set(cleanH, orderIdx);
+              });
             }
             continue;
           }
@@ -5182,7 +5193,7 @@ function applySectionFilter() {
           let atChunk = rawAtBody;
           while (idx + 1 < rawKeywords.length) {
             const nextTok = rawKeywords[idx + 1];
-            if (/^[@#<>!"]/.test(nextTok)) break;
+            if (/^[@#<>!]/.test(nextTok)) break;
 
             if (/^[\-\u2010-\u2015\u2212]$/.test(nextTok) &&
                 idx + 2 < rawKeywords.length &&
@@ -5193,6 +5204,7 @@ function applySectionFilter() {
             }
 
             const prevConnected = endsWithConnector(rawKeywords[idx]) || isListConnector(nextTok);
+            if (nextTok.startsWith('"') && !prevConnected) break;
             const cleanNext = nextTok.replace(/[,+&;\/]+$/, "");
             const tailSegment = atChunk.split(/[,+&;\/]+/).pop().trim();
             const tailWords = tailSegment.split(/\s+/).filter(Boolean);
@@ -5213,16 +5225,39 @@ function applySectionFilter() {
             }
           }
 
-          const cleanPre = preNormalizePointListText(atChunk, false);
-          const atTokens = cleanPre.split(/[\s,+&;•·*\n\r\/|]+/).map(t => t.replace(/"/g, "").trim()).filter(Boolean);
+          const atTokens = [];
+          if (atChunk.includes('"')) {
+            const segRegex = /"([^"]+)"|([^,|+&;\/"]+)/g;
+            let m;
+            while ((m = segRegex.exec(atChunk)) !== null) {
+              if (m[1]) {
+                const segVal = normalizeSearchSpelling(m[1], true).toLowerCase().trim();
+                if (segVal) atTokens.push(segVal);
+              } else if (m[2]) {
+                const cleanPre = preNormalizePointListText(m[2], false);
+                cleanPre.split(/[\s,+&;•·*\n\r\/|]+/).map(t => t.trim()).filter(Boolean).forEach(t => atTokens.push(t));
+              }
+            }
+          } else {
+            const cleanPre = preNormalizePointListText(atChunk, false);
+            cleanPre.split(/[\s,+&;•·*\n\r\/|]+/).map(t => t.replace(/"/g, "").trim()).filter(Boolean).forEach(t => atTokens.push(t));
+          }
           atTokens.forEach(t => {
             const rangeTerms = expandPointRange(t);
             rangeTerms.forEach(rt => {
+              const orderIdx = atOrderCounter++;
               const resolved = resolvePointTokenToShortNames(rt);
               if (resolved.length > 0 && (rangeTerms.length > 1 || /\d/.test(rt) || rt.length >= 4)) {
-                resolved.forEach(name => exactMatchedShortNames.add(name));
+                resolved.forEach(name => {
+                  exactMatchedShortNames.add(name);
+                  if (!atExactOrder.has(name)) atExactOrder.set(name, orderIdx);
+                });
               }
-              headers.push(...expandTCMPoint(rt, true));
+              expandTCMPoint(rt, true).forEach(h => {
+                headers.push(h);
+                const cleanH = normalizeCompactKey(h);
+                if (cleanH && !headerOrderMap.has(cleanH)) headerOrderMap.set(cleanH, orderIdx);
+              });
             });
           });
         } else if (token.startsWith("#")) {
@@ -5234,23 +5269,29 @@ function applySectionFilter() {
             idx++;
           }
           const orGroup = [];
+          let branchIdx = 0;
           const segRegex = /"([^"]+)"|([^,|"]+)/g;
           let m;
           while ((m = segRegex.exec(hashChunk)) !== null) {
             const t = normalizeSearchSpelling((m[1] || m[2] || ""), true).toLowerCase().trim();
-            if (t) orGroup.push(...expandTCMPoint(t, true));
+            if (t) {
+              const currentBranch = branchIdx++;
+              expandTCMPoint(t, true).forEach(ext => orGroup.push({ text: ext, branchIdx: currentBranch }));
+            }
           }
           if (orGroup.length > 0) fullNamesGroups.push(orGroup);
         } else {
           const parts = token.split("|").filter(Boolean);
           const orGroup = [];
+          let branchIdx = 0;
           parts.forEach(part => {
             const trimmedPart = part.replace(/^[,;(+&\/]+|[,;)+&\/]+$/g, "");
             if (!trimmedPart) return;
+            const currentBranch = branchIdx++;
             if (trimmedPart.startsWith('"') && trimmedPart.endsWith('"') && trimmedPart.length >= 2) {
               const phrase = normalizeSearchSpelling(trimmedPart.slice(1, -1)).toLowerCase();
               const safePhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              orGroup.push({ type: 'exact', regex: new RegExp("\\b" + safePhrase + "\\b", "i"), regexString: "\\b" + safePhrase + "\\b", text: phrase });
+              orGroup.push({ type: 'exact', regex: new RegExp("\\b" + safePhrase + "\\b", "i"), regexString: "\\b" + safePhrase + "\\b", text: phrase, branchIdx: currentBranch });
             } else {
               const cleanPart = trimmedPart.replace(/^"+|"+$/g, "");
               if (!cleanPart) return;
@@ -5258,7 +5299,7 @@ function applySectionFilter() {
               const expandedTerms = expandTCMPoint(phrase, false);
               expandedTerms.forEach(ext => {
                 const safePhrase = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                orGroup.push({ type: 'substring', regexString: safePhrase, text: ext });
+                orGroup.push({ type: 'substring', regexString: safePhrase, text: ext, branchIdx: currentBranch });
               });
             }
           });
@@ -5291,9 +5332,9 @@ function applySectionFilter() {
       });
       fullNamesGroups.forEach(group => {
         group.forEach(f => {
-          if (f.trim().length > 2) {
-            regexParts.push(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-            textTerms.push(f);
+          if (f.text.trim().length > 2) {
+            regexParts.push(f.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+            textTerms.push(f.text);
           }
         });
       });
@@ -5309,10 +5350,11 @@ function applySectionFilter() {
         const cleanH = normalizeCompactKey(h);
         if (!cleanH || seenCleanH.has(cleanH)) return;
         seenCleanH.add(cleanH);
+        const orderIdx = headerOrderMap.has(cleanH) ? headerOrderMap.get(cleanH) : 99999;
         if (/^[a-z].*\d$/i.test(cleanH)) {
-          headerMatchers.push({ type: "regex", regex: new RegExp("^" + cleanH.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "(?:$|[^0-9])", "i") });
+          headerMatchers.push({ type: "regex", regex: new RegExp("^" + cleanH.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "(?:$|[^0-9])", "i"), orderIdx });
         } else {
-          headerMatchers.push({ type: "substr", text: cleanH });
+          headerMatchers.push({ type: "substr", text: cleanH, orderIdx });
         }
       });
     }
@@ -5344,7 +5386,7 @@ function applySectionFilter() {
       // 5. FULL NAMES & CHANNELS #
       if (fullNamesGroups.length > 0) {
         const hashTarget = point._hashTarget;
-        const passesAllHashGroups = fullNamesGroups.every(group => group.some(f => hashTarget.includes(f)));
+        const passesAllHashGroups = fullNamesGroups.every(group => group.some(f => hashTarget.includes(f.text)));
         if (!passesAllHashGroups) return false;
       }
 
@@ -5376,13 +5418,91 @@ function applySectionFilter() {
       return true;
     });
 
-    if (isAutoPointList && orderedPointList.length > 0) {
-      const orderMap = new Map();
-      orderedPointList.forEach((name, i) => orderMap.set(name, i));
+    const orderedHashGroups = fullNamesGroups.filter(g => g.length > 1 && g[g.length - 1].branchIdx > 0);
+    const orderedIncludeGroups = parsedIncludes.filter(g => g.length > 1 && g[g.length - 1].branchIdx > 0);
+    const hasCustomOrder =
+      (isAutoPointList && orderedPointList.length > 0) ||
+      atOrderCounter > 1 ||
+      orderedHashGroups.length > 0 ||
+      orderedIncludeGroups.length > 0 ||
+      strictImportance.length > 1;
+
+    if (hasCustomOrder && results.length > 1) {
+      const autoOrderMap = new Map();
+      if (isAutoPointList) {
+        orderedPointList.forEach((name, i) => autoOrderMap.set(name, i));
+      }
+
+      const getIncludeGroupRank = (point, orGroup, titleText) => {
+        for (let i = 0; i < orGroup.length; i++) {
+          const term = orGroup[i];
+          if (term.type === 'exact') {
+            term.regex.lastIndex = 0;
+            if (term.regex.test(titleText)) return term.branchIdx * 2;
+          } else if (titleText.includes(term.text)) {
+            return term.branchIdx * 2;
+          }
+        }
+        for (let i = 0; i < orGroup.length; i++) {
+          const term = orGroup[i];
+          if (term.type === 'exact') {
+            term.regex.lastIndex = 0;
+            if (term.regex.test(point._searchIndex)) return term.branchIdx * 2 + 1;
+          } else if (point._searchIndex.includes(term.text)) {
+            return term.branchIdx * 2 + 1;
+          }
+        }
+        return 99999;
+      };
+
+      const rankMap = new Map();
+      results.forEach(point => {
+        const key = [];
+        if (isAutoPointList && orderedPointList.length > 0) {
+          key.push(autoOrderMap.has(point["Short Name"]) ? autoOrderMap.get(point["Short Name"]) : 99999);
+        }
+        if (atOrderCounter > 1) {
+          let atRank = atExactOrder.has(point["Short Name"]) ? atExactOrder.get(point["Short Name"]) : 99999;
+          const cleanPointName = point._shortNameKey;
+          for (let i = 0; i < headerMatchers.length; i++) {
+            const m = headerMatchers[i];
+            if (m.orderIdx < atRank && (m.type === "regex" ? m.regex.test(cleanPointName) : cleanPointName.includes(m.text))) {
+              atRank = m.orderIdx;
+            }
+          }
+          key.push(atRank);
+        }
+        if (orderedHashGroups.length > 0) {
+          const hashTarget = point._hashTarget;
+          orderedHashGroups.forEach(group => {
+            const hit = group.find(f => hashTarget.includes(f.text));
+            key.push(hit ? hit.branchIdx : 99999);
+          });
+        }
+        if (orderedIncludeGroups.length > 0) {
+          const titleText = normalizeSearchSpelling(
+            (point["Short Name"] || "") + " " + (point["Full Name"] || point[" Full Name"] || ""),
+            true
+          ).toLowerCase();
+          orderedIncludeGroups.forEach(group => {
+            key.push(getIncludeGroupRank(point, group, titleText));
+          });
+        }
+        if (strictImportance.length > 1) {
+          const imp = point.Important ? String(point.Important).trim() : "";
+          const impIdx = strictImportance.indexOf(imp);
+          key.push(impIdx !== -1 ? impIdx : 99999);
+        }
+        rankMap.set(point, key);
+      });
+
       results.sort((a, b) => {
-        const ia = orderMap.has(a["Short Name"]) ? orderMap.get(a["Short Name"]) : 99999;
-        const ib = orderMap.has(b["Short Name"]) ? orderMap.get(b["Short Name"]) : 99999;
-        return ia - ib;
+        const ka = rankMap.get(a);
+        const kb = rankMap.get(b);
+        for (let i = 0; i < ka.length; i++) {
+          if (ka[i] !== kb[i]) return ka[i] - kb[i];
+        }
+        return 0;
       });
     }
 
