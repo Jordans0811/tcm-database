@@ -595,6 +595,36 @@
     }
     .point-link:active { background-color: rgba(0, 122, 255, 0.15); }
 
+    /* BBCode List Styles */
+    ul.tcm-list, .rich-text-editor ul {
+      list-style: none;
+      margin: 4px 0;
+      padding-left: 1.35em;
+    }
+    ul.tcm-list > li, .rich-text-editor ul > li {
+      position: relative;
+      margin: 2px 0;
+    }
+    ul.tcm-list > li::before, .rich-text-editor ul > li::before {
+      content: "➣";
+      position: absolute;
+      left: -1.35em;
+      color: #cc5500;
+      font-weight: 700;
+    }
+    ol.tcm-list, .rich-text-editor ol {
+      margin: 4px 0;
+      padding-left: 1.5em;
+    }
+    ol.tcm-list > li, .rich-text-editor ol > li {
+      margin: 2px 0;
+    }
+    .tcm-list-marker {
+      color: #cc5500;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
     /* Quick Peek Modal Specifics - Side Sheet Layout */
     #quickPeekModal {
       justify-content: flex-end; /* Pushes the panel to the right side */
@@ -1988,6 +2018,7 @@ mark.diff-term-mark {
 
       .point-link { color: #64b5f6; text-decoration-color: rgba(100, 181, 246, 0.4); }
       .point-link:active { background-color: rgba(100, 181, 246, 0.2); }
+      ul.tcm-list > li::before, .rich-text-editor ul > li::before, .tcm-list-marker { color: #ff9f0a; }
       #quickPeekModal 
       .quick-peek-content { background: #000000; border-left: 1px solid #38383a; }
       #quickPeekModal 
@@ -2693,6 +2724,7 @@ display: flex; flex-direction: column;">
         <button onclick="execFormat('bold')" title="Bold"><b>B</b></button>
         <button onclick="execFormat('italic')" title="Italicize"><i>I</i></button>
         <button onclick="execFormat('underline')" title="Underline"><u>U</u></button>
+        <button onclick="execFormat('insertUnorderedList')" title="Bulleted List">➣</button>
         <button onclick="insertTableTemplate()" title="Insert Table Template">⊞</button>
         <input type="color" id="colorPicker" value="#000000" onclick="syncColorPicker()" oninput="execFormat('foreColor', this.value)" onchange="execFormat('foreColor', this.value)" title="Text Color">
         <button onclick="execFormat('removeFormat')" class="clear-format-btn" title="Remove formatting">Tx</button>
@@ -3027,7 +3059,7 @@ display: flex; flex-direction: column;">
 
 
 // --- CHANGE THIS STRING TO UPDATE YOUR VERSION NUMBER ---
-const APP_VERSION = "11.28.26.v1";
+const APP_VERSION = "11.28.26.v2";
 
 // Register the Service Worker
 if ('serviceWorker' in navigator) {
@@ -3531,7 +3563,9 @@ else setTimeout(warmPdfJsCache, 3500);
     // NEW: Strips formatting tags from the invisible index to make searching faster and more accurate
   function stripBBCode(str) {
     if (!str) return "";
-    return String(str).replace(/\[\/?(b|i|u|color(?:=[^\]]+)?)\]/gi, "");
+    return String(str)
+      .replace(/\[\/?(?:b|i|u|color(?:=[^\]]+)?)\]/gi, "")
+      .replace(/\[\/?(?:list(?:=[^\]]+)?|\*)\]/gi, " ");
   }
 
     function generateSearchIndex(point) {
@@ -4498,10 +4532,24 @@ function applySectionFilter() {
 
   
        const editArea = document.getElementById('editArea');
+  let enterStartedInList = false;
+
+  function isSelectionInsideList(container) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    let node = sel.anchorNode;
+    while (node && node !== container) {
+      if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === 'li') return true;
+      node = node.parentNode;
+    }
+    return false;
+  }
 
   // 1. Prevent standard Enter behavior on KeyDown (Stops double-lines on PC/Mac)
   editArea.addEventListener('keydown', function(event) {
     if (event.key === 'Enter' || event.keyCode === 13) {
+      enterStartedInList = isSelectionInsideList(editArea);
+      if (enterStartedInList) return;
       event.preventDefault(); 
     }
   });
@@ -4510,6 +4558,10 @@ function applySectionFilter() {
   editArea.addEventListener('keyup', function(event) {
     // Incorporating your StackOverflow logic
     if (event.key === 'Enter' || event.keyCode === 13) {
+      if (enterStartedInList || isSelectionInsideList(editArea)) {
+        enterStartedInList = false;
+        return;
+      }
       event.preventDefault();
       
       // Because we added 'white-space: pre-wrap' to your CSS earlier,
@@ -5591,6 +5643,35 @@ function applySectionFilter() {
   }
 
   function escapeHTML(str) { return !str ? "" : String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+  function parseBBCodeLists(str) {
+    if (!str || !/\[\/?(?:list|\*)/i.test(str)) return str;
+    let out = str;
+    const listRx = /(\r?\n)?\[list(?:=([^\]]+))?\]((?:(?!\[list\b)[\s\S])*?)\[\/list\](\r?\n)?/gi;
+    let guard = 0;
+    while (listRx.test(out) && guard++ < 20) {
+      listRx.lastIndex = 0;
+      out = out.replace(listRx, (match, preNl, listType, inner, postNl, offset, fullStr) => {
+        const cleanedInner = inner.replace(/\[\/\*\]/gi, "");
+        const parts = cleanedInner.split(/\[\*\]/i);
+        const leading = parts.shift().trim();
+        const items = parts
+          .map(item => item.trim().replace(/\r?\n(?=<(?:ul|ol)\b)/gi, ""))
+          .filter(Boolean)
+          .map(item => `<li>${item}</li>`)
+          .join("");
+        const isOrdered = listType && /^[1aAiI]$/.test(listType.trim());
+        const openTag = isOrdered
+          ? `<ol class="tcm-list tcm-list-ordered" type="${listType.trim()}">`
+          : `<ul class="tcm-list">`;
+        const closeTag = isOrdered ? `</ol>` : `</ul>`;
+        const keepPre = preNl && /\|\s*$/.test(fullStr.slice(0, offset)) ? preNl : "";
+        const keepPost = postNl && /^\s*\|/.test(fullStr.slice(offset + match.length)) ? postNl : "";
+        return keepPre + (leading ? leading : "") + (items ? `${openTag}${items}${closeTag}` : "") + keepPost;
+      });
+    }
+    return out;
+  }
   
       function highlightText(text, customRegex) {
     if (!text) return ""; 
@@ -5603,8 +5684,12 @@ function applySectionFilter() {
       .replace(/\[u\]([\s\S]*?)\[\/u\]/gi, "<u>$1</u>")
       .replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>");
 
-    // Sweep up any orphaned/broken BBCode tags that were severed during paragraph filtering
-    withBB = withBB.replace(/\[\/?(b|i|u|color(?:=[^\]]+)?)\]/gi, "");
+    withBB = parseBBCodeLists(withBB);
+
+    // Convert orphaned [*] (from single-line search filtering) to ➣ and sweep broken BBCode tags
+    withBB = withBB
+      .replace(/\[\*\]\s*/gi, "<span class='tcm-list-marker'>➣</span> ")
+      .replace(/\[\/?(?:b|i|u|color(?:=[^\]]+)?|list(?:=[^\]]+)?|\*)\]/gi, "");
 
     const regexToUse = (customRegex !== undefined) ? customRegex : activeHighlightRegex;
     if (!regexToUse) return withBB;
@@ -7169,12 +7254,12 @@ sel.addRange(range);
   // --- 2. Translators: BBCode <-> HTML ---
     function bbcodeToHtml(text) {
     if (!text) return "";
-    return escapeHTML(text)
+    let html = escapeHTML(text)
       .replace(/\[b\]([\s\S]*?)\[\/b\]/gi, "<b>$1</b>")
       .replace(/\[i\]([\s\S]*?)\[\/i\]/gi, "<i>$1</i>")
       .replace(/\[u\]([\s\S]*?)\[\/u\]/gi, "<u>$1</u>")
-      .replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>")
-      .replace(/\n/g, "<br>"); // Convert newlines for the editable div
+      .replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi, "<span style='color:$1'>$2</span>");
+    return parseBBCodeLists(html).replace(/\n/g, "<br>"); // Convert newlines for the editable div
   }
  
  
@@ -7215,6 +7300,19 @@ sel.addRange(range);
         // NEW: Force the extracted color back into Hex format
         else if (tag === 'span' && child.style.color) out += `[color=${rgbToHex(child.style.color)}]${inner}[/color]`;
         else if (tag === 'font' && child.color) out += `[color=${rgbToHex(child.color)}]${inner}[/color]`;
+        else if (tag === 'ul') {
+          const body = inner.replace(/^\n+|\n+$/g, "");
+          if (body) out += (out.length > 0 && !out.endsWith("\n") ? "\n" : "") + `[list]\n${body}\n[/list]\n`;
+        }
+        else if (tag === 'ol') {
+          const listType = child.getAttribute('type') || '1';
+          const body = inner.replace(/^\n+|\n+$/g, "");
+          if (body) out += (out.length > 0 && !out.endsWith("\n") ? "\n" : "") + `[list=${listType}]\n${body}\n[/list]\n`;
+        }
+        else if (tag === 'li') {
+          const cleanLi = inner.replace(/^\n+|\n+$/g, "");
+          if (cleanLi) out += (out.length > 0 && !out.endsWith("\n") ? "\n" : "") + `[*]${cleanLi}\n`;
+        }
         else if (tag === 'br') out += `\n`;
         else if (tag === 'div' || tag === 'p') out += (out.length > 0 ? `\n` : ``) + inner; // Handle Enter key
         else out += inner;
@@ -7851,7 +7949,7 @@ let comparePinFirst = false;
     });
     if (activeIndices.length < 2) return rawHtmlArray;
 
-    const blockSplitRx = /(<br\s*\/?>|<\/?(?:tr|td|th|table|tbody|thead|div|p)\b[^>]*>)/gi;
+    const blockSplitRx = /(<br\s*\/?>|<\/?(?:tr|td|th|table|tbody|thead|div|p|ul|ol|li)\b[^>]*>)/gi;
 
     // 1. Parse each column's section HTML into lines & clauses
     const parsedColumns = rawHtmlArray.map(html => {
@@ -8433,6 +8531,11 @@ window.shuffleCompare = function() {
           .table-quiz-bar { display: none !important; }
           .importance-badge { color: #ff3b30; font-weight: 900; font-size: 20px; margin-left: 8px; }
           .point-link { color: #007aff; font-weight: 600; text-decoration: underline; text-decoration-color: rgba(0, 122, 255, 0.4); text-underline-offset: 2px; }
+          ul.tcm-list { list-style: none; margin: 4px 0; padding-left: 1.35em; }
+          ul.tcm-list > li { position: relative; margin: 2px 0; }
+          ul.tcm-list > li::before { content: "➣"; position: absolute; left: -1.35em; color: #cc5500; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          ol.tcm-list { margin: 4px 0; padding-left: 1.5em; }
+          ol.tcm-list > li { margin: 2px 0; }
         </style>
       </head>
       <body>
@@ -9606,6 +9709,10 @@ document.addEventListener('keyup', (e) => {
               nonMatchingParas.push(...tableLines);
             }
           } else {
+            if (/^\[\/?list(?:=[^\]]+)?\]$/i.test(trimmed)) {
+              i++;
+              continue;
+            }
             if (lineMatchesSearch(rawLines[i])) {
               matchingParas.push(rawLines[i]);
             } else {
@@ -11025,11 +11132,12 @@ window.applyLineOcclusionToHTML = function(html, pointId, forceWrapAll = false) 
     }
   }
 
-  const cells = tempDiv.querySelectorAll('td, th');
+  const cells = tempDiv.querySelectorAll('td, th, li');
 cells.forEach(cell => {
   let cellLineNodes = [];
   Array.from(cell.childNodes).forEach(node => {
-    if (node.nodeName.toLowerCase() === 'br') {
+    const tag = node.nodeName.toLowerCase();
+    if (tag === 'br' || tag === 'ul' || tag === 'ol') {
       processLine(cellLineNodes);
       cellLineNodes = [];
     } else {
@@ -11043,7 +11151,7 @@ cells.forEach(cell => {
   const rootNodes = Array.from(tempDiv.childNodes);
   rootNodes.forEach(node => {
     const tag = node.nodeName.toLowerCase();
-    if (tag === 'br' || tag === 'table' || tag === 'div' || tag === 'p') {
+    if (tag === 'br' || tag === 'table' || tag === 'div' || tag === 'p' || tag === 'ul' || tag === 'ol') {
       processLine(currentLineNodes); currentLineNodes = [];
     } else { currentLineNodes.push(node); }
   });
