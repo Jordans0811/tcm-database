@@ -412,7 +412,7 @@
             <select id="qzDifficultySelect" class="quiz-select" onchange="onQuizModeOrDiffChange()"></select>
           </div>
           <div class="quiz-settings-row">
-            <select id="qzLimitSelect" class="quiz-select" onchange="retakeQuizWholePool()">
+            <select id="qzLimitSelect" class="quiz-select" onchange="onQuizLimitChange()">
               <option value="all">All Cards in Filtered Pool</option>
               <option value="10" selected>10 Cards per Batch</option>
               <option value="15">15 Cards per Batch</option>
@@ -641,6 +641,7 @@
     except_mcq: "🚫 Odd-Out (EXCEPT)",
     fitb_clinical: "📝 Clinical FITB",
     standard: "📍 Location MCQ",
+    precision_traps: "🎯 Location Traps",
     fitb: "📝 Location FITB"
   };
 
@@ -824,8 +825,28 @@
   const locBlankCategories = {
     cunNumbers: ['0.1', '0.2', '0.3', '0.4', '0.5', '0.7', '0.8', '1', '1.3', '1.5', '2', '2.5', '3', '3.5', '4', '4.3', '4.5', '5', '5.5', '6', '7', '8', '9', '12'],
     pointNumbers: Array.from({ length: 67 }, (_, i) => String(i + 1)),
-    directions: ['superior', 'inferior', 'anterior', 'posterior', 'medial', 'lateral', 'distal', 'proximal', 'dorsal', 'ventral', 'ulnar', 'radial', 'left', 'right', 'superficial', 'deep'],
-    anatomy: ['border', 'tendon', 'margin', 'crease', 'umbilicus', 'ligament', 'muscle', 'bone', 'process', 'prominence', 'depression', 'malleolus', 'patella', 'clavicle', 'sternum', 'costal', 'joint', 'fossa', 'protuberance', 'condyle', 'epicondyle', 'tuberosity', 'angle', 'nipple', 'intercostal', 'spinous']
+    directions: ['superior', 'inferior', 'above', 'below', 'upper', 'lower', 'anterior', 'posterior', 'medial', 'lateral', 'distal', 'proximal', 'dorsal', 'ventral', 'palmar', 'plantar', 'ulnar', 'radial', 'left', 'right', 'superficial', 'deep', 'internal', 'external'],
+    anatomy: ['border', 'tendon', 'margin', 'edge', 'crest', 'ridge', 'crease', 'umbilicus', 'ligament', 'muscle', 'belly', 'bone', 'process', 'prominence', 'depression', 'groove', 'cleft', 'malleolus', 'patella', 'clavicle', 'sternum', 'costal', 'joint', 'fossa', 'protuberance', 'condyle', 'epicondyle', 'tuberosity', 'angle', 'nipple', 'intercostal', 'spinous']
+  };
+  const locLikeForLikeGroups = {
+    directions: [
+      ['superior', 'inferior'],
+      ['above', 'below'],
+      ['upper', 'lower'],
+      ['anterior', 'posterior'],
+      ['medial', 'lateral'],
+      ['distal', 'proximal'],
+      ['ulnar', 'radial'],
+      ['left', 'right'],
+      ['superficial', 'deep'],
+      ['internal', 'external']
+    ],
+    anatomy: [
+      ['border', 'margin', 'edge', 'crest', 'ridge'],
+      ['depression', 'fossa', 'groove', 'cleft', 'crease'],
+      ['process', 'prominence', 'protuberance', 'tuberosity', 'condyle', 'epicondyle'],
+      ['tendon', 'ligament', 'muscle', 'belly']
+    ]
   };
   const locNumRegexStr = "\\d+(?:\\.\\d+)?";
   const locDirRegexStr = locBlankCategories.directions.join("|");
@@ -1838,7 +1859,7 @@
     const subSel = document.getElementById("qzSubModeSelect");
     if (subSel && Array.from(subSel.options).some(o => o.value === subMode)) {
       subSel.value = subMode;
-      onQuizModeOrDiffChange();
+      onQuizModeOrDiffChange(false);
     } else {
       retakeQuizWholePool();
     }
@@ -2035,6 +2056,9 @@
     populateSubModeSelect();
     initQuizFilterTree();
     initQuizDistractorTree();
+    if (!skipResumePrompt) {
+      applySavedQuizTrackSetup();
+    }
     updatePoolSummaryBanner();
     updateQuizCloudSyncBtnUI();
 
@@ -2049,6 +2073,7 @@
 
     if (currentTrack === "location") {
       subSel.add(new Option("Identify Location / Point (MCQ)", "standard", true, true));
+      subSel.add(new Option("🎯 Precision Traps (Exact Wording, Altered Cun/Landmarks)", "precision_traps"));
       subSel.add(new Option("Fill in the Blank (Location)", "fitb"));
     } else if (currentTrack === "clinical_points") {
       subSel.add(new Option("⚡ All Clinical Point Modes (NCBAHM Comprehensive)", "both_mcq", true, true));
@@ -2096,7 +2121,7 @@
     qzDifficulty = diffSel.value;
   }
 
-  window.onQuizModeOrDiffChange = function () {
+  window.onQuizModeOrDiffChange = function (persistSetup = true) {
     const prevWasFitb = qzSubMode.startsWith("fitb");
     qzSubMode = document.getElementById("qzSubModeSelect").value;
     const nowIsFitb = qzSubMode.startsWith("fitb");
@@ -2105,6 +2130,16 @@
     } else {
       qzDifficulty = document.getElementById("qzDifficultySelect").value;
     }
+    if (persistSetup) {
+      saveQuizTrackSetup();
+      markQuizLedgerDirty();
+    }
+    retakeQuizWholePool();
+  };
+
+  window.onQuizLimitChange = function () {
+    saveQuizTrackSetup();
+    markQuizLedgerDirty();
     retakeQuizWholePool();
   };
 
@@ -2167,7 +2202,9 @@
   function getCloseNumbers(targetStr, fullPool) {
     let targetNum = parseFloat(targetStr);
     if (isNaN(targetNum)) return shuffleArr(fullPool.filter(w => w !== targetStr));
-    let filtered = fullPool.filter(w => parseFloat(w) !== targetNum);
+    const isDecimal = String(targetStr).includes(".");
+    const sameKind = fullPool.filter(w => w.includes(".") === isDecimal && parseFloat(w) !== targetNum);
+    let filtered = sameKind.length > 0 ? sameKind : fullPool.filter(w => parseFloat(w) !== targetNum);
     filtered.sort((a, b) => Math.abs(parseFloat(a) - targetNum) - Math.abs(parseFloat(b) - targetNum));
     return shuffleArr(filtered.slice(0, 5));
   }
@@ -2187,29 +2224,126 @@
     return null;
   }
 
-  function mutateLocationText(text) {
-    if (!text) return text;
-    let mutated = text;
-    let matches = [...mutated.matchAll(locTargetWordsRegex)];
-    if (matches.length > 0) {
-      let numMutations = Math.floor(Math.random() * 3) + 1;
-      let matchesToMutate = shuffleArr(matches).slice(0, numMutations).sort((a, b) => b.index - a.index);
-      for (let m of matchesToMutate) {
-        let originalWord = m[0];
-        let lowerWord = originalWord.toLowerCase();
-        let cat = getLocationWordCategory(originalWord, text, m.index);
-        if (!cat) continue;
-        let pool = (cat === "cunNumbers" || cat === "pointNumbers")
-          ? getCloseNumbers(originalWord, locBlankCategories[cat])
-          : locBlankCategories[cat].filter(w => w.toLowerCase() !== lowerWord);
-        if (pool.length > 0) {
-          let newWord = pool[Math.floor(Math.random() * pool.length)];
-          if (/^[A-Z]/.test(originalWord)) newWord = newWord.charAt(0).toUpperCase() + newWord.slice(1);
-          mutated = mutated.substring(0, m.index) + newWord + mutated.substring(m.index + originalWord.length);
-        }
-      }
+  function isInsideBBCodeTag(text, idx) {
+    const open = text.lastIndexOf("[", idx);
+    if (open === -1) return false;
+    const close = text.lastIndexOf("]", idx);
+    return open > close;
+  }
+
+  function getLikeForLikeLocationSwaps(word, originalText = "", index = -1) {
+    const lower = word.toLowerCase();
+    const cat = getLocationWordCategory(word, originalText, index);
+    if (!cat) return [];
+    if (cat === "cunNumbers" || cat === "pointNumbers") {
+      return getCloseNumbers(word, locBlankCategories[cat]);
     }
-    return mutated;
+    if (cat === "directions") {
+      if (lower === "palmar" || lower === "plantar") return ["dorsal"];
+      if (lower === "dorsal") {
+        const t = originalText.toLowerCase();
+        if (/\b(hand|wrist|finger|palm|forearm|metacarp|carpal)\b/.test(t)) return ["palmar"];
+        if (/\b(foot|toe|sole|ankle|metatars|tarsal|malleolus)\b/.test(t)) return ["plantar"];
+        return ["ventral"];
+      }
+      if (lower === "ventral") return ["dorsal"];
+      const grp = locLikeForLikeGroups.directions.find(g => g.includes(lower));
+      return grp ? shuffleArr(grp.filter(w => w !== lower)) : [];
+    }
+    if (cat === "anatomy") {
+      const grp = locLikeForLikeGroups.anatomy.find(g => g.includes(lower));
+      return grp ? shuffleArr(grp.filter(w => w !== lower)) : [];
+    }
+    return [];
+  }
+
+  function applyLocationSlotReplacements(text, slots, values) {
+    const paired = slots
+      .map((s, i) => ({ index: s.index, len: s.orig.length, orig: s.orig, rep: values[i] }))
+      .sort((a, b) => b.index - a.index);
+    let out = text;
+    for (const p of paired) {
+      let rep = p.rep;
+      if (/^[A-Z]/.test(p.orig)) rep = rep.charAt(0).toUpperCase() + rep.slice(1);
+      out = out.substring(0, p.index) + rep + out.substring(p.index + p.len);
+    }
+    return out;
+  }
+
+  function generateLikeForLikeLocationClones(rawText, neededCount = 5) {
+    if (!rawText || neededCount <= 0) return [];
+    const baseClean = stripBBCode(rawText).trim();
+    const rawMatches = [...rawText.matchAll(locTargetWordsRegex)];
+    const slots = [];
+    for (const m of rawMatches) {
+      if (isInsideBBCodeTag(rawText, m.index)) continue;
+      const swaps = getLikeForLikeLocationSwaps(m[0], rawText, m.index);
+      if (swaps.length === 0) continue;
+      const cat = getLocationWordCategory(m[0], rawText, m.index);
+      const prio = cat === "cunNumbers" ? 4 : (cat === "directions" ? 3 : (cat === "anatomy" ? 2 : 1));
+      slots.push({ index: m.index, orig: m[0], swaps, prio });
+    }
+    if (slots.length === 0) return [];
+
+    const orderedSlots = shuffleArr(slots).sort((a, b) => b.prio - a.prio);
+    const distinctSlots = [];
+    const seenTerms = new Set();
+    orderedSlots.forEach(s => {
+      const key = s.orig.toLowerCase();
+      if (!seenTerms.has(key)) {
+        seenTerms.add(key);
+        distinctSlots.push(s);
+      }
+    });
+    const gridPool = distinctSlots.length >= 2 ? distinctSlots : orderedSlots;
+
+    const clones = [];
+    const seen = new Set([baseClean]);
+    const tryAdd = (mut) => {
+      const clean = stripBBCode(mut).trim();
+      if (clean && !seen.has(clean)) {
+        seen.add(clean);
+        clones.push(mut);
+      }
+    };
+
+    const buildGrid = (slotList) => {
+      const valueSets = slotList.map(s => [s.orig, ...s.swaps.slice(0, slotList.length === 1 ? neededCount : 2)]);
+      let combos = [[]];
+      for (const vs of valueSets) {
+        const next = [];
+        for (const c of combos) {
+          for (const v of vs) next.push([...c, v]);
+        }
+        combos = next;
+      }
+      return shuffleArr(combos.slice(1));
+    };
+
+    let chosenSlots = gridPool.slice(0, Math.min(2, gridPool.length));
+    let combos = buildGrid(chosenSlots);
+    if (combos.length < neededCount && gridPool.length >= 3) {
+      chosenSlots = gridPool.slice(0, 3);
+      combos = buildGrid(chosenSlots);
+    }
+    for (const vals of combos) {
+      if (clones.length >= neededCount) break;
+      tryAdd(applyLocationSlotReplacements(rawText, chosenSlots, vals));
+    }
+
+    let guard = 0;
+    while (clones.length < neededCount && guard++ < 25) {
+      const pick = shuffleArr(orderedSlots).slice(0, Math.min(orderedSlots.length, Math.floor(Math.random() * 2) + 1));
+      const vals = pick.map(s => s.swaps[Math.floor(Math.random() * s.swaps.length)]);
+      tryAdd(applyLocationSlotReplacements(rawText, pick, vals));
+    }
+
+    return clones;
+  }
+
+  function mutateLocationText(text) {
+    const clones = generateLikeForLikeLocationClones(text, 1);
+    return clones.length > 0 ? clones[0] : text;
   }
 
   // Uses global replacement so repeated terms in a statement never contradict themselves
@@ -2782,7 +2916,8 @@
     }
 
     const distractors = getSmartPointDistractors(targetPoint, 6);
-    if (Math.random() < 0.55) {
+    const isPrecisionTraps = qzSubMode === "precision_traps";
+    if (!isPrecisionTraps && Math.random() < 0.55) {
       labelEl.textContent = "Identify the Point from Location";
       bodyEl.innerHTML = maskSelfSpoilers(bbcodeToHtml(rawText), targetPoint);
       currentCorrectAnswer = targetPoint["Short Name"];
@@ -2791,17 +2926,22 @@
         ...distractors.slice(0, 5).map(d => ({ text: d["Short Name"], pointId: d["Short Name"] }))
       ]);
     } else {
-      labelEl.textContent = "Select the Exact Location";
+      if (isPrecisionTraps) currentQuestionSubMode = "precision_traps";
+      labelEl.textContent = isPrecisionTraps ? "Precision Trap • Select the Exact Location" : "Select the Exact Location";
       bodyEl.innerHTML = `<div style="font-size:24px; font-weight:900; color:#cc5500; text-align:center; padding:8px 0;">${escapeHTML(targetPoint["Short Name"])}</div>`;
       currentCorrectAnswer = stripBBCode(rawText).trim();
       let opts = [{ text: bbcodeToHtml(rawText), rawCompare: currentCorrectAnswer, pointId: targetPoint["Short Name"] }];
 
-      for (let i = 0; i < 3 && opts.length < 3; i++) {
-        let mut = mutateLocationText(rawText);
-        if (stripBBCode(mut).trim() !== currentCorrectAnswer && !opts.some(o => o.rawCompare === stripBBCode(mut).trim())) {
-          opts.push({ text: bbcodeToHtml(mut), rawCompare: stripBBCode(mut).trim(), pointId: targetPoint["Short Name"] });
+      const cloneTarget = (isPrecisionTraps || qzDifficulty === "hard" || qzDifficulty === "insane")
+        ? 5
+        : (qzDifficulty === "easy" ? 1 : 2);
+      const clones = generateLikeForLikeLocationClones(rawText, cloneTarget);
+      clones.forEach(mut => {
+        const cleanMut = stripBBCode(mut).trim();
+        if (cleanMut !== currentCorrectAnswer && !opts.some(o => o.rawCompare === cleanMut)) {
+          opts.push({ text: bbcodeToHtml(mut), rawCompare: cleanMut, pointId: targetPoint["Short Name"] });
         }
-      }
+      });
       for (let d of distractors) {
         if (opts.length >= 6) break;
         let dLoc = d["Location "] || d["Location"] || "";
@@ -4423,6 +4563,7 @@
 
   function getSeenKey() { return `tcmSeen_${currentTrack}_${qzSubMode}`; }
   function getStateKey() { return `tcmQuizState_${currentTrack}`; }
+  function getSetupKey(track = currentTrack) { return `tcmQuizSetup_${track}`; }
 
   // Prefers the dedicated "MetaData" row if present; falls back to legacy "__quiz_sync__" rows or points[0..2].
   function getQuizSyncAnchorPoint(trackName = currentTrack) {
@@ -4533,6 +4674,19 @@
       if (sa > 0) skillsEncoded[sk] = [sa, sm];
     });
 
+    let setupObj = null;
+    try {
+      const rawSetup = localStorage.getItem(getSetupKey(trackName));
+      if (rawSetup) {
+        const parsedSetup = JSON.parse(rawSetup);
+        setupObj = Object.assign({}, parsedSetup, {
+          filteredIds: Array.isArray(parsedSetup.filteredIds)
+            ? parsedSetup.filteredIds.map(encodeId)
+            : (parsedSetup.filteredIds || "ALL")
+        });
+      }
+    } catch (e) {}
+
     return {
       v: 2,
       track: trackName,
@@ -4546,7 +4700,8 @@
       seen: seenMap,
       mastery: masteryEncoded,
       skills: skillsEncoded,
-      session: sessionObj
+      session: sessionObj,
+      setup: setupObj
     };
   }
 
@@ -4699,6 +4854,27 @@
         } else {
           localStorage.setItem(sKey, JSON.stringify(cSess));
         }
+        changed = true;
+      }
+    }
+
+    if (cloud.setup && typeof cloud.setup === "object") {
+      const setupKey = getSetupKey(trk);
+      let lSetup = null;
+      try {
+        const raw = localStorage.getItem(setupKey);
+        if (raw) lSetup = JSON.parse(raw);
+      } catch (e) {}
+      const lTime = Number(lSetup?.updatedAt || 0);
+      const cTime = Number(cloud.setup.updatedAt || fallbackUpdatedAt || 0);
+
+      if (cTime > lTime) {
+        const decodedSetup = Object.assign({}, cloud.setup, {
+          filteredIds: Array.isArray(cloud.setup.filteredIds)
+            ? cloud.setup.filteredIds.map(idx => (typeof idx === "number" && dict ? dict[idx] : idx)).filter(Boolean)
+            : (cloud.setup.filteredIds || "ALL")
+        });
+        localStorage.setItem(setupKey, JSON.stringify(decodedSetup));
         changed = true;
       }
     }
@@ -5371,6 +5547,8 @@
 
   window.applyQuizPoolFilter = function () {
     trackFilteredPoints = computeCurrentModalFilteredPoints();
+    saveQuizTrackSetup();
+    markQuizLedgerDirty();
 
     closeQuizFilterModal();
     document.getElementById("quizSettingsPanel").classList.remove("open");
@@ -5417,10 +5595,121 @@
       return checkedChans.has(c);
     });
     if (trackDistractorPoints.length === 0) trackDistractorPoints = [...trackEligiblePoints];
+    saveQuizTrackSetup();
+    saveQuizSessionState();
+    markQuizLedgerDirty();
     closeQuizDistractorModal();
   };
 
   // --- 15. SESSION SAVE & RESUME ---
+  function getSelectedDistractorChans() {
+    const allCbs = Array.from(document.querySelectorAll(".qz-dist-cb"));
+    if (allCbs.length === 0) return "ALL";
+    const checked = allCbs.filter(b => b.checked).map(b => b.value);
+    return (checked.length === 0 || checked.length === allCbs.length) ? "ALL" : checked;
+  }
+
+  function applyDistractorChansUI(chans) {
+    const allCbs = Array.from(document.querySelectorAll(".qz-dist-cb"));
+    const allToggle = document.getElementById("qzDistAll");
+    if (!chans || chans === "ALL" || !Array.isArray(chans) || chans.length === 0) {
+      allCbs.forEach(b => (b.checked = true));
+      if (allToggle) { allToggle.checked = true; allToggle.indeterminate = false; }
+      trackDistractorPoints = [...trackEligiblePoints];
+      return;
+    }
+    const cSet = new Set(chans);
+    allCbs.forEach(b => (b.checked = cSet.has(b.value)));
+    const checkedCount = allCbs.filter(b => b.checked).length;
+    if (allToggle) {
+      allToggle.checked = checkedCount === allCbs.length;
+      allToggle.indeterminate = checkedCount > 0 && checkedCount < allCbs.length;
+    }
+    const matched = trackEligiblePoints.filter(p => cSet.has(p["Channel Full Name"] || p[" Channel Full Name"] || "Other"));
+    trackDistractorPoints = matched.length > 0 ? matched : [...trackEligiblePoints];
+  }
+
+  function saveQuizTrackSetup(track = currentTrack) {
+    const allPtCbs = Array.from(document.querySelectorAll("#qzChannelTree .qz-pt-cb"));
+    const checkedIds = allPtCbs.filter(cb => cb.checked).map(cb => cb.value);
+    const isAllChecked = allPtCbs.length === 0 || checkedIds.length === allPtCbs.length;
+    const impVal = document.getElementById("qzImpFilter")?.value || "all";
+    const setup = {
+      updatedAt: Date.now(),
+      subMode: qzSubMode,
+      difficulty: qzDifficulty,
+      limitVal: document.getElementById("qzLimitSelect")?.value || "10",
+      impFilter: impVal,
+      filteredIds: isAllChecked ? "ALL" : checkedIds,
+      distractorChans: getSelectedDistractorChans()
+    };
+    try {
+      localStorage.setItem(getSetupKey(track), JSON.stringify(setup));
+    } catch (e) {}
+  }
+
+  function applySavedQuizTrackSetup(track = currentTrack) {
+    const limitEl = document.getElementById("qzLimitSelect");
+    const impEl = document.getElementById("qzImpFilter");
+    const raw = localStorage.getItem(getSetupKey(track));
+    if (!raw) {
+      if (limitEl) limitEl.value = "10";
+      if (impEl) impEl.value = "all";
+      return false;
+    }
+    try {
+      const setup = JSON.parse(raw);
+      const subSel = document.getElementById("qzSubModeSelect");
+      if (setup.subMode && subSel && Array.from(subSel.options).some(o => o.value === setup.subMode)) {
+        qzSubMode = setup.subMode;
+        subSel.value = qzSubMode;
+        populateDifficultySelect();
+      }
+      const diffSel = document.getElementById("qzDifficultySelect");
+      if (setup.difficulty && diffSel && Array.from(diffSel.options).some(o => o.value === setup.difficulty)) {
+        qzDifficulty = setup.difficulty;
+        diffSel.value = qzDifficulty;
+      }
+      if (limitEl) {
+        limitEl.value = (setup.limitVal && Array.from(limitEl.options).some(o => o.value === setup.limitVal))
+          ? setup.limitVal
+          : "10";
+      }
+      if (impEl) {
+        const validImp = setup.impFilter && Array.from(impEl.options).some(o => o.value === setup.impFilter && !o.disabled);
+        impEl.value = validImp ? setup.impFilter : "all";
+      }
+
+      if (setup.filteredIds === "ALL") {
+        document.querySelectorAll("#qzChannelTree .qz-pt-cb, #qzChannelTree .qz-chan-cb").forEach(cb => {
+          cb.checked = true;
+          cb.indeterminate = false;
+        });
+        syncQuizGlobalCheckbox();
+      } else if (Array.isArray(setup.filteredIds) && setup.filteredIds.length > 0) {
+        const fSet = new Set(setup.filteredIds);
+        const hasAnyMatch = trackEligiblePoints.some(p => fSet.has(p["Short Name"]));
+        if (hasAnyMatch) {
+          document.querySelectorAll("#qzChannelTree .qz-pt-cb").forEach(cb => {
+            cb.checked = fSet.has(cb.value);
+          });
+          document.querySelectorAll("#qzChannelTree .qf-group").forEach(g => {
+            if (!g.querySelector("#qzSelectAllGlobal")) syncSingleQuizGroup(g);
+          });
+        }
+      }
+
+      const computedFiltered = computeCurrentModalFilteredPoints();
+      trackFilteredPoints = computedFiltered.length > 0 ? computedFiltered : [...trackEligiblePoints];
+
+      applyDistractorChansUI(setup.distractorChans);
+      updateFilterModalLiveCount();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function saveQuizSessionState() {
     if (remainingQuizQueue.length === 0 && !currentTargetPoint) return;
     const allBtns = Array.from(document.querySelectorAll("#qzOptionsGrid .quiz-opt-btn"));
@@ -5432,7 +5721,9 @@
       subMode: qzSubMode,
       difficulty: qzDifficulty,
       limitVal: document.getElementById("qzLimitSelect")?.value || "10",
+      impFilter: document.getElementById("qzImpFilter")?.value || "all",
       filteredIds: isAllFiltered ? "ALL" : trackFilteredPoints.map(p => p["Short Name"]),
+      distractorChans: getSelectedDistractorChans(),
       activeIds: activeQuizPool.map(p => p["Short Name"]),
       remainingIds: remainingQuizQueue.map(item => (
         item && item._isRequeuedWrapper
@@ -5486,6 +5777,13 @@
       document.getElementById("qzDifficultySelect").value = qzDifficulty;
       if (state.limitVal && document.getElementById("qzLimitSelect")) {
         document.getElementById("qzLimitSelect").value = state.limitVal;
+      }
+      const impEl = document.getElementById("qzImpFilter");
+      if (state.impFilter && impEl && Array.from(impEl.options).some(o => o.value === state.impFilter && !o.disabled)) {
+        impEl.value = state.impFilter;
+      }
+      if (state.distractorChans) {
+        applyDistractorChansUI(state.distractorChans);
       }
 
       const byId = id => trackEligiblePoints.find(p => p["Short Name"] === id);
